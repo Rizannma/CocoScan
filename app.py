@@ -1,12 +1,11 @@
 import os
 import logging
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from dotenv import load_dotenv
 from supabase import create_client, Client
 import re
 import requests
 
-# Native Python email modules (Replaces Brevo SDK)
+# Native Python email modules
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -27,9 +26,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment configuration variables
-load_dotenv()
-
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback_local_secret")
 
@@ -44,6 +40,9 @@ def send_status_email(user_email, user_name, status):
     smtp_port = int(os.getenv("MAIL_PORT", 587))
     sender_email = os.getenv("MAIL_USERNAME")    
     sender_password = os.getenv("MAIL_PASSWORD")  
+    
+    # Dynamically get production URL base or default to localhost
+    base_url = request.url_root.rstrip('/')
     
     sender_name = "CocoScan Platform"
     subject = f"Account Update: Your CocoScan Application has been {status}"
@@ -64,7 +63,7 @@ def send_status_email(user_email, user_name, status):
         <p>Great news! Your account application for <strong>CocoScan</strong> has been reviewed and approved by our administration team.</p>
         <p>You can now log in to access your custom dashboard, review coconut metrics, and utilize our pest scanning system features.</p>
         <div style="margin: 30px 0; text-align: center;">
-            <a href="http://127.0.0.1:5000/login" style="background-color: {theme_color}; color: #ffffff; padding: 14px 32px; text-decoration: none; font-weight: bold; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Log In To Dashboard</a>
+            <a href="{base_url}/login" style="background-color: {theme_color}; color: #ffffff; padding: 14px 32px; text-decoration: none; font-weight: bold; border-radius: 8px; display: inline-block; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Log In To Dashboard</a>
         </div>
         """
     else:
@@ -149,7 +148,7 @@ def send_status_email(user_email, user_name, status):
     except Exception as e:
         logger.error(f"Gmail SMTP Exception thrown while mailing {user_email}: {str(e)}")
         return False
-    
+        
 @app.route('/favicon.ico')
 def favicon():
     return '', 204
@@ -387,11 +386,7 @@ def farmer_dashboard():
         user_query = supabase.table("users").select("first_name, last_name").eq("id", user_id).execute()
         user_name = f"{user_query.data[0].get('first_name', '')} {user_query.data[0].get('last_name', '')}".strip() if user_query.data else "Farmer"
         
-        # -------------------------------------------------------------
-        # PRODUCTION REPLACEMENT: LIVE REAL-TIME DATA METRICS DOCKING
-        # -------------------------------------------------------------
         # Total report count query
-        { 'count': 'exact', 'head': True }
         total_res = supabase.table('reports').select('*', count='exact', head=True).execute()
         total_cases = total_res.count if hasattr(total_res, 'count') else 0
 
@@ -408,7 +403,6 @@ def farmer_dashboard():
             "pending_cases": pending_cases, 
             "resolved_cases": resolved_cases
         }
-        # -------------------------------------------------------------
         
         weather = {
             "location": "San Pablo City, Laguna",
@@ -492,24 +486,20 @@ def farmer_submit_report():
         return jsonify({'success': False, 'message': 'Unauthorized user session'}), 403
 
     try:
-        # 1. Extract data sent by your scanning interface/form
-        # Adjust these keys if your frontend HTML form uses different 'name' attributes
         pest_type = request.form.get('pest_type', 'Unknown Pest').strip()
         damage_severity = request.form.get('damage_severity', 'Low').strip()
         location_notes = request.form.get('location_notes', '').strip()
-        image_url = request.form.get('image_url', '').strip() # If your scanner uploads an image first
+        image_url = request.form.get('image_url', '').strip()
 
-        # 2. Build the production-ready payload mapped to your database schema
         report_payload = {
             "user_id": user_id,
             "pest_type": pest_type,
             "damage_severity": damage_severity,
             "location_notes": location_notes,
             "image_url": image_url,
-            "status": "Pending", # Default status matching our dashboard counter query
+            "status": "Pending",
         }
 
-        # 3. Fire directly to the live Supabase cloud instance
         response = supabase.table("reports").insert(report_payload).execute()
 
         if not response.data:
@@ -517,13 +507,7 @@ def farmer_submit_report():
             return jsonify({'success': False, 'message': 'Database rejected insertion payload.'}), 500
 
         logger.info(f"Pest report logged successfully for user {user_id}. Report ID: {response.data[0].get('id')}")
-        
-        # If your frontend expects a JSON response (like an AJAX submit):
         return jsonify({'success': True, 'message': 'Report submitted and synchronized cleanly!'})
-        
-        # ALTERNATIVE: If your frontend is a standard form submit that reloads the page, comment out the jsonify line above and uncomment these below:
-        # flash("Pest diagnostic report submitted successfully!", "success")
-        # return redirect(url_for('farmer_reports'))
 
     except Exception as e:
         logger.error(f"Cloud instance synchronization failed: {str(e)}")
@@ -659,4 +643,6 @@ def internal_error(e):
     return render_template('500.html'), 500
 
 if __name__ == '__main__':
+    from dotenv import load_dotenv
+    load_dotenv()
     app.run(debug=True, threaded=True)
