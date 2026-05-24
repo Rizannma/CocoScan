@@ -1,0 +1,6 @@
+flask
+supabase
+python-dotenv
+requests
+werkzeug
+email-validator

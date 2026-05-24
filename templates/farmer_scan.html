@@ -1,0 +1,1119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CocoScan - Detect Pest</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-base: #f4f7f5;
+            --bg-card: #ffffff;
+            --brand-dark: #0b251a;
+            --brand-accent: #4ac68f;
+            --primary-green: #528265;
+            --text-dark: #1e293b;
+            --text-muted: #64748b;
+            --border-light: rgba(0, 0, 0, 0.05);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: #0b251a;
+            color: var(--text-dark);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        
+        /* ---  DESKTOP RESTRICTION STYLING --- */
+        .desktop-restriction-overlay {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: radial-gradient(circle at center, #0e3021 0%, #04120c 100%);
+            color: #ffffff;
+            z-index: 10000;
+            padding: 24px;
+            text-align: center;
+            overflow: hidden;
+        }
+
+        .desktop-card-prompt {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            padding: 50px 35px;
+            border-radius: 28px;
+            max-width: 420px;
+            width: 100%;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+        }
+
+        /* Subtle background glow behind the card */
+        .glow-effect {
+            position: absolute;
+            top: -20%; left: -20%; right: -20%; bottom: -20%;
+            background: radial-gradient(circle at center, rgba(74, 198, 143, 0.08) 0%, transparent 60%);
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* Double Ripple Pulse Animation */
+        .desktop-card-prompt .icon-pulse-container {
+            width: 84px;
+            height: 84px;
+            background: linear-gradient(135deg, rgba(74, 198, 143, 0.2) 0%, rgba(82, 130, 101, 0.2) 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 28px auto;
+            border: 1px solid rgba(74, 198, 143, 0.3);
+            position: relative;
+        }
+
+        .desktop-card-prompt i {
+            font-size: 2.4rem;
+            color: #4ac68f;
+            text-shadow: 0 0 15px rgba(74, 198, 143, 0.4);
+            z-index: 2;
+        }
+
+        .ripple-ring {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            border: 1px solid rgba(74, 198, 143, 0.4);
+            animation: rippleEffect 2.5s infinite cubic-bezier(0.25, 0, 0, 1);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .ring-2 {
+            animation-delay: 0.8s;
+        }
+
+        @keyframes rippleEffect {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(1.4); opacity: 0; }
+        }
+
+        .desktop-card-prompt h2 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            margin-bottom: 14px;
+            letter-spacing: -0.5px;
+            background: linear-gradient(120deg, #ffffff 40%, #c3eede 100%);
+           -webkit-background-clip: text;
+            background-clip: text; 
+            -webkit-text-fill-color: transparent;
+        }
+
+        .desktop-card-prompt p {
+            font-size: 0.95rem;
+            color: #a4c2b3;
+            line-height: 1.6;
+            margin-bottom: 0; /* Removed bottom margin since instruction box is gone */
+        }
+
+        .desktop-card-prompt p strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        /* --- MOBILE VIEWPORT WORKSPACE --- */
+        .mobile-viewport-container {
+            width: 100%;
+            min-height: 100vh;
+            background-color: var(--bg-base);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* --- STICKY APP HEADER --- */
+        .mobile-header {
+            width: 100%;
+            height: 64px;
+            background-color: var(--brand-dark);
+            color: #ffffff;
+            position: fixed;
+            top: 0; left: 0;
+            z-index: 1000;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-img-fallback {
+            width: 32px;
+            height: 32px;
+            background: var(--bg-card);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mobile-header h2 {
+            font-size: 1.15rem;
+            font-weight: 800;
+        }
+
+        .mobile-header p {
+            font-size: 0.65rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            color: #ffffff;
+            font-size: 1.35rem;
+            cursor: pointer;
+        }
+
+        /* --- MENU DRAWER MECHANICS --- */
+        .sidebar-wrapper {
+            width: 290px;
+            background-color: var(--brand-dark);
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: fixed;
+            top: 64px; bottom: 0; right: 0;
+            z-index: 999;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .sidebar-wrapper.show-mobile {
+            transform: translateX(0);
+        }
+
+        .menu-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: rgba(255, 255, 255, 0.4);
+            padding: 24px 20px 12px 20px;
+            font-weight: 700;
+        }
+
+        .sidebar-menu-list {
+            list-style: none;
+            padding: 0 10px;
+        }
+
+        .menu-item-link {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            font-size: 0.95rem;
+            font-weight: 500;
+            border-radius: 10px;
+            margin-bottom: 6px;
+        }
+
+        .menu-item-link:hover, .menu-item-link.active {
+            color: #ffffff;
+            background-color: rgba(255, 255, 255, 0.06);
+        }
+
+        .sidebar-user-footer {
+            padding: 20px;
+            background-color: rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .user-meta-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .user-identity-text h4 { font-size: 0.9rem; color: #ffffff; }
+        .user-identity-text p { font-size: 0.75rem; color: rgba(255, 255, 255, 0.4); }
+
+        .btn-logout-trigger { color: rgba(255, 255, 255, 0.4); font-size: 1.2rem; }
+        .btn-logout-trigger:hover { color: #ef4444 !important; }
+
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(11, 37, 26, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 950;
+        }
+        .sidebar-backdrop.active { display: block; }
+
+        /* --- MAIN DYNAMIC CONTENT BOXES --- */
+        .main-content-layout {
+            flex: 1;
+            width: 100%;
+            padding: 88px 16px 24px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .section-title-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .section-title-wrap h1 {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: var(--brand-dark);
+        }
+
+        .section-title-wrap p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* --- STATE VIEW BLOCK CONTROLS --- */
+        .workflow-step-view {
+            display: none;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+        }
+
+        .workflow-step-view.active-view {
+            display: flex;
+        }
+
+        /* --- LOADING SCREEN SPINNER --- */
+        #step-loading-view {
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .spinner-element {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(82, 130, 101, 0.15);
+            border-top: 4px solid var(--primary-green);
+            border-radius: 50%;
+            animation: spinAnimation 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spinAnimation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* --- STAGE 1: SCAN DROPPING BOARD --- */
+        .upload-drop-zone {
+            background-color: var(--bg-card);
+            border: 2px dashed rgba(82, 130, 101, 0.2);
+            border-radius: 18px;
+            padding: 32px 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .upload-cloud-icon {
+            width: 50px;
+            height: 50px;
+            background-color: #f0f4f2;
+            color: var(--primary-green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .upload-drop-zone p {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .upload-action-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        .btn-action-trigger {
+            flex: 1;
+            padding: 11px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .btn-action-trigger.camera {
+            background-color: var(--brand-dark);
+            color: #ffffff;
+        }
+
+        .btn-action-trigger.file {
+            background-color: transparent;
+            border: 1px solid rgba(0,0,0,0.1);
+            color: var(--text-dark);
+        }
+
+        /* --- SYSTEM GUIDANCE CARD --- */
+        .guidance-tips-card {
+            background-color: #e8f0ec;
+            border-radius: 16px;
+            padding: 16px;
+        }
+
+        .guidance-tips-card h4 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--brand-dark);
+            margin-bottom: 8px;
+        }
+
+        .guidance-tips-card ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .guidance-tips-card li {
+            font-size: 0.8rem;
+            color: #385043;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .guidance-tips-card li::before {
+            content: "•";
+            color: var(--primary-green);
+            font-size: 1.2rem;
+        }
+
+        /* --- HISTORY TRACK CARD --- */
+        .recent-scans-panel {
+            background-color: var(--bg-card);
+            border-radius: 18px;
+            padding: 18px;
+            border: 1px solid var(--border-light);
+        }
+
+        .panel-header-inline {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--brand-dark);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .panel-header-inline i { color: var(--primary-green); }
+
+        .scans-history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .history-item-node {
+            padding: 12px;
+            border: 1px solid var(--border-light);
+            border-radius: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .history-item-node:hover {
+            background-color: #f8faf9;
+        }
+
+        .history-info-meta h5 { font-size: 0.85rem; font-weight: 600; color: var(--text-dark); }
+        .history-info-meta p { font-size: 0.72rem; color: var(--text-muted); margin-top: 1px; }
+
+        /* --- STAGE 2: DETECTION OUTPUT BOARD --- */
+        .diagnostic-result-badge {
+            background-color: #528265;
+            border-radius: 14px;
+            padding: 14px 16px;
+            color: #ffffff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .badge-main h3 { font-size: 1.1rem; font-weight: 700; }
+        .badge-main p { font-size: 0.75rem; opacity: 0.8; margin-top: 2px; }
+        .badge-side-meta { font-size: 0.75rem; text-align: right; opacity: 0.9; }
+
+        .preview-media-frame {
+            width: 100%;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--border-light);
+            position: relative;
+        }
+
+        .preview-media-frame img {
+            width: 100%;
+            display: block;
+            object-fit: cover;
+            max-height: 320px;
+        }
+
+        .image-timestamp-footer {
+            background-color: #ffffff;
+            padding: 8px 12px;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-light);
+            text-align: center;
+        }
+
+        /* --- INITIAL RECOMMENDATION SPECS --- */
+        .recommendation-sheet {
+            background-color: var(--bg-card);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid var(--border-light);
+        }
+
+        .recommendation-sheet h4 { font-size: 0.88rem; font-weight: 700; color: var(--brand-dark); margin-bottom: 8px; }
+        
+        .recommendation-sheet ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .recommendation-sheet li {
+            font-size: 0.8rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            line-height: 1.4;
+        }
+
+        .recommendation-sheet li::before {
+            content: "▪";
+            color: var(--primary-green);
+            font-size: 0.75rem;
+            margin-top: 2px;
+        }
+
+        .disclaimer-text-note {
+            font-size: 0.7rem;
+            font-style: italic;
+            color: var(--text-muted);
+            margin-top: 12px;
+            line-height: 1.3;
+        }
+
+        /* --- NOTES TEXTAREA INPUT --- */
+        .additional-notes-area h4 {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--primary-green);
+            margin-bottom: 6px;
+        }
+
+        .notes-input-box {
+            width: 100%;
+            height: 90px;
+            border-radius: 12px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background-color: #eef3f0;
+            padding: 12px;
+            font-size: 0.82rem;
+            color: var(--text-dark);
+            resize: none;
+            outline: none;
+        }
+
+         /* --- INTEGRATED NOTIFICATION STYLING --- */
+        .bell-notice-wrapper {
+            position: relative; width: 38px; height: 38px; background: #ffffff;
+            border: 1px solid rgba(0,0,0,0.08); border-radius: 10px; color: #0b251a;
+            font-size: 1.1rem; cursor: pointer; display: flex; align-items: center;
+            justify-content: center; transition: all 0.2s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .notif-item {
+            display: flex; gap: 10px; padding: 10px; border-radius: 8px;
+            background: #f8fafc; border: 1px solid rgba(0,0,0,0.02); transition: background 0.15s ease; cursor: pointer;
+        }
+        .notif-item.is-unread {
+            background: rgba(22, 70, 48, 0.04); border-left: 3px solid #164630;
+        }
+        .notif-item p { margin: 0; font-size: 0.78rem; line-height: 1.3; color: #334155; }
+        .notif-item span.time { font-size: 0.65rem; color: #94a3b8; display: block; margin-top: 4px; }
+        .notif-filter { transition: all 0.2s ease; }
+        .notif-filter.active { background: #164630 !important; color: #ffffff !important; border-color: #164630 !important; }
+
+        /* --- ACTION CONTROL CONSOLE --- */
+        .control-action-bar {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            margin-top: 4px;
+        }
+
+        .btn-control {
+            flex: 1;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            text-align: center;
+        }
+
+        .btn-control.submit {
+            background-color: var(--brand-dark);
+            color: #ffffff;
+        }
+
+        .btn-control.cancel {
+            background-color: transparent;
+            border: 1px solid var(--brand-dark);
+            color: var(--brand-dark);
+        }
+
+        /* Hide raw inputs safely */
+        #hidden-file-input, #hidden-camera-input { display: none; }
+
+        /* --- RESPONSIVE VIEWS --- */
+        @media (min-width: 501px) {
+            .desktop-restriction-overlay { display: flex; }
+            .mobile-viewport-container { display: none; }
+        }
+        @media (max-width: 500px) {
+            .desktop-restriction-overlay { display: none; }
+            .mobile-viewport-container { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+      <div class="desktop-restriction-overlay">
+        <div class="desktop-card-prompt">
+            <div class="glow-effect"></div>
+            
+            <div class="icon-pulse-container">
+                <div class="ripple-ring ring-1"></div>
+                <div class="ripple-ring ring-2"></div>
+                <i class="fa-solid fa-mobile-screen-button"></i>
+            </div>
+            
+            <h2>Mobile Access Required</h2>
+            <p>The <strong>CocoScan Farmer Platform</strong> is purpose-built exclusively for mobile smartphone screens to facilitate field scan operations.</p>
+        </div>
+    </div>
+
+    <div class="mobile-viewport-container">
+        
+        <header class="mobile-header">
+            <div class="logo-group">
+                <div class="logo-img-fallback">
+                    <i class="fa-solid fa-tree-city" style="color: var(--primary-green); font-size: 0.95rem;"></i>
+                </div>
+                <div>
+                    <h2>CocoScan</h2>
+                    <p>Coconut Pest Detection</p>
+                </div>
+            </div>
+            <button class="hamburger-btn" onclick="toggleSidebarMenu()">
+                <i class="fa-solid fa-bars" id="toggleIcon"></i>
+            </button>
+        </header>
+
+        <div class="sidebar-backdrop" id="backdrop" onclick="toggleSidebarMenu()"></div>
+
+        <aside class="sidebar-wrapper" id="sidebar">
+            <div>
+                <div class="menu-label">Main Menu</div>
+                 <ul class="sidebar-menu-list">
+                <li><a href="/farmer/dashboard" class="menu-item-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a></li>
+                
+                <li><a href="/farmer/scan" class="menu-item-link active"><i class="fa-solid fa-camera"></i> Scan Pest</a></li>
+                
+                <li><a href="/farmer/reports" class="menu-item-link"><i class="fa-solid fa-folder-open"></i> My Reports</a></li>
+            </ul>
+            </div>
+
+            <div class="sidebar-user-footer">
+                <div class="user-meta-box">
+                    <div class="user-avatar-circle"><i class="fa-solid fa-user" style="color:#fff; font-size: 0.95rem;"></i></div>
+                    <div class="user-identity-text">
+                        <h4>{{ user_name }}</h4>
+                        <p>Farmer</p>
+                    </div>
+                </div>
+                <a href="farmer/logout" class="btn-logout-trigger"><i class="fa-solid fa-right-from-bracket"></i></a>
+            </div>
+        </aside>
+
+        <main class="main-content-layout">
+
+            <div id="step-upload-view" class="workflow-step-view active-view">
+                <header class="section-title-wrap">
+                    <div>
+                        <h1>Detect Pest</h1>
+                        <p>Powered by Image Recognition</p>
+                    </div>
+
+                 <div id="notification-container" style="position: relative;">
+                    <div id="bell-trigger" class="bell-notice-wrapper">
+                        <i class="fa-regular fa-bell"></i>
+                        <span id="bell-badge" style="display: none; position: absolute; top: 8px; right: 9px; width: 6px; height: 6px; background-color: #e63946; border-radius: 50%; border: 1.5px solid #ffffff;"></span>
+                    </div>
+
+                    <div id="notif-dropdown" style="display: none; position: absolute; top: 46px; right: 0; width: 320px; background: #ffffff; border: 1px solid rgba(0,0,0,0.08); border-radius: 14px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 1000; padding: 14px; box-sizing: border-box;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #0b251a;">Notifications</h4>
+                            <button id="clear-all-btn" style="background: none; border: none; color: #ef4444; font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 0;">Clear All</button>
+                        </div>
+
+                        <div style="display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.04); padding-bottom: 8px;">
+                            <button class="notif-filter active" data-filter="all" style="font-size: 0.7rem; border: none; background: #164630; color: #ffffff; padding: 4px 8px; border-radius: 6px; font-weight: 600; cursor: pointer;">All</button>
+                            <button class="notif-filter" data-filter="unread" style="font-size: 0.7rem; border: 1px solid rgba(0,0,0,0.08); background: #ffffff; color: #64748b; padding: 4px 8px; border-radius: 6px; font-weight: 600; cursor: pointer;">Unread</button>
+                            <button class="notif-filter" data-filter="alert" style="font-size: 0.7rem; border: 1px solid rgba(0,0,0,0.08); background: #ffffff; color: #64748b; padding: 4px 8px; border-radius: 6px; font-weight: 600; cursor: pointer;">Risks</button>
+                        </div>
+
+                        <div id="notif-list-wrapper" style="max-height: 240px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
+                    </div>
+                </div>
+
+                </header>
+
+                <div class="upload-drop-zone">
+                    <div class="upload-cloud-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+                    <p>Drop your coconut leaf image here<br><span style="font-size: 0.72rem; color: var(--text-muted);">or click the buttons below to upload</span></p>
+                    
+                    <div class="upload-action-row">
+                        <button class="btn-action-trigger camera" onclick="triggerNativeCamera()">
+                            <i class="fa-solid fa-camera"></i> Take Photo
+                        </button>
+                        <button class="btn-action-trigger file" onclick="triggerNativeUpload()">
+                            <i class="fa-solid fa-upload"></i> Upload Image
+                        </button>
+                    </div>
+                    <input type="file" id="hidden-file-input" accept="image/*" onchange="handleImagePipeline(event)">
+                    <input type="file" id="hidden-camera-input" accept="image/*" capture="environment" onchange="handleImagePipeline(event)">
+                </div>
+
+                <div class="guidance-tips-card">
+                    <h4>Tips for Best Results</h4>
+                    <ul>
+                        <li>Use good lighting conditions</li>
+                        <li>Focus on affected leaf areas</li>
+                        <li>Capture the full leaf if possible</li>
+                        <li>Avoid blurry images</li>
+                    </ul>
+                </div>
+
+                <div class="recent-scans-panel">
+                    <div class="panel-header-inline"><i class="fa-solid fa-clock-rotate-left"></i> Recent History Logs</div>
+                    <div class="scans-history-list" id="historical-log-target">
+                        <div class="history-item-node" onclick="viewHistoricalReport('Brontispa', '91%', 'High', '2026-05-24 14:30:22')">
+                            <div class="history-info-meta">
+                                <h5>Brontispa</h5>
+                                <p>Today 2:30 PM</p>
+                            </div>
+                            <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 0.8rem;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="step-loading-view" class="workflow-step-view">
+                <div class="spinner-element"></div>
+                <h4 style="color: var(--brand-dark); font-weight: 700; font-size: 1rem;">Analyzing Image Spectrum...</h4>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Running statistical local inference rules</p>
+            </div>
+
+            <div id="step-results-view" class="workflow-step-view">
+                <header class="section-title-wrap">
+                    <div>
+                        <h1>Detected Pest Diagnosis</h1>
+                        <p>Status: <span id="res-status-label" style="color: #10b981; font-weight: 600;">Analysis Evaluated</span></p>
+                    </div>
+                </header>
+
+                <div class="diagnostic-result-badge" id="result-badge-color">
+                    <div class="badge-main">
+                        <h3 id="res-pest-title">Rhinoceros Beetle</h3>
+                        <p>Confidence: <span id="res-confidence">87%</span></p>
+                    </div>
+                    <div class="badge-side-meta">
+                        <div>Leaf Damage</div>
+                        <strong style="font-size: 0.9rem;" id="res-damage">Moderate</strong>
+                    </div>
+                </div>
+
+                <div class="preview-media-frame">
+                    <img id="res-img-placeholder" src="" alt="Coconut Leaf Scan Target Frame">
+                    <div class="image-timestamp-footer">
+                        Farmer: <span style="color: var(--text-dark); font-weight: 500;">Pedro Almanza</span> | Brgy. San Ignacio, San Pablo City, Laguna | <span id="res-timestamp">2026-05-24 13:00:00</span>
+                    </div>
+                </div>
+
+                <div class="recommendation-sheet">
+                    <h4>Initial Recommendation</h4>
+                    <ul id="res-recommendations-list">
+                        </ul>
+                    <p class="disclaimer-text-note">This is an initial system suggestion generated by the on-device inference module. An agricultural extension manager will review this vector payload to verify biological status.</p>
+                </div>
+
+                <div class="additional-notes-area">
+                    <h4>Field Observation Notes</h4>
+                    <textarea class="notes-input-box" id="field-notes-capture" placeholder="Describe context details (e.g., population count, tree count, neighboring farm status)..."></textarea>
+                </div>
+
+                <div class="control-action-bar">
+                    <button class="btn-control submit" onclick="commitReportPayload()">Submit Report</button>
+                    <button class="btn-control cancel" onclick="abortReportWorkflow()">Cancel</button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Internal Context State Matrix 
+        let globalActiveImagePayload = ""; 
+        const defaultImages = {
+            "Rhinoceros Beetle": "https://images.unsplash.com/photo-1590005354167-6da97870c913?auto=format&fit=crop&w=480&q=80",
+            "Brontispa": "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=480&q=80"
+        };
+
+        function toggleSidebarMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('backdrop');
+            const icon = document.getElementById('toggleIcon');
+            
+            sidebar.classList.toggle('show-mobile');
+            backdrop.classList.toggle('active');
+            
+            if(sidebar.classList.contains('show-mobile')) {
+                icon.className = "fa-solid fa-xmark";
+            } else {
+                icon.className = "fa-solid fa-bars";
+            }
+        }
+
+        function triggerNativeUpload() {
+            document.getElementById('hidden-file-input').click();
+        }
+
+        function triggerNativeCamera() {
+            document.getElementById('hidden-camera-input').click();
+        }
+
+        // Image pipeline reads the real uploaded file data and passes it to the pseudo engine
+        function handleImagePipeline(event) {
+            const input = event.target;
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    globalActiveImagePayload = e.target.result;
+                    executePseudoInferenceEngine();
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Pseudo-Inference Engine handles logic calculations smoothly without a backend model link
+        function executePseudoInferenceEngine() {
+            // Switch current visible view matrix state to Loading screen
+            document.getElementById('step-upload-view').classList.remove('active-view');
+            document.getElementById('step-loading-view').classList.add('active-view');
+
+            // 1.2-second artificial timeout simulates neural path pass delay
+            setTimeout(() => {
+                const vectorClasses = ["Rhinoceros Beetle", "Brontispa"];
+                const randomlySelectedPest = vectorClasses[Math.floor(Math.random() * vectorClasses.length)];
+                
+                // Randomly generate validation parameters
+                const computedConfidence = Math.floor(Math.random() * (96 - 85 + 1) + 85) + "%";
+                const damageSeverities = ["Moderate", "High", "Critical"];
+                const computedDamage = damageSeverities[Math.floor(Math.random() * damageSeverities.length)];
+
+                // Compile formatted ISO native timestamp
+                const activeDate = new Date();
+                const formattedTimestamp = activeDate.toISOString().replace('T', ' ').substring(0, 19);
+
+                // Render compiled states onto Result DOM node trees
+                document.getElementById('res-pest-title').textContent = randomlySelectedPest;
+                document.getElementById('res-confidence').textContent = computedConfidence;
+                document.getElementById('res-damage').textContent = computedDamage;
+                document.getElementById('res-timestamp').textContent = formattedTimestamp;
+                
+                // Colorize badge dynamically depending on diagnostic severity weight
+                const badgeElement = document.getElementById('result-badge-color');
+                if (computedDamage === "Critical") {
+                    badgeElement.style.backgroundColor = "#b91c1c"; // Crimson warning
+                } else if (computedDamage === "High") {
+                    badgeElement.style.backgroundColor = "#d97706"; // Amber alert
+                } else {
+                    badgeElement.style.backgroundColor = "#528265"; // Default standard primary system green
+                }
+
+                // If real image data exists, use it. Otherwise, select default visual reference arrays
+                document.getElementById('res-img-placeholder').src = globalActiveImagePayload || defaultImages[randomlySelectedPest];
+
+                // Append contextual agricultural action suggestions
+                const listNode = document.getElementById('res-recommendations-list');
+                if (randomlySelectedPest === 'Rhinoceros Beetle') {
+                    listNode.innerHTML = `
+                        <li>Clean surroundings and remove decaying coconut logs/stumps immediately to destroy breeding zones.</li>
+                        <li>Extract adult beetles manually from entry boring points using iron hooks.</li>
+                        <li>Install aggregation pheromone traps (e.g., Oryctalure) set at a ratio of 1 trap per 2 hectares.</li>
+                        <li>Apply green muscardine fungus (Metarhizium anisopliae) agents on active compost frames.</li>
+                    `;
+                } else {
+                    listNode.innerHTML = `
+                        <li>Prune off heavily infested lower fronds showing advanced linear scorching, then burn immediately.</li>
+                        <li>Spray crop canopy crowns thoroughly with custom localized organic neem extracts or approved biological control solutions.</li>
+                        <li>Release predatory earwigs (Chelisoches morio) or micro-hymenopteran parasitoids into targeted zones if available.</li>
+                        <li>Quarantine and isolate vulnerable seed nurseries from active vectors.</li>
+                    `;
+                }
+
+                // UI Transition update
+                document.getElementById('step-loading-view').classList.remove('active-view');
+                document.getElementById('step-results-view').classList.add('active-view');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }, 1200);
+        }
+
+        // Simulates pushing a finalized record payload to remote database structures
+        function commitReportPayload() {
+            const compiledPest = document.getElementById('res-pest-title').textContent;
+            const compiledConfidence = document.getElementById('res-confidence').textContent;
+            const compiledDamage = document.getElementById('res-damage').textContent;
+            const notesValue = document.getElementById('field-notes-capture').value || "None provided";
+            
+            // Create a historical log entry dynamically on the index board component
+            const targetLogList = document.getElementById('historical-log-target');
+            const newHistoryItem = document.createElement('div');
+            newHistoryItem.className = "history-item-node";
+            newHistoryItem.setAttribute('onclick', `viewHistoricalReport('${compiledPest}', '${compiledConfidence}', '${compiledDamage}', '${document.getElementById('res-timestamp').textContent}')`);
+            
+            newHistoryItem.innerHTML = `
+                <div class="history-info-meta">
+                    <h5>${compiledPest} (${compiledConfidence})</h5>
+                    <p>Just now | Damage: ${compiledDamage}</p>
+                </div>
+                <i class="fa-solid fa-chevron-right" style="color: var(--text-muted); font-size: 0.8rem;"></i>
+            `;
+            
+            // Prepend log stack item safely
+            targetLogList.insertBefore(newHistoryItem, targetLogList.firstChild);
+            
+            alert(`SUCCESS: Report synchronized.\n\nPayload Logged:\n• Anomaly: ${compiledPest}\n• Confidence Score: ${compiledConfidence}\n• Notes: ${notesValue}`);
+            resetWorkflowStateToHome();
+        }
+
+        // View historical metrics from local logs
+        function viewHistoricalReport(pest, conf, damage, time) {
+            document.getElementById('res-pest-title').textContent = pest;
+            document.getElementById('res-confidence').textContent = conf;
+            document.getElementById('res-damage').textContent = damage;
+            document.getElementById('res-timestamp').textContent = time;
+            document.getElementById('res-img-placeholder').src = defaultImages[pest] || defaultImages["Rhinoceros Beetle"];
+            document.getElementById('field-notes-capture').value = "Historical record viewed from locally saved device storage.";
+            
+            // Re-render recommendations list
+            const listNode = document.getElementById('res-recommendations-list');
+            if (pest === 'Rhinoceros Beetle') {
+                listNode.innerHTML = `<li>Clean surroundings and remove decaying materials.</li><li>Extract adult beetles manually.</li>`;
+            } else {
+                listNode.innerHTML = `<li>Prune off heavily infested fronds.</li><li>Apply biological treatments.</li>`;
+            }
+
+            document.getElementById('step-upload-view').classList.remove('active-view');
+            document.getElementById('step-results-view').classList.add('active-view');
+        }
+
+        function abortReportWorkflow() {
+            if (confirm("Are you sure you want to discard this field scan session? Data will be lost.")) {
+                resetWorkflowStateToHome();
+            }
+        }
+
+        function resetWorkflowStateToHome() {
+            document.getElementById('step-results-view').classList.remove('active-view');
+            document.getElementById('step-loading-view').classList.remove('active-view');
+            document.getElementById('step-upload-view').classList.add('active-view');
+            
+            // Clear buffers safely
+            document.getElementById('hidden-file-input').value = "";
+            document.getElementById('hidden-camera-input').value = "";
+            document.getElementById('field-notes-capture').value = "";
+            globalActiveImagePayload = "";
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        /* ================== NOTIFICATION OVERLAY ENGINE ================== */
+        function initNotificationsSystem() {
+            const trigger = document.getElementById("bell-trigger");
+            const dropdown = document.getElementById("notif-dropdown");
+            const badge = document.getElementById("bell-badge");
+            const wrapper = document.getElementById("notif-list-wrapper");
+            const clearBtn = document.getElementById("clear-all-btn");
+            let activeFilter = "all";
+
+            trigger.addEventListener("click", (e) => {
+                e.stopPropagation();
+                dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
+            });
+
+            document.addEventListener("click", (e) => {
+                if (!dropdown.contains(e.target) && e.target !== trigger) dropdown.style.display = "none";
+            });
+
+            function drawNotifications() {
+                wrapper.innerHTML = "";
+                const unread = notifications.filter(n => n.type === "unread").length;
+                badge.style.display = unread > 0 ? "block" : "none";
+
+                let filtered = notifications;
+                if (activeFilter === "unread") filtered = notifications.filter(n => n.type === "unread");
+                if (activeFilter === "alert") filtered = notifications.filter(n => n.tag === "alert");
+
+                if (filtered.length === 0) {
+                    wrapper.innerHTML = `
+                        <div style="text-align: center; padding: 30px 10px;">
+                            <i class="fa-regular fa-bell-slashed" style="font-size: 1.3rem; color: #cbd5e1; margin-bottom: 6px;"></i>
+                            <p style="font-size: 0.75rem; color: #94a3b8; margin: 0;">No notifications found.</p>
+                        </div>`;
+                    return;
+                }
+
+                filtered.forEach(item => {
+                    const node = document.createElement("div");
+                    node.className = `notif-item ${item.type === 'unread' ? 'is-unread' : ''}`;
+                    const icon = item.tag === 'alert' ? 'fa-triangle-exclamation' : 'fa-camera';
+                    const col = item.tag === 'alert' ? '#f59e0b' : '#164630';
+
+                    node.innerHTML = `
+                        <i class="fa-solid ${icon}" style="color:${col}; margin-top:2px; font-size:0.85rem;"></i>
+                        <div>
+                            <p>${item.text}</p>
+                            <span class="time">${item.time}</span>
+                        </div>`;
+                    
+                    node.addEventListener("click", () => {
+                        item.type = "read";
+                        drawNotifications();
+                    });
+                    wrapper.appendChild(node);
+                });
+            }
+
+            document.querySelectorAll(".notif-filter").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    document.querySelectorAll(".notif-filter").forEach(b => b.classList.remove("active"));
+                    e.target.classList.add("active");
+                    activeFilter = e.target.getAttribute("data-filter");
+                    drawNotifications();
+                });
+            });
+
+            clearBtn.addEventListener("click", () => {
+                if (notifications.length === 0) return;
+                if (confirm("Are you sure you want to delete all notifications? This action cannot be undone.")) {
+                    notifications = [];
+                    drawNotifications();
+                }
+            });
+
+            drawNotifications();
+        }
+
+        /* ================== SEARCH AND FILTERS ENGINE ================== */
+        function initSearchAndFilters() {
+            const searchInput = document.getElementById("report-search");
+            searchInput.addEventListener("input", (e) => {
+                activeSearchQuery = e.target.value.toLowerCase().trim();
+                currentPage = 1; 
+                renderReportsGrid();
+            });
+
+            document.querySelectorAll(".chip-filter-btn").forEach(chip => {
+                chip.addEventListener("click", (e) => {
+                    document.querySelectorAll(".chip-filter-btn").forEach(c => c.classList.remove("active-chip"));
+                    e.target.classList.add("active-chip");
+                    activeStatusFilter = e.target.getAttribute("data-status");
+                    currentPage = 1;
+                    renderReportsGrid();
+                });
+            });
+        }
+    </script>
+</body>
+</html>
