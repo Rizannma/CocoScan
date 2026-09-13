@@ -176,19 +176,19 @@
 <div id="instant-nav-bar"></div>
 
 <!-- PWA Install Banner DOM -->
-<div id="pwa-install-banner" role="dialog" aria-label="Install CocoScan Application">
+<div id="pwa-install-banner" role="dialog" aria-label="{{ t('pwa_and_offline.pwa_install_title', 'Install CocoScan App') }}">
     <div class="pwa-banner-icon">
         <i class="fa-solid fa-seedling"></i>
     </div>
     <div class="pwa-banner-content">
-        <span class="pwa-banner-title">Install CocoScan App</span>
-        <span class="pwa-banner-subtitle">Add to Home Screen for fast, offline-ready access</span>
+        <span class="pwa-banner-title" data-i18n="pwa_and_offline.pwa_install_title">{{ t('pwa_and_offline.pwa_install_title', 'Install CocoScan App') }}</span>
+        <span class="pwa-banner-subtitle" data-i18n="pwa_and_offline.pwa_install_subtitle">{{ t('pwa_and_offline.pwa_install_subtitle', 'Add to Home Screen for fast, offline-ready access') }}</span>
     </div>
     <div style="display: flex; align-items: center; gap: 8px;">
         <button class="pwa-install-btn" id="pwa-trigger-btn" type="button">
-            <i class="fa-solid fa-download"></i> Install
+            <i class="fa-solid fa-download"></i> <span data-i18n="pwa_and_offline.pwa_install_btn">{{ t('pwa_and_offline.pwa_install_btn', 'Install') }}</span>
         </button>
-        <button class="pwa-close-btn" id="pwa-dismiss-btn" type="button" aria-label="Dismiss Install Prompt" title="Dismiss">
+        <button class="pwa-close-btn" id="pwa-dismiss-btn" type="button" aria-label="{{ t('pwa_and_offline.pwa_dismiss_btn', 'Dismiss') }}" title="{{ t('pwa_and_offline.pwa_dismiss_btn', 'Dismiss') }}">
             <i class="fa-solid fa-xmark"></i>
         </button>
     </div>

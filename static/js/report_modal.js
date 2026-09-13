@@ -391,7 +391,11 @@
             "resolved": "Resolved",
             "ready_to_submit": "Ready to Submit",
         };
-        return labels[normalized] || normalized || "Pending";
+        const defaultLabel = labels[normalized] || normalized || "Pending";
+        if (window.CocoScanI18n && typeof window.CocoScanI18n.t === "function") {
+            return window.CocoScanI18n.t(`workflow_statuses.${normalized}`, defaultLabel);
+        }
+        return defaultLabel;
     }
 
     function getWorkflowStatusBadgeStyle(status) {
@@ -505,16 +509,17 @@
 
     function getRecommendationTooltip(text) {
         const lower = String(text).toLowerCase();
-        if (lower.includes("sanitation")) return "<strong>Step 1:</strong> Collect all dead leaves, rotting trunks, and fallen fruits.<br><strong>Step 2:</strong> Burn them or bury them deep away from healthy trees to destroy hidden pest breeding grounds.";
-        if (lower.includes("trap") && lower.includes("pheromone")) return "<strong>Step 1:</strong> Hang the trap 1.5 to 2 meters high on a pole.<br><strong>Step 2:</strong> Place it at least 20-30 meters away from your healthy trees so it lures pests AWAY from your farm, not into it.";
-        if (lower.includes("fungus") || lower.includes("muscardine")) return "Mix the recommended Green Muscardine fungus with water and spray directly onto compost pits, rotting logs, or traps where adult beetles lay eggs.";
-        if (lower.includes("biological")) return "Introduce natural predators like earwigs or use organic biocontrol agents recommended by the local agriculture office.";
-        if (lower.includes("light trap")) return "Set up a bright light bulb over a basin of soapy water at night. Flying pests will be attracted to the light and drown in the water.";
-        if (lower.includes("prun") || lower.includes("cut")) return "Use a clean, sharp bolo to cut off heavily infested fronds. Burn or bury the cut pieces immediately so pests don't spread to other leaves.";
-        if (lower.includes("fertiliz")) return "Apply the recommended nitrogen or potassium fertilizers around the base of the tree (about 1 meter away from the trunk) to help the tree recover faster.";
-        if (lower.includes("chemical") || lower.includes("insecticide")) return "<strong>WARNING:</strong> Only use chemicals as a final option. Wear gloves and a mask, follow the exact dosage on the bottle, and spray only on affected areas.<br><br><i>Note: If you are unsure about what chemical to use, ask the agriculturist by putting it in your Farmer Notes below before submitting.</i>";
-        if (lower.includes("monitor")) return "Visit your farm every 3-5 days. Check the crown and young leaves of the affected trees for any new boreholes, chewed leaves, or pest droppings.";
-        return "Please follow this recommendation carefully. For exact measurements or detailed guidance, wait for the agriculturist's expert assessment.";
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+        if (lower.includes("sanitation")) return t("pest_recommendations.tooltip_sanitation", "<strong>Step 1:</strong> Collect all dead leaves, rotting trunks, and fallen fruits.<br><strong>Step 2:</strong> Burn them or bury them deep away from healthy trees to destroy hidden pest breeding grounds.");
+        if (lower.includes("trap") && lower.includes("pheromone")) return t("pest_recommendations.tooltip_pheromone", "<strong>Step 1:</strong> Hang the trap 1.5 to 2 meters high on a pole.<br><strong>Step 2:</strong> Place it at least 20-30 meters away from your healthy trees so it lures pests AWAY from your farm, not into it.");
+        if (lower.includes("fungus") || lower.includes("muscardine")) return t("pest_recommendations.tooltip_fungus", "Mix the recommended Green Muscardine fungus with water and spray directly onto compost pits, rotting logs, or traps where adult beetles lay eggs.");
+        if (lower.includes("biological")) return t("pest_recommendations.tooltip_biological", "Introduce natural predators like earwigs or use organic biocontrol agents recommended by the local agriculture office.");
+        if (lower.includes("light trap")) return t("pest_recommendations.tooltip_light_trap", "Set up a bright light bulb over a basin of soapy water at night. Flying pests will be attracted to the light and drown in the water.");
+        if (lower.includes("prun") || lower.includes("cut")) return t("pest_recommendations.tooltip_prune", "Use a clean, sharp bolo to cut off heavily infested fronds. Burn or bury the cut pieces immediately so pests don't spread to other leaves.");
+        if (lower.includes("fertiliz")) return t("pest_recommendations.tooltip_fertilizer", "Apply the recommended nitrogen or potassium fertilizers around the base of the tree (about 1 meter away from the trunk) to help the tree recover faster.");
+        if (lower.includes("chemical") || lower.includes("insecticide")) return t("pest_recommendations.tooltip_chemical", "<strong>WARNING:</strong> Only use chemicals as a final option. Wear gloves and a mask, follow the exact dosage on the bottle, and spray only on affected areas.<br><br><i>Note: If you are unsure about what chemical to use, ask the agriculturist by putting it in your Farmer Notes below before submitting.</i>");
+        if (lower.includes("monitor")) return t("pest_recommendations.tooltip_monitor", "Visit your farm every 3-5 days. Check the crown and young leaves of the affected trees for any new boreholes, chewed leaves, or pest droppings.");
+        return t("pest_recommendations.tooltip_default", "Please follow this recommendation carefully. For exact measurements or detailed guidance, wait for the agriculturist's expert assessment.");
     }
 
     function getRecommendationPriority(text) {
@@ -528,13 +533,74 @@
         return 6;
     }
 
+    function localizeRecommendationItem(item) {
+        if (!item) return "";
+        const clean = String(item).trim();
+        const lang = (window.CocoScanI18n && typeof window.CocoScanI18n.getLanguage === 'function') 
+            ? window.CocoScanI18n.getLanguage() 
+            : (document.documentElement.lang || 'en');
+        if (lang !== 'tl') return clean;
+
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+        const map = {
+            "Prune and safely dispose of infested leaves": t("recommendations.initial_items.Prune and safely dispose of infested leaves", "Putulin at ligtas na sunugin o ibaon ang mga apektadong dahon"),
+            "Maintain field sanitation and monitor infestation levels": t("recommendations.initial_items.Maintain field sanitation and monitor infestation levels", "Panatilihin ang kalinisan ng sakahan at subaybayan ang dami ng peste"),
+            "Release earwigs and Tetrastichus parasitoids for natural control": t("recommendations.initial_items.Release earwigs and Tetrastichus parasitoids for natural control", "Magpakawala ng earwigs at Tetrastichus parasitoids para sa natural na pagpuksa"),
+            "Spray white Muscardine fungus": t("recommendations.initial_items.Spray white Muscardine fungus", "Mag-spray ng white Muscardine fungus"),
+            "Use approved pesticide early morning for severe infestations": t("recommendations.initial_items.Use approved pesticide early morning for severe infestations", "Gumamit ng aprubadong pamatay-peste sa madaling araw kapag labis na ang pamemeste"),
+            "Improve farm sanitation and remove breeding sites": t("recommendations.initial_items.Improve farm sanitation and remove breeding sites", "Pabutihin ang kalinisan ng sakahan at alisin ang mga pinamumugaran"),
+            "Install pheromone traps and green Muscardine fungus log traps": t("recommendations.initial_items.Install pheromone traps and green Muscardine fungus log traps", "Magkabit ng mga pheromone trap at green Muscardine fungus log trap"),
+            "Apply biological treatment or use light traps at night": t("recommendations.initial_items.Apply biological treatment or use light traps at night", "Maglapat ng biological treatment o gumamit ng light trap sa gabi"),
+            "Monitor weekly and consult an agricultural technician for severe cases": t("recommendations.initial_items.Monitor weekly and consult an agricultural technician for severe cases", "Subaybayan linggu-linggo at sumangguni sa agricultural technician kapag malala ang kaso"),
+            "Continue regular monitoring": t("recommendations.initial_items.Continue regular monitoring", "Ipagpatuloy ang regular na pagsubaybay"),
+            "Maintain current sanitation practices": t("recommendations.initial_items.Maintain current sanitation practices", "Panatilihin ang kasalukuyang gawi sa kalinisan")
+        };
+        return map[clean] || clean;
+    }
+
+    function formatScheduleStamp(stamp) {
+        if (!stamp) return "";
+        const lang = (window.CocoScanI18n && typeof window.CocoScanI18n.getLanguage === 'function') 
+            ? window.CocoScanI18n.getLanguage() 
+            : (document.documentElement.lang || 'en');
+        if (lang !== 'tl') return stamp;
+
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+        let res = String(stamp).trim();
+        if (res.startsWith("Confirmed:")) {
+            res = res.replace("Confirmed:", t("modal.schedule_confirmed_prefix", "Kumpirmado:"));
+        } else if (res.startsWith("Previous Schedule:")) {
+            res = res.replace("Previous Schedule:", t("modal.schedule_previous_prefix", "Nakaraang Iskedyul:"));
+        }
+
+        res = res.replace(", from ", ", " + t("modal.schedule_from", "mula") + " ");
+        res = res.replace(" to ", " " + t("modal.schedule_to", "hanggang") + " ");
+
+        const months = {
+            "January": "Enero", "February": "Pebrero", "March": "Marso", "April": "Abril",
+            "May": "Mayo", "June": "Hunyo", "July": "Hulyo", "August": "Agosto",
+            "September": "Setyembre", "October": "Oktubre", "November": "Nobyembre", "December": "Disyembre"
+        };
+        for (const [enMonth, tlMonth] of Object.entries(months)) {
+            res = res.replace(new RegExp(`\\b${enMonth}\\b`, 'g'), tlMonth);
+        }
+        return res;
+    }
+
     function renderList(node, items, emptyText, showIcon = true, withTooltip = false) {
         if (!node) return;
         node.innerHTML = "";
 
         if (!items || items.length === 0) {
             const li = document.createElement("li");
-            if (emptyText === "No expert assessment available yet." || emptyText === "Submit report for expert assessment") {
+            const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+            const isExpertAssessmentEmpty = (
+                emptyText === "No expert assessment available yet." ||
+                emptyText === "Submit report for expert assessment" ||
+                emptyText === t("modal.expert_assessment_empty", "No expert assessment available yet.") ||
+                emptyText === t("modal.expert_assessment_prompt", "Submit report for expert assessment")
+            );
+            if (isExpertAssessmentEmpty) {
                 li.style.listStyle = "none";
                 li.style.margin = "0";
                 li.style.padding = "0";
@@ -568,7 +634,8 @@
             }
             const isExpertList = node && node.id === "report-expert-list";
             const textColor = isExpertList ? "#64748b" : "var(--text-dark)";
-            html += `<span style="font-size: 0.85rem; line-height: 1.3; color: ${textColor}; padding: 0;">${escapeHtml(item)}</span>`;
+            const displayText = isExpertList ? escapeHtml(item) : escapeHtml(localizeRecommendationItem(item));
+            html += `<span style="font-size: 0.85rem; line-height: 1.3; color: ${textColor}; padding: 0;">${displayText}</span>`;
 
             const tooltipText = withTooltip ? getRecommendationTooltip(item) : "";
             if (withTooltip) {
@@ -617,7 +684,9 @@
 
         if (!images || images.length === 0) {
             if (currentReportModalMode !== "scan") {
-                node.innerHTML = '<div style="width:100%;"><p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; text-align: left;">No additional images uploaded.</p></div>';
+                const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+                const emptyText = t("modal.additional_images_empty", "No additional images uploaded.");
+                node.innerHTML = `<div style="width:100%;"><p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; text-align: left;">${escapeHtml(emptyText)}</p></div>`;
             }
             return;
         }
@@ -814,7 +883,8 @@
                 report.expertRecommendations = [];
             }
             report.expertRecommendations.push(assessment);
-            renderList(document.getElementById("report-expert-list"), report.expertRecommendations, "No expert assessment available yet.", false);
+            const expertEmptyText = window.CocoScanI18n ? window.CocoScanI18n.t("modal.expert_assessment_empty", "No expert assessment available yet.") : "No expert assessment available yet.";
+            renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false);
             const issuerNote = document.getElementById("expert-assessment-issuer-note");
             if (issuerNote) {
                 const name = data.reviewer_name || report.reviewer_name || "PCA Agriculturist";
@@ -890,6 +960,7 @@
     }
 
     function renderVisitDiscussionCard(mode, report) {
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
         const workflowCard = document.getElementById("workflow-actions-card");
         const workflowInput = document.getElementById("workflow-detail-input");
         const feedbackContainer = document.getElementById("report-farmer-feedback");
@@ -902,9 +973,18 @@
         const isAgriculturist = mode === "agriculturist";
         const chats = Array.isArray(report?.visitChats) ? report.visitChats : [];
         const statusLabel = getWorkflowStatusDisplayLabel(report?.status || "");
-        const scheduleTitle = report?.visitScheduleTitle || (report?.visitRescheduleReason ? "Reschedule Requested" : "Visit Scheduled");
+        const rawScheduleTitle = report?.visitScheduleTitle || (report?.visitRescheduleReason ? "Reschedule Requested" : "Visit Scheduled");
+        let localizedScheduleTitle = rawScheduleTitle;
+        if (report?.visitRescheduleReason || rawScheduleTitle === "Reschedule Requested") {
+            localizedScheduleTitle = t("workflow_statuses.visit_requested", "Reschedule Requested");
+        } else if (rawScheduleTitle === "New Schedule Confirmed") {
+            localizedScheduleTitle = t("modal.schedule_new_confirmed", "New Schedule Confirmed");
+        } else if (rawScheduleTitle === "Visit Scheduled") {
+            localizedScheduleTitle = t("workflow_statuses.visit_scheduled", "Visit Scheduled");
+        }
+        const scheduleTitle = localizedScheduleTitle;
         const statusText = isArchived ? scheduleTitle : statusLabel;
-        const messagePlaceholder = isAgriculturist ? "Type a message..." : "Type a message to reply...";
+        const messagePlaceholder = isAgriculturist ? "Type a message..." : t("modal.discussion_placeholder", "Discuss visit details...");
         const messageCount = chats.length;
         const messageLabel = `${messageCount} ${messageCount === 1 ? "message" : "messages"}`;
         const isExpanded = Boolean(report?.visitDiscussionExpanded);
@@ -973,7 +1053,7 @@
                         overflow:hidden;
                         text-overflow:ellipsis;
                     ">
-                        Visit Request Discussion
+                        ${escapeHtml(t('modal.discussion_toggle_title', 'Visit Request Discussion'))}
                     </span>
 
                 </span>
@@ -1003,14 +1083,14 @@
             return `
                                 <div style="display:flex; justify-content:${isAgriculturistMessage ? "flex-end" : "flex-start"};">
                                     <div style="max-width:82%; display:grid; gap:4px;">
-                                        <div style="font-size:0.74rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; padding:${isAgriculturistMessage ? "0 0 0 8px" : "0 8px 0 0"};">${escapeHtml(chat.sender_label || "Farmer")}</div>
+                                        <div style="font-size:0.74rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; padding:${isAgriculturistMessage ? "0 0 0 8px" : "0 8px 0 0"};">${escapeHtml(chat.sender_label || (isAgriculturistMessage ? "Agriculturist" : "Farmer"))}</div>
                                         <div style="padding:10px 12px; border-radius:16px; background:${isAgriculturistMessage ? "#ecfdf5" : "#f8fafc"}; color:#0f172a; box-shadow:0 1px 2px rgba(15,23,42,0.06);">
                                             <div style="font-size:0.9rem; line-height:1.5;">${escapeHtml(chat.message || "")}</div>
-                                            <div style="margin-top:6px; font-size:0.72rem; color:#64748b;">${escapeHtml(formatVisitChatTimestamp(chat.created_at) || "Just now")}</div>
+                                            <div style="margin-top:6px; font-size:0.72rem; color:#64748b;">${escapeHtml(formatVisitChatTimestamp(chat.created_at) || t('reports.just_now', "Just now"))}</div>
                                         </div>
                                     </div>
                                 </div>`;
-        }).join("") : '<div style="font-size:0.9rem; color:#64748b;">No discussion messages yet.</div>'}
+        }).join("") : `<div style="font-size:0.9rem; color:#64748b;">${escapeHtml(t('modal.discussion_empty', 'No discussion messages yet.'))}</div>`}
                     </div>
                     ${isArchived ? "" : `
                         <div style="display:flex; align-items:flex-end; background:#f8fafc; border:1px solid #cbd5e1; border-radius:24px; padding:6px 6px 6px 16px; gap:8px;">
@@ -1022,17 +1102,26 @@
                     `}
                 </div>
                 ` : ""}
-                ${report?.visitScheduleStamp ? `<div style="padding:10px 12px; border-radius:14px; ${bannerStyle} font-size:0.92rem; font-weight:600;">${escapeHtml(scheduleTitle)}<br>${escapeHtml(report.visitScheduleStamp)}</div>` : ""}
+                ${report?.visitScheduleStamp ? `<div style="padding:10px 12px; border-radius:14px; ${bannerStyle} font-size:0.92rem; font-weight:600;">${escapeHtml(scheduleTitle)}<br>${escapeHtml(formatScheduleStamp(report.visitScheduleStamp))}</div>` : ""}
                 ${(hasPendingReschedule && !isArchived && mode !== "lgu" && mode !== "admin") ? `
                     <div style="background:#eff6ff; color:#1e3a8a; padding:12px 14px; border-radius:8px; border:1px solid #bfdbfe; font-size:0.9rem; display:flex; align-items:center; gap:10px; font-family: sans-serif;">
-                        <strong>Tip:</strong> Click the "Visit Request Discussion" button to chat and finalize a new date and time.
+                        <strong>${escapeHtml(t('modal.tip_label', 'Tip:'))}</strong> ${escapeHtml(t('modal.discussion_tip_reschedule', 'Click the "Visit Request Discussion" button to chat and finalize a new date and time.'))}
                     </div>
                 ` : ""}
                 ${(!isArchived && isAgriculturist && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="visit-discussion-finalize-btn" class="btn-control submit-primary" style="justify-self:start; margin-top:4px;">Finalize Schedule</button>` : ""}
-                ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<div style="font-size:0.9rem; color:#475569; line-height:1.5;">The scheduling discussion has been closed.</div>` : ""}
-                ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="request-reschedule-btn" class="btn-control submit-primary" style="justify-self:start;">Request Reschedule</button>` : ""}
-                ${(report?.visit_summary && (mode === "lgu" || mode === "admin")) ? `<div style="font-size:0.95rem; color:#334155; line-height:1.6; background:#f8fafc; padding:14px; border-radius:12px; border:1px solid #e2e8f0; margin-top:10px;"><strong>Visit Summary:</strong><br>${escapeHtml(report.visit_summary)}</div>` : ""}
+                ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<div style="font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(t('modal.discussion_closed', 'The scheduling discussion has been closed.'))}</div>` : ""}
+                ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="request-reschedule-btn" class="btn-control submit-primary" style="justify-self:start;">${escapeHtml(t('modal.btn_request_reschedule', 'Request Reschedule'))}</button>` : ""}
+                ${(report?.visit_summary && (mode === "lgu" || mode === "admin")) ? `<div style="font-size:0.95rem; color:#334155; line-height:1.6; background:#f8fafc; padding:14px; border-radius:12px; border:1px solid #e2e8f0; margin-top:10px;"><strong>${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}:</strong><br>${escapeHtml(report.visit_summary)}</div>` : ""}
             </div>`;
+
+        const h4 = feedbackCard.querySelector('h4');
+        if (h4) {
+            if (isArchived || normalizedStatus === "resolved") {
+                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${escapeHtml(t('modal.resolution_details_title', 'Resolution Details'))}`;
+            } else {
+                h4.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
+            }
+        }
 
         const toggleButton = feedbackContainer.querySelector('#visit-discussion-toggle');
         if (toggleButton) {
@@ -1142,6 +1231,7 @@
     }
 
     function openRequestRescheduleModal(report) {
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
         const existingModal = document.getElementById("visit-reschedule-mini-modal");
         if (existingModal) {
             existingModal.remove();
@@ -1160,27 +1250,27 @@
         modal.innerHTML = `
             <div style="width:min(100%, 430px); background:#fff; border-radius:20px; box-shadow:0 20px 50px rgba(15,23,42,0.22); padding:28px; display:grid; gap:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:14px;">
-                    <div style="font-size:1.05rem; font-weight:700; color:#102a43;">Request Reschedule</div>
-                    <button type="button" id="visit-reschedule-modal-close" class="btn-control cancel-secondary" style="width: auto; min-height: 34px; padding: 8px 12px; border-radius: 999px; background: #dc2626; color: #ffffff; border: 1px solid #dc2626; box-shadow: none;">Close</button>
+                    <div style="font-size:1.05rem; font-weight:700; color:#102a43;">${escapeHtml(t('modal.reschedule_modal_title', 'Request Reschedule'))}</div>
+                    <button type="button" id="visit-reschedule-modal-close" class="btn-control cancel-secondary" style="width: auto; min-height: 34px; padding: 8px 12px; border-radius: 999px; background: #dc2626; color: #ffffff; border: 1px solid #dc2626; box-shadow: none;">${escapeHtml(t('modal.btn_close', 'Close'))}</button>
                 </div>
                 <div style="display:grid; gap:14px;">
                     <label style="display:grid; gap:10px; font-size:0.98rem; color:#334155;">
-                        <span style="font-weight:700;">Reason</span>
+                        <span style="font-weight:700;">${escapeHtml(t('modal.reschedule_reason_label', 'Reason'))}</span>
                         <select id="visit-reschedule-reason" class="schedule-input" style="padding:0 14px; border-radius:12px; border:1px solid #e6e6e6; height:48px; box-sizing:border-box; font-size:1rem;">
-                            <option value="Emergency">Emergency</option>
-                            <option value="Bad weather">Bad weather</option>
-                            <option value="Personal conflict">Personal conflict</option>
-                            <option value="Other">Other</option>
+                            <option value="Emergency">${escapeHtml(t('modal.reschedule_opt_emergency', 'Emergency'))}</option>
+                            <option value="Bad weather">${escapeHtml(t('modal.reschedule_opt_weather', 'Bad weather'))}</option>
+                            <option value="Personal conflict">${escapeHtml(t('modal.reschedule_opt_conflict', 'Personal conflict'))}</option>
+                            <option value="Other">${escapeHtml(t('modal.reschedule_opt_other', 'Other'))}</option>
                         </select>
                     </label>
                     <div id="visit-reschedule-other-wrapper" style="display:none;">
                         <label style="display:grid; gap:10px; font-size:0.98rem; color:#334155;">
-                            <span style="font-weight:700;">Reason Details</span>
-                            <textarea id="visit-reschedule-other-details" class="notes-input-box" placeholder="Add more details..." style="min-height:140px; padding:18px;"></textarea>
+                            <span style="font-weight:700;">${escapeHtml(t('modal.reschedule_details_label', 'Reason Details'))}</span>
+                            <textarea id="visit-reschedule-other-details" class="notes-input-box" placeholder="${escapeHtml(t('modal.reschedule_details_placeholder', 'Add more details...'))}" style="min-height:140px; padding:18px;"></textarea>
                         </label>
                     </div>
                 </div>
-                <button type="button" id="visit-reschedule-save-btn" class="btn-control submit-primary" style="width:100%; padding:16px 20px; border-radius:14px;">Submit Request</button>
+                <button type="button" id="visit-reschedule-save-btn" class="btn-control submit-primary" style="width:100%; padding:16px 20px; border-radius:14px;">${escapeHtml(t('modal.reschedule_btn_submit', 'Submit Request'))}</button>
             </div>`;
         document.body.appendChild(modal);
 
@@ -1200,15 +1290,15 @@
             const reason = reasonSelect?.value || "";
             const details = modal.querySelector('#visit-reschedule-other-details')?.value?.trim() || "";
             if (reason === 'Other' && !details) {
-                alert("Please provide reason details for 'Other'.");
+                alert(t('modal.alert_provide_details', "Please provide reason details for 'Other'."));
                 return;
             }
             const finalReason = reason === 'Other' ? `${reason}: ${details}` : reason;
             if (!finalReason) {
-                alert("Please select a reason before submitting the reschedule request.");
+                alert(t('modal.alert_select_reason', "Please select a reason before submitting the reschedule request."));
                 return;
             }
-            setButtonLoading(saveBtn, true, "Submitting...");
+            setButtonLoading(saveBtn, true, t('modal.reschedule_btn_submitting', "Submitting..."));
             try {
                 const response = await fetch(`/reports/${report.id}/request-reschedule`, {
                     method: "POST",
@@ -1227,7 +1317,7 @@
                 await loadVisitDiscussion(report);
                 renderWorkflowActions(currentReportModalMode, report);
                 modal.remove();
-                alert(data.message || "Reschedule request submitted.");
+                alert(data.message || t('modal.reschedule_success', "Reschedule request submitted."));
             } catch (error) {
                 alert("The reschedule request could not be submitted right now.");
                 setButtonLoading(saveBtn, false);
@@ -1574,28 +1664,29 @@
                     setDisplay(workflowInput, false);
                 }
                 if (feedbackContainer) {
+                    const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
                     feedbackContainer.innerHTML = `
                         <div style="display:grid; gap:14px; padding:6px 0;">
                             <div style="display:grid; gap:8px;">
                                 <p style="font-size:0.92rem; color:#334155; margin:0; line-height:1.55;">
-                                    Did the initial recommendation and expert assessment resolve your issue?<br>
-                                    <em style="font-size:0.72rem; color:#64748b;">If not, you can request an on-site visit and continue the workflow.</em>
+                                    ${t('modal.feedback_question', 'Did the initial recommendation and expert assessment resolve your issue?')}<br>
+                                    <em style="font-size:0.72rem; color:#64748b;">${t('modal.feedback_subtext', 'If not, you can request an on-site visit and continue the workflow.')}</em>
                                 </p>
                                 <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:0;">
                                     <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#102a43;">
-                                        <input type="radio" name="farmer-feedback-choice" value="resolved" checked style="accent-color:#059669;"> Yes
+                                        <input type="radio" name="farmer-feedback-choice" value="resolved" checked style="accent-color:#059669;"> ${t('modal.feedback_yes', 'Yes')}
                                     </label>
                                     <label style="display:flex; align-items:center; gap:8px; font-weight:600; color:#102a43;">
-                                        <input type="radio" name="farmer-feedback-choice" value="needs-assistance" style="accent-color:#be185d;"> No
+                                        <input type="radio" name="farmer-feedback-choice" value="needs-assistance" style="accent-color:#be185d;"> ${t('modal.feedback_no', 'No')}
                                     </label>
                                 </div>
                             </div>
                             <div id="farmer-visit-reason-section" style="display:none; display:grid; gap:8px;">
-                                <label style="font-size:0.9rem; font-weight:600; color:#334155;">Reason for requesting a visit</label>
-                                <textarea id="farmer-visit-reason" class="notes-input-box" placeholder="Describe why you still need assistance..." style="min-height:110px; width:100%; box-sizing:border-box; padding:14px 16px;"></textarea>
+                                <label style="font-size:0.9rem; font-weight:600; color:#334155;">${t('modal.feedback_reason_label', 'Reason for requesting a visit')}</label>
+                                <textarea id="farmer-visit-reason" class="notes-input-box" placeholder="${t('modal.feedback_reason_placeholder', 'Describe why you still need assistance...')}" style="min-height:110px; width:100%; box-sizing:border-box; padding:14px 16px;"></textarea>
                             </div>
                             <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:4px;">
-                                <button id="farmer-submit-feedback-btn" class="btn-control submit-primary" type="button">Submit</button>
+                                <button id="farmer-submit-feedback-btn" class="btn-control submit-primary" type="button">${t('modal.btn_confirm_resolved', 'Confirm Resolved')}</button>
                             </div>
                         </div>`;
                     const feedbackRadios = feedbackContainer.querySelectorAll("input[name='farmer-feedback-choice']");
@@ -1608,7 +1699,7 @@
                             setDisplay(reasonSection, showReason, 'grid');
                         }
                         if (submitFeedbackBtn) {
-                            submitFeedbackBtn.textContent = showReason ? 'Request Visit' : 'Confirm Resolved';
+                            submitFeedbackBtn.textContent = showReason ? t('modal.btn_request_visit', 'Request Visit') : t('modal.btn_confirm_resolved', 'Confirm Resolved');
                         }
                     };
                     feedbackRadios.forEach((input) => input.addEventListener('change', refreshReasonDisplay));
@@ -1626,11 +1717,12 @@
                     }
                 }
             } else if (normalizedStatus === "visit_requested" || normalizedStatus === "resolved") {
+                const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
                 if (workflowInput) {
                     setDisplay(workflowInput, false);
                 }
                 if (feedbackContainer) {
-                    const reasonDisplay = report.farmerFeedbackReason ? `<p style="margin:0; font-size:0.95rem; color:#334155;"><strong>Reason:</strong> ${escapeHtml(report.farmerFeedbackReason)}</p>` : "";
+                    const reasonDisplay = report.farmerFeedbackReason ? `<p style="margin:0; font-size:0.95rem; color:#334155;"><strong>${escapeHtml(t('modal.label_reason', 'Reason'))}:</strong> ${escapeHtml(report.farmerFeedbackReason)}</p>` : "";
                     const scheduleDisplay = Array.isArray(report.farmerSchedules) && report.farmerSchedules.length
                         ? `<div style="display:grid; gap:6px; padding-top:8px;">${report.farmerSchedules.map(s => `<div style="font-size:0.95rem; color:#0f172a;">• ${escapeHtml(s.display)}</div>`).join("")}</div>`
                         : "";
@@ -1639,7 +1731,7 @@
                     if (normalizedStatus === "resolved" && report.visit_summary) {
                         visitSummaryBlock = `
                             <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-top:12px;">
-                                <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">Visit Summary</h5>
+                                <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}</h5>
                                 <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHTML(report.visit_summary)}</p>
                                 ${(report.visitImages && report.visitImages.length > 0) ? `
                                     <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
@@ -1651,13 +1743,13 @@
                     }
 
                     const message = normalizedStatus === "visit_requested"
-                        ? `<p style="font-size:0.92rem; color:#334155; margin:0;">Your visit request was submitted successfully. The agriculturist will review your preferred schedules.</p>${reasonDisplay}${scheduleDisplay}`
+                        ? `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.visit_requested_notice', 'Your visit request was submitted successfully. The agriculturist will review your preferred schedules.'))}</p>${reasonDisplay}${scheduleDisplay}`
                         : (report.visit_summary
-                            ? `<p style="font-size:0.92rem; color:#334155; margin:0;">The agriculturist has completed the visit and marked the issue as resolved.</p>${visitSummaryBlock}`
+                            ? `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.resolution_visit_completed_text', 'The agriculturist has completed the visit and marked the issue as resolved.'))}</p>${visitSummaryBlock}`
                             : `
                             <div style="font-size: 0.8rem; color: #64748b; line-height: 1.3; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-                                <div><strong style="color: #475569;">Outcome:</strong> Issue resolved by following expert assessment.</div>
-                                <div><strong style="color: #475569;">Resolved On:</strong> ${formatTimestamp(report.updated_at || report.timestamp)}</div>
+                                <div><strong style="color: #475569;">${escapeHtml(t('modal.label_outcome', 'Outcome'))}:</strong> ${escapeHtml(t('modal.resolution_outcome_text', 'Issue resolved by following expert assessment.'))}</div>
+                                <div><strong style="color: #475569;">${escapeHtml(t('modal.resolution_resolved_on', 'Resolved On:'))}</strong> ${formatTimestamp(report.updated_at || report.timestamp)}</div>
                             </div>`);
                     feedbackContainer.innerHTML = `
                         <div style="margin-top:10px; display:grid; gap:12px;">
@@ -1669,9 +1761,9 @@
                         const h4 = feedbackCard.querySelector('h4');
                         if (h4) {
                             if (normalizedStatus === "resolved") {
-                                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> Resolution Details`;
+                                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${escapeHtml(t('modal.resolution_details_title', 'Resolution Details'))}`;
                             } else {
-                                h4.innerHTML = `<i class="fa-solid fa-calendar-check"></i> Follow-up`;
+                                h4.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
                             }
                         }
                     }
@@ -1701,8 +1793,8 @@
                         if (report.visit_summary) {
                             visitSummaryBlock = `
                                 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-top:12px;">
-                                    <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">Visit Summary</h5>
-                                    <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHTML(report.visit_summary)}</p>
+                                    <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}</h5>
+                                    <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(report.visit_summary)}</p>
                                     ${(report.visitImages && report.visitImages.length > 0) ? `
                                         <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
                                             ${report.visitImages.map(url => `<img src="${url}" style="height:80px; width:120px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open('${url}', '_blank')">`).join('')}
@@ -1713,11 +1805,11 @@
                         }
 
                         const message = report.visit_summary
-                            ? `<p style="font-size:0.92rem; color:#334155; margin:0;">The agriculturist has completed the visit and marked the issue as resolved.</p>${visitSummaryBlock}`
+                            ? `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.resolution_visit_completed_text', 'The agriculturist has completed the visit and marked the issue as resolved.'))}</p>${visitSummaryBlock}`
                             : `
                                 <div style="font-size: 0.8rem; color: #64748b; line-height: 1.3; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-                                    <div><strong style="color: #475569;">Outcome:</strong> Issue resolved by following expert assessment.</div>
-                                    <div><strong style="color: #475569;">Resolved On:</strong> ${formatTimestamp(report.updated_at || report.timestamp)}</div>
+                                    <div><strong style="color: #475569;">${escapeHtml(t('modal.label_outcome', 'Outcome'))}:</strong> ${escapeHtml(t('modal.resolution_outcome_text', 'Issue resolved by following expert assessment.'))}</div>
+                                    <div><strong style="color: #475569;">${escapeHtml(t('modal.resolution_resolved_on', 'Resolved On:'))}</strong> ${formatTimestamp(report.updated_at || report.timestamp)}</div>
                                 </div>`;
                         feedbackContainer.innerHTML = `
                             <div style="margin-top:10px; display:grid; gap:12px;">
@@ -1728,7 +1820,7 @@
                             setDisplay(feedbackCard, true, 'block');
                             const h4 = feedbackCard.querySelector('h4');
                             if (h4) {
-                                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> Resolution Details`;
+                                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${escapeHtml(t('modal.resolution_details_title', 'Resolution Details'))}`;
                             }
                         }
                     }
@@ -2187,7 +2279,8 @@
                 report.expertRecommendations = [];
             }
             report.expertRecommendations.push(assessment);
-            renderList(document.getElementById("report-expert-list"), report.expertRecommendations, "No expert assessment available yet.", false);
+            const expertEmptyText = window.CocoScanI18n ? window.CocoScanI18n.t("modal.expert_assessment_empty", "No expert assessment available yet.") : "No expert assessment available yet.";
+            renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false);
             const issuerNote = document.getElementById("expert-assessment-issuer-note");
             if (issuerNote) {
                 const name = data.reviewer_name || report.reviewer_name || "PCA Agriculturist";
@@ -2335,11 +2428,12 @@
             primaryImage.src = report.primaryImage || "https://images.unsplash.com/photo-1590005354167-6da97870c913?auto=format&fit=crop&w=480&q=80";
         }
 
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
         if (notesInput) {
             notesInput.value = report.notes || "";
         }
         if (notesDisplay) {
-            notesDisplay.textContent = report.notes || "No notes logged.";
+            notesDisplay.textContent = report.notes || t("modal.notes_empty", "No notes logged.");
         }
         if (expertInput) {
             expertInput.value = "";
@@ -2361,12 +2455,12 @@
             }
         } else {
             if (initialCard) setDisplay(initialCard, true, "flex");
-            renderList(document.getElementById("report-initial-list"), report.initialRecommendations, "No initial recommendations available.", true, true);
+            renderList(document.getElementById("report-initial-list"), report.initialRecommendations, t("modal.initial_reco_empty", "No initial recommendations available."), true, true);
         }
 
-        let expertEmptyText = "No expert assessment available yet.";
+        let expertEmptyText = t("modal.expert_assessment_empty", "No expert assessment available yet.");
         if (currentReportModalMode === "scan") {
-            expertEmptyText = "Submit report for expert assessment";
+            expertEmptyText = t("modal.expert_assessment_prompt", "Submit report for expert assessment");
         }
         renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false, false);
 

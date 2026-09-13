@@ -504,17 +504,17 @@
 </style>
 
         <div class="modal-header-inline" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px;">
-            <h2 style="margin: 0;">Report Summary</h2>
+            <h2 style="margin: 0;" data-i18n="modal.summary_title">{{ t('modal.summary_title', 'Report Summary') }}</h2>
             <div style="display:flex; align-items:center; gap:8px;">
                 <!-- Print button: icon-only, small, unobtrusive on mobile -->
-                <button id="report-print-btn" class="btn-control" type="button" title="Print report" onclick="printReportModal()" style="width:auto; min-height:34px; padding:8px 10px; border-radius:999px; background:#f3f4f6; color:#164630; border:1px solid #e6e7ea; box-shadow:none;">
+                <button id="report-print-btn" class="btn-control" type="button" title="{{ t('modal.btn_print', 'Print report') }}" onclick="printReportModal()" style="width:auto; min-height:34px; padding:8px 10px; border-radius:999px; background:#f3f4f6; color:#164630; border:1px solid #e6e7ea; box-shadow:none;">
                     <i class="fa-solid fa-print"></i>
                 </button>
-                <button class="btn-control cancel-secondary" id="report-modal-close-btn" type="button" onclick="closeReportModal()" style="width: auto; min-height: 34px; padding: 8px 12px; border-radius: 999px; background: #dc2626; color: #ffffff; border: 1px solid #dc2626; box-shadow: none;">Close</button>
+                <button class="btn-control cancel-secondary" id="report-modal-close-btn" type="button" onclick="closeReportModal()" style="width: auto; min-height: 34px; padding: 8px 12px; border-radius: 999px; background: #dc2626; color: #ffffff; border: 1px solid #dc2626; box-shadow: none;" data-i18n="modal.btn_close">{{ t('modal.btn_close', 'Close') }}</button>
             </div>
         </div>
 
-        <div class="status-row-bar">Status: <span id="report-status-text">--</span></div>
+        <div class="status-row-bar"><span data-i18n="modal.status_label">{{ t('modal.status_label', 'Status:') }}</span> <span id="report-status-text">--</span></div>
 
         <div class="desktop-split-layout">
             <div class="desktop-col-left">
@@ -522,7 +522,7 @@
         <div class="diagnostic-result-badge" id="report-severity-banner">
             <div class="badge-main">
                 <h3 id="report-pest-title">--</h3>
-                <p>Confidence: <span id="report-confidence">--</span></p>
+                <p><span data-i18n="modal.confidence_label">{{ t('modal.confidence_label', 'Confidence:') }}</span> <span id="report-confidence">--</span></p>
             </div>
         </div>
 
@@ -531,9 +531,9 @@
         </div>
 
         <div style="font-size: 0.8rem; color: #64748b; line-height: 1.3; margin-top: 12px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px;">
-            <div><strong style="color: #475569;">Farmer:</strong> <span id="report-farmer-name">--</span></div>
-            <div><strong style="color: #475569;">Location:</strong> <span id="report-location-text">--</span></div>
-            <div><strong style="color: #475569;">Scanned:</strong> <span id="report-timestamp-text">--</span></div>
+            <div><strong style="color: #475569;" data-i18n="modal.farmer_label">{{ t('modal.farmer_label', 'Farmer:') }}</strong> <span id="report-farmer-name">--</span></div>
+            <div><strong style="color: #475569;" data-i18n="modal.location_label">{{ t('modal.location_label', 'Location:') }}</strong> <span id="report-location-text">--</span></div>
+            <div><strong style="color: #475569;" data-i18n="modal.scanned_label">{{ t('modal.scanned_label', 'Scanned:') }}</strong> <span id="report-timestamp-text">--</span></div>
         </div>
 
             </div>
@@ -541,37 +541,37 @@
 
 {% if session.get('user_role') in ['admin', 'lgu'] %}
         <div class="premium-form-card" id="report-notes-card">
-            <h4><i class="fa-solid fa-pen-to-square"></i> Farmer Notes</h4>
-            <textarea class="notes-input-box" id="field-notes-capture" placeholder="Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs)."></textarea>
+            <h4 data-i18n="modal.farmer_notes_title"><i class="fa-solid fa-pen-to-square"></i> {{ t('modal.farmer_notes_title', 'Farmer Notes') }}</h4>
+            <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder"></textarea>
             <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
         </div>
 
             <div class="premium-reco-card" id="report-initial-card">
-            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Initial Recommendations</h4>
-           <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;">
-                These are general recommendations for the detected pest to help your initial decision on what to do.
+            <h4 data-i18n="modal.initial_reco_title"><i class="fa-solid fa-wand-magic-sparkles"></i> {{ t('modal.initial_reco_title', 'Initial Recommendations') }}</h4>
+           <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
+                {{ t('modal.initial_reco_desc', 'These are general recommendations for the detected pest to help your initial decision on what to do.') }}
             </p>
             <ul id="report-initial-list"></ul>
-            <p style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;">
-                Tap the <i class="fa-solid fa-circle-question" style="color: rgba(56, 189, 248, 0.7); margin:0 2px;"></i> icon for more details.
+            <p style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;" data-i18n="modal.initial_reco_subtext">
+                {{ t('modal.initial_reco_subtext', 'Tap the question mark icon for more details.') }}
             </p>
         </div>
 
         {% else %}
             <div class="premium-reco-card" id="report-initial-card">
-            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> Initial Recommendations</h4>
-           <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;">
-                These are general recommendations for the detected pest to help your initial decision on what to do.
+            <h4 data-i18n="modal.initial_reco_title"><i class="fa-solid fa-wand-magic-sparkles"></i> {{ t('modal.initial_reco_title', 'Initial Recommendations') }}</h4>
+           <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
+                {{ t('modal.initial_reco_desc', 'These are general recommendations for the detected pest to help your initial decision on what to do.') }}
             </p>
             <ul id="report-initial-list"></ul>
-            <p style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;">
-                Tap the <i class="fa-solid fa-circle-question" style="color: rgba(56, 189, 248, 0.7); margin:0 2px;"></i> icon for more details.
+            <p style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;" data-i18n="modal.initial_reco_subtext">
+                {{ t('modal.initial_reco_subtext', 'Tap the question mark icon for more details.') }}
             </p>
         </div>
 
         <div class="premium-form-card" id="report-notes-card">
-            <h4><i class="fa-solid fa-pen-to-square"></i> Farmer Notes</h4>
-            <textarea class="notes-input-box" id="field-notes-capture" placeholder="Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs)."></textarea>
+            <h4 data-i18n="modal.farmer_notes_title"><i class="fa-solid fa-pen-to-square"></i> {{ t('modal.farmer_notes_title', 'Farmer Notes') }}</h4>
+            <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder"></textarea>
             <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
         </div>
         {% endif %}
@@ -579,26 +579,26 @@
         <!-- Expert card removed from here; placed below Additional Images for agriculturist pending view -->
 
         <div class="premium-form-card" data-scan-only>
-            <h4><i class="fa-solid fa-images"></i> Supporting Photos (optional)</h4>
+            <h4 data-i18n="modal.supporting_photos_title"><i class="fa-solid fa-images"></i> {{ t('modal.supporting_photos_title', 'Supporting Photos (optional)') }}</h4>
             <div class="modern-micro-upload-zone" onclick="triggerSupportingPhotoUpload()">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
-                <span>Add Extra Field Images</span>
-                <p>Tap to open your phone gallery directory</p>
+                <span data-i18n="modal.supporting_photos_prompt">{{ t('modal.supporting_photos_prompt', 'Add Extra Field Images') }}</span>
+                <p data-i18n="modal.supporting_photos_subtext">{{ t('modal.supporting_photos_subtext', 'Tap to open your phone gallery directory') }}</p>
             </div>
             <input type="file" id="supporting-photos-input" accept="image/*" multiple onchange="handleSupportingImages(event)">
-            <div id="supporting-photos-error" style="display: none; padding: 12px 16px; background-color: #fee2e2; color: #991b1b; border-radius: 8px; font-size: 0.88rem; font-weight: 600; margin-top: 12px; align-items: center; gap: 8px; border-left: 4px solid #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> <span>You can upload a maximum of 3 supporting photos only.</span></div>
+            <div id="supporting-photos-error" style="display: none; padding: 12px 16px; background-color: #fee2e2; color: #991b1b; border-radius: 8px; font-size: 0.88rem; font-weight: 600; margin-top: 12px; align-items: center; gap: 8px; border-left: 4px solid #dc2626;"><i class="fa-solid fa-circle-exclamation"></i> <span data-i18n="modal.supporting_photos_error">{{ t('modal.supporting_photos_error', 'You can upload a maximum of 3 supporting photos only.') }}</span></div>
             <div class="supporting-preview-grid" id="supporting-preview-grid"></div>
         </div>
 
         <div class="premium-form-card" data-readonly-only>
-            <h4><i class="fa-solid fa-images"></i> Additional Images</h4>
+            <h4 data-i18n="modal.additional_images_title"><i class="fa-solid fa-images"></i> {{ t('modal.additional_images_title', 'Additional Images') }}</h4>
             <div id="report-additional-images-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px;"></div>
         </div>
 
         <div class="premium-reco-card" id="report-expert-card" style="display:block;">
-            <h4><i class="fa-solid fa-user-shield"></i> Expert Assessment</h4>
+            <h4 data-i18n="modal.expert_assessment_title"><i class="fa-solid fa-user-shield"></i> {{ t('modal.expert_assessment_title', 'Expert Assessment') }}</h4>
             <ul id="report-expert-list" class="expert-reco-clean-list" style="margin-top: 12px;"></ul>
-            <p id="expert-assessment-issued-note" style="font-size:0.88rem; color:#475569; font-style:italic; margin:8px 0 0; display:none;">Expert assessment issued.</p>
+            <p id="expert-assessment-issued-note" style="font-size:0.88rem; color:#475569; font-style:italic; margin:8px 0 0; display:none;" data-i18n="modal.expert_assessment_issued">{{ t('modal.expert_assessment_issued', 'Expert assessment issued.') }}</p>
             
             <textarea id="expert-notes-input" class="notes-input-box" placeholder="Provide additional observations, clarifications, or recommendations based on your assessment of this report." style="display:none; margin-top: 12px;"></textarea>
             <p id="expert-notes-help" class="expert-notes-help-text" style="font-size:0.88rem; display:none;">Share assessment notes for the farmer using the Submit button.</p>
@@ -609,7 +609,7 @@
         </div>
 
         <div class="premium-form-card" id="report-farmer-feedback-card" style="display:none;">
-            <h4><i class="fa-solid fa-calendar-check"></i> Follow-up</h4>
+            <h4 data-i18n="modal.followup_section_title"><i class="fa-solid fa-calendar-check"></i> {{ t('modal.followup_section_title', 'Follow-up') }}</h4>
             <div id="report-farmer-feedback"></div>
         </div>
 
@@ -630,7 +630,7 @@
 
         <div class="control-action-bar">
             <button class="btn-control submit-primary" id="report-scan-submit-btn" type="button" onclick="submitReportPayload()">
-                <i class="fa-solid fa-paper-plane"></i> Submit Report
+                <i class="fa-solid fa-paper-plane"></i> <span data-i18n="modal.btn_submit_report">{{ t('modal.btn_submit_report', 'Submit Report') }}</span>
             </button>
         </div>
     </div>

@@ -2,7 +2,7 @@
 {% set sidebar_role = 'Farmer' %}
 {% set active_page = 'scan' %}
 
-{% block title %}CocoScan - Scan Pest{% endblock %}
+{% block title %}CocoScan - {{ t('navigation.menu_scan_pest', 'Scan Pest') }}{% endblock %}
 
 {% block mobile_restriction_overlay %}
 <div class="desktop-restriction-overlay">
@@ -13,10 +13,10 @@
             <div class="ripple-ring ring-2"></div>
             <i class="fa-solid fa-mobile-screen-button"></i>
         </div>
-        <h2>Mobile Access Required</h2>
-        <p>You can view your dashboard on any device, but <strong>Scan Pest</strong> requires a mobile smartphone to utilize its camera for capturing real-time leaf images directly in the field.</p>
+        <h2 data-i18n="scanner.mobile_restriction_title">{{ t('scanner.mobile_restriction_title', 'Mobile Access Required') }}</h2>
+        <p data-i18n="scanner.mobile_restriction_desc">{{ t('scanner.mobile_restriction_desc', 'You can view your dashboard on any device, but Scan Pest requires a mobile smartphone to utilize its camera for capturing real-time leaf images directly in the field.') }}</p>
         <button type="button" onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href = '/farmer/dashboard'; }" class="btn-restriction-back">
-            <i class="fa-solid fa-arrow-left"></i> Go Back
+            <i class="fa-solid fa-arrow-left"></i> <span data-i18n="navigation.btn_go_back">{{ t('navigation.btn_go_back', 'Go Back') }}</span>
         </button>
     </div>
 </div>
@@ -1233,7 +1233,8 @@
             border-color: rgba(239, 68, 68, 0.35);
         }
 
-        #hidden-camera-input {
+        #hidden-camera-input,
+        #hidden-upload-input {
             display: none;
         }
 
@@ -1264,46 +1265,45 @@
 <div id="step-upload-view" class="workflow-step-view active-view">
                 <header class="section-title-wrap">
                     <div>
-                        <h1>Detect Pest</h1>
-                        <p>Powered by Image Recognition</p>
+                        <h1 data-i18n="scanner.page_title">{{ t('scanner.page_title', 'Detect Pest') }}</h1>
+                        <p data-i18n="scanner.page_subtitle">{{ t('scanner.page_subtitle', 'Powered by Image Recognition') }}</p>
                     </div>
 
                 </header>
 
                 <div class="upload-drop-zone">
                     <div class="upload-cloud-icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
-                    <p>Drop your coconut leaf image here<br><span
-                            style="font-size: 0.72rem; color: var(--text-muted);">or choose how you want to capture or upload</span></p>
+                    <p style="font-size: 0.95rem; font-weight: 600; color: var(--brand-dark); margin: 0;"><span data-i18n="scanner.drop_zone_title">{{ t('scanner.drop_zone_title', 'Scan or upload your coconut leaf image') }}</span></p>
                     <div class="upload-action-row">
                         <button type="button" class="btn-action-trigger camera" onclick="triggerNativeCamera()">
-                            <i class="fa-solid fa-camera"></i> Use Camera
+                            <i class="fa-solid fa-camera"></i> <span>Camera</span>
                         </button>
                         <button type="button" class="btn-action-trigger upload" onclick="triggerPhotoUpload()">
-                            <i class="fa-solid fa-cloud-arrow-up"></i> Upload Photo
+                            <i class="fa-solid fa-cloud-arrow-up"></i> <span>Upload Photo</span>
                         </button>
                     </div>
                     <div id="gps-status-banner" class="gps-status-banner" role="status" aria-live="polite"></div>
-                    <p style="font-size:0.75rem; color: var(--text-muted); margin-top: 6px;">
-                        Camera captures live GPS. Uploaded photos allow manual or map pin location input.
+                    <p style="font-size:0.75rem; color: var(--text-muted); margin-top: 6px;" data-i18n="scanner.gps_help_text">
+                        {{ t('scanner.gps_help_text', 'Camera captures live GPS, while uploaded photos use manual or map pin input.') }}
                     </p>
-                    <input type="file" id="hidden-camera-input" accept="image/*" capture="environment"
+                    <input type="file" id="hidden-camera-input" accept="image/*" capture="environment" style="display: none;"
                         onchange="handleImagePipeline(event, 'camera')">
-                    <input type="file" id="hidden-upload-input" accept="image/*"
+                    <input type="file" id="hidden-upload-input" accept="image/*" style="display: none;"
                         onchange="handleImagePipeline(event, 'upload')">
                 </div>
 
                 <div class="guidance-tips-card">
-                    <h4>Tips for Best Results</h4>
+                    <h4 data-i18n="scanner.tips_title">{{ t('scanner.tips_title', 'Tips for Best Results') }}</h4>
                     <ul>
-                        <li>Use good lighting conditions</li>
-                        <li>Focus on affected leaf areas</li>
-                        <li>Capture the full leaf if possible</li>
-                        <li>Avoid blurry images</li>
+                        <li data-i18n="scanner.tips_item1">{{ t('scanner.tips_item1', 'Use good lighting conditions') }}</li>
+                        <li data-i18n="scanner.tips_item2">{{ t('scanner.tips_item2', 'Focus on affected leaf areas') }}</li>
+                        <li data-i18n="scanner.tips_item3">{{ t('scanner.tips_item3', 'Capture the full leaf if possible') }}</li>
+                        <li data-i18n="scanner.tips_item4">{{ t('scanner.tips_item4', 'Avoid blurry images') }}</li>
                     </ul>
                 </div>
 
                 <div class="recent-scans-panel">
-                    <div class="panel-header-inline"><i class="fa-solid fa-clock-rotate-left"></i> Recent History Logs
+                    <div class="panel-header-inline"><i class="fa-solid fa-clock-rotate-left"></i> <span data-i18n="scanner.history_logs_title">{{ t('scanner.history_logs_title', 'Recent History Logs') }}</span>
                     </div>
                     <div class="scans-history-list" id="historical-log-target"></div>
                 </div>
@@ -1314,30 +1314,30 @@
                 <div class="location-modal-card">
                     <div class="location-modal-header">
                         <h3 id="location-modal-title">
-                            <i class="fa-solid fa-map-location-dot" style="color: #2A7B4C;"></i> Set Tree Location
+                            <i class="fa-solid fa-map-location-dot" style="color: #2A7B4C;"></i> <span data-i18n="scanner.loc_modal_title">{{ t('scanner.loc_modal_title', 'Set Tree Location') }}</span>
                         </h3>
                         <button type="button" onclick="cancelUploadLocationModal()" style="background: none; border: none; font-size: 1.2rem; color: #94a3b8; cursor: pointer;" aria-label="Close">
                             <i class="fa-solid fa-xmark"></i>
                         </button>
                     </div>
                     <div class="location-modal-body">
-                        <p style="font-size: 0.82rem; color: #64748b; line-height: 1.45;">
-                            To ensure reporting accuracy for uploaded photos, please enter the farm location or tap the map to place a pin where this coconut tree is located.
+                        <p style="font-size: 0.82rem; color: #64748b; line-height: 1.45;" data-i18n="scanner.loc_modal_desc">
+                            {{ t('scanner.loc_modal_desc', 'To ensure reporting accuracy for uploaded photos, please enter the farm location or tap the map to place a pin where this coconut tree is located.') }}
                         </p>
 
                         <div class="location-input-group">
                             <label for="manual-location-text">
-                                <span>Farm / Barangay Location <span style="color: #dc2626;">*</span></span>
+                                <span><span data-i18n="scanner.loc_label_farm">{{ t('scanner.loc_label_farm', 'Farm / Barangay Location') }}</span> <span style="color: #dc2626;">*</span></span>
                                 <button type="button" class="btn-current-gps-inline" onclick="fetchDeviceLocationForMap()">
-                                    <i class="fa-solid fa-crosshairs"></i> Use Current GPS
+                                    <i class="fa-solid fa-crosshairs"></i> <span data-i18n="scanner.loc_btn_use_gps">{{ t('scanner.loc_btn_use_gps', 'Use Current GPS') }}</span>
                                 </button>
                             </label>
-                            <input type="text" id="manual-location-text" class="location-text-field" placeholder="e.g., Brgy. Malabanban Sur, Candelaria, Quezon" oninput="handleManualLocationTextInput(this.value)">
+                            <input type="text" id="manual-location-text" class="location-text-field" placeholder="{{ t('scanner.loc_input_placeholder', 'e.g., Brgy. Malabanban Sur, Candelaria, Quezon') }}" data-i18n-placeholder="scanner.loc_input_placeholder" oninput="handleManualLocationTextInput(this.value)">
                         </div>
 
                         <div class="location-input-group">
                             <label>
-                                <span>Tap or Drag Pin on Map</span>
+                                <span data-i18n="scanner.loc_map_pin_label">{{ t('scanner.loc_map_pin_label', 'Tap or Drag Pin on Map') }}</span>
                                 <span id="pin-coords-text" style="font-size: 0.72rem; color: #94a3b8; font-weight: 500;"></span>
                             </label>
                             <div class="upload-map-wrapper">
@@ -1347,13 +1347,13 @@
 
                         <div id="location-reverse-badge" class="location-detected-badge" style="display: none;">
                             <i class="fa-solid fa-location-dot" style="color: #16a34a; font-size: 1rem;"></i>
-                            <span id="location-reverse-text">Detected location</span>
+                            <span id="location-reverse-text" data-i18n="scanner.loc_detected_badge">{{ t('scanner.loc_detected_badge', 'Detected location') }}</span>
                         </div>
                     </div>
                     <div class="location-modal-footer">
-                        <button type="button" class="btn-cancel-location" onclick="cancelUploadLocationModal()">Cancel</button>
+                        <button type="button" class="btn-cancel-location" onclick="cancelUploadLocationModal()" data-i18n="scanner.loc_btn_cancel">{{ t('scanner.loc_btn_cancel', 'Cancel') }}</button>
                         <button type="button" class="btn-confirm-location" id="btn-confirm-upload-location" onclick="confirmUploadLocationAndScan()">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Confirm & Scan
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="scanner.loc_btn_confirm_scan">{{ t('scanner.loc_btn_confirm_scan', 'Confirm & Scan') }}</span>
                         </button>
                     </div>
                 </div>
@@ -1366,16 +1366,16 @@
                         <div style="width: 56px; height: 56px; border-radius: 16px; background: rgba(42, 123, 76, 0.12); color: #2A7B4C; font-size: 1.75rem; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 12px;">
                             <i class="fa-solid fa-cloud-arrow-down"></i>
                         </div>
-                        <h3 id="offline-saved-title" style="font-size: 1.15rem; font-weight: 800; color: #0b251a; margin-bottom: 6px;">Saved to Local Drafts</h3>
-                        <p style="font-size: 0.85rem; color: #475569; line-height: 1.5; margin: 0 0 16px 0;">
-                            You are currently offline. Your photo has been securely saved to your local device drafts. When you regain internet connection, open the <strong>Drafts</strong> page to run AI pest detection and submit your report.
+                        <h3 id="offline-saved-title" style="font-size: 1.15rem; font-weight: 800; color: #0b251a; margin-bottom: 6px;" data-i18n="scanner.offline_saved_title">{{ t('scanner.offline_saved_title', 'Saved to Local Drafts') }}</h3>
+                        <p style="font-size: 0.85rem; color: #475569; line-height: 1.5; margin: 0 0 16px 0;" data-i18n="scanner.offline_saved_desc">
+                            {{ t('scanner.offline_saved_desc', 'You are currently offline. Your photo has been securely saved to your local device drafts. When you regain internet connection, open the Drafts page to run AI pest detection and submit your report.') }}
                         </p>
                         <div style="display: flex; flex-direction: column; gap: 8px;">
                             <a href="/farmer/drafts" class="btn-confirm-location" style="justify-content: center; text-decoration: none;">
-                                <i class="fa-solid fa-folder-open"></i> View Saved Drafts
+                                <i class="fa-solid fa-folder-open"></i> <span data-i18n="scanner.offline_saved_btn_view_drafts">{{ t('scanner.offline_saved_btn_view_drafts', 'View Saved Drafts') }}</span>
                             </a>
-                            <button type="button" class="btn-cancel-location" onclick="dismissOfflineSavedModal()">
-                                Upload / Scan Another
+                            <button type="button" class="btn-cancel-location" onclick="dismissOfflineSavedModal()" data-i18n="scanner.offline_saved_btn_another">
+                                {{ t('scanner.offline_saved_btn_another', 'Upload / Scan Another') }}
                             </button>
                         </div>
                     </div>
@@ -1384,9 +1384,8 @@
 
             <div id="step-loading-view" class="workflow-step-view">
                 <div class="spinner-element"></div>
-                <h4 style="color: var(--brand-dark); font-weight: 700; font-size: 1rem;">Analyzing Image Spectrum...
-                </h4>
-                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Running inference rules</p>
+                <h4 style="color: var(--brand-dark); font-weight: 700; font-size: 1rem;" data-i18n="scanner.analyzing_title">{{ t('scanner.analyzing_title', 'Analyzing Image Spectrum...') }}</h4>
+                <p style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;" data-i18n="scanner.analyzing_subtext">{{ t('scanner.analyzing_subtext', 'Running inference rules') }}</p>
             </div>
 
             <div id="step-results-view" class="workflow-step-view">
@@ -1469,13 +1468,15 @@
             const recentHistory = historyDataset.slice(0, 5);
 
             if (!recentHistory || recentHistory.length === 0) {
+                const emptyTitle = window.CocoScanI18n ? window.CocoScanI18n.t('scanner.no_recent_history_title', 'No recent scan history') : 'No recent scan history';
+                const emptyDesc = window.CocoScanI18n ? window.CocoScanI18n.t('scanner.no_recent_history_desc', 'Your recent insect diagnostics will be tracked here once you execute a localized leaf scan operation.') : 'Your recent insect diagnostics will be tracked here once you execute a localized leaf scan operation.';
                 logTargetContainer.innerHTML = `
                     <div class="history-empty-state-card">
                         <div class="history-empty-icon-circle">
                             <i class="fa-solid fa-receipt"></i>
                         </div>
-                        <h4>No recent scan history</h4>
-                        <p>Your recent insect diagnostics will be tracked here once you execute a localized leaf scan operation.</p>
+                        <h4>${emptyTitle}</h4>
+                        <p>${emptyDesc}</p>
                     </div>`;
                 return;
             }

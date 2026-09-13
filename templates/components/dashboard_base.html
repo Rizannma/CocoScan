@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 {% import "components/macros.html" as macros %}
-<html lang="en">
+<html lang="{{ current_lang or 'en' }}">
 
 <head>
     <meta charset="UTF-8">
@@ -12,6 +12,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/weather_widget.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}"></script>
 
     <style>
         /* ==========================================================================
@@ -118,17 +119,47 @@
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 0.95rem;
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            text-decoration: none;
+            transition: all 0.2s ease;
             flex-shrink: 0;
             margin-right: 2px;
         }
 
         .btn-inapp-back:hover {
             background: rgba(255, 255, 255, 0.18);
-            border-color: rgba(255, 255, 255, 0.32);
+            border-color: rgba(255, 255, 255, 0.3);
             color: #ffffff;
             transform: translateX(-2px);
+        }
+
+        .lang-toggle-btn {
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #ffffff;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.2s ease;
+            user-select: none;
+            letter-spacing: 0.5px;
+        }
+
+        .lang-toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.22);
+            border-color: rgba(255, 255, 255, 0.45);
+            transform: translateY(-1px);
+        }
+
+        .lang-toggle-btn .active-lang {
+            color: var(--brand-accent);
+            font-weight: 800;
+            text-decoration: underline;
+            text-underline-offset: 2px;
         }
 
         .btn-inapp-back:active {
@@ -206,6 +237,26 @@
         .menu-item-link.active {
             color: #ffffff;
             background-color: rgba(255, 255, 255, 0.06);
+        }
+
+        .sidebar-menu-scroll {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-bottom-group {
+            margin-top: auto;
+            flex-shrink: 0;
+            width: 100%;
+        }
+
+        .sidebar-lang-container {
+            padding: 12px 18px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
 
         .sidebar-user-footer {
@@ -875,7 +926,7 @@
     <div class="mobile-viewport-container">
         <header class="mobile-header">
             <div class="header-brand-group" style="display: flex; align-items: center; gap: 10px;">
-                <button type="button" class="btn-inapp-back" onclick="handleInAppBackNavigation()" title="Go Back" aria-label="Go Back">
+                <button type="button" class="btn-inapp-back" onclick="handleInAppBackNavigation()" title="{{ t('navigation.btn_go_back', 'Go Back') }}" aria-label="{{ t('navigation.btn_go_back', 'Go Back') }}">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
                 <div class="logo-group">
@@ -884,32 +935,55 @@
                     </div>
                     <div>
                         <h2>CocoScan</h2>
-                        <p>Coconut Pest Detection</p>
+                        <p data-i18n="navigation.app_subtitle">{{ t('navigation.app_subtitle', 'Coconut Pest Detection') }}</p>
                     </div>
                 </div>
             </div>
-            <button class="hamburger-btn" onclick="toggleSidebarMenu()" aria-label="Toggle Navigation Menu">
-                <i class="fa-solid fa-bars" id="toggleIcon"></i>
-            </button>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                {% if session.get('user_role') == 'farmer' or not session.get('user_role') %}
+                <button type="button" class="lang-toggle-btn" onclick="toggleLanguagePreference()" title="{{ t('navigation.lang_preference', 'Language' if current_lang != 'tl' else 'Wika') }}" aria-label="Toggle Language">
+                    <i class="fa-solid fa-globe" style="font-size: 0.78rem; color: var(--brand-accent);"></i>
+                    <span class="lang-en {% if current_lang != 'tl' %}active-lang{% endif %}">EN</span>
+                    <span style="opacity: 0.4;">|</span>
+                    <span class="lang-tl {% if current_lang == 'tl' %}active-lang{% endif %}">TL</span>
+                </button>
+                {% endif %}
+                <button class="hamburger-btn" onclick="toggleSidebarMenu()" aria-label="Toggle Navigation Menu">
+                    <i class="fa-solid fa-bars" id="toggleIcon"></i>
+                </button>
+            </div>
         </header>
 
         <div class="sidebar-backdrop" id="backdrop" onclick="toggleSidebarMenu()"></div>
 
         <aside class="sidebar-wrapper" id="sidebar">
-            <div>
+            <div class="sidebar-menu-scroll">
                 {{ macros.render_sidebar(role=sidebar_role, active_item=active_page) }}
             </div>
 
-            <div class="sidebar-user-footer">
-                <div class="user-meta-box">
-                    <div class="user-avatar-circle"><i class="fa-solid fa-user"
-                            style="color:#fff; font-size: 0.95rem;"></i></div>
-                    <div class="user-identity-text">
-                        <h4 id="sidebar-user-name">{{ user_name or 'Account' }}</h4>
-                        <p>{% block user_role %}User{% endblock %}</p>
-                    </div>
+            <div class="sidebar-bottom-group">
+                {% if session.get('user_role') == 'farmer' or not session.get('user_role') %}
+                <div class="sidebar-lang-container">
+                    <span style="font-size: 0.75rem; color: rgba(255,255,255,0.6); font-weight: 600;" data-i18n="navigation.lang_preference">{{ t('navigation.lang_preference', 'Language' if current_lang != 'tl' else 'Wika') }}</span>
+                    <button type="button" class="lang-toggle-btn" onclick="toggleLanguagePreference()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color:#fff; border-radius: 16px; padding: 4px 10px; font-size: 0.72rem; cursor: pointer;">
+                        <span class="lang-en {% if current_lang != 'tl' %}active-lang{% endif %}">EN</span>
+                        <span style="opacity: 0.4;">|</span>
+                        <span class="lang-tl {% if current_lang == 'tl' %}active-lang{% endif %}">TL</span>
+                    </button>
                 </div>
-                <a href="/logout" class="btn-logout-trigger"><i class="fa-solid fa-right-from-bracket"></i></a>
+                {% endif %}
+
+                <div class="sidebar-user-footer">
+                    <div class="user-meta-box">
+                        <div class="user-avatar-circle"><i class="fa-solid fa-user"
+                                style="color:#fff; font-size: 0.95rem;"></i></div>
+                        <div class="user-identity-text">
+                            <h4 id="sidebar-user-name">{{ user_name or 'Account' }}</h4>
+                            <p>{% block user_role %}{{ t('navigation.user_role_farmer', 'Farmer') if session.get('user_role') == 'farmer' else 'User' }}{% endblock %}</p>
+                        </div>
+                    </div>
+                    <a href="/logout" class="btn-logout-trigger" title="{{ t('navigation.btn_logout', 'Logout') }}" aria-label="{{ t('navigation.btn_logout', 'Logout') }}"><i class="fa-solid fa-right-from-bracket"></i></a>
+                </div>
             </div>
         </aside>
 
@@ -1069,10 +1143,26 @@
                 sidebarNameEl.textContent = fullName;
             }
 
-            let welcome = "Dashboard";
-            if (hour < 12) welcome = `Good Morning, ${firstName}!`;
-            else if (hour < 18) welcome = `Good Afternoon, ${firstName}!`;
-            else welcome = `Good Evening, ${firstName}!`;
+            const isTagalog = (window.CocoScanI18n && typeof window.CocoScanI18n.getLanguage === 'function')
+                ? (window.CocoScanI18n.getLanguage() === 'tl')
+                : (localStorage.getItem('cocoscan_lang') === 'tl' || document.documentElement.getAttribute('lang') === 'tl');
+
+            function formatGreeting(name) {
+                if (isTagalog) {
+                    if (hour < 12) return `Magandang Umaga, ${name}!`;
+                    else if (hour < 18) return `Magandang Hapon, ${name}!`;
+                    else return `Magandang Gabi, ${name}!`;
+                } else {
+                    if (hour < 12) return `Good Morning, ${name}!`;
+                    else if (hour < 18) return `Good Afternoon, ${name}!`;
+                    else return `Good Evening, ${name}!`;
+                }
+            }
+
+            let welcome = isTagalog ? "Dashboard" : "Dashboard";
+            if (firstName) {
+                welcome = formatGreeting(firstName);
+            }
             if (banner) banner.textContent = welcome;
 
             // Asynchronously check IndexedDB for any cached profile details to ensure full fidelity
@@ -1088,9 +1178,7 @@
                                 localStorage.setItem('cocoscan_user_first_name', dbFirstName);
                                 if (sidebarNameEl) sidebarNameEl.textContent = user.name;
                                 if (banner) {
-                                    if (hour < 12) banner.textContent = `Good Morning, ${dbFirstName}!`;
-                                    else if (hour < 18) banner.textContent = `Good Afternoon, ${dbFirstName}!`;
-                                    else banner.textContent = `Good Evening, ${dbFirstName}!`;
+                                    banner.textContent = formatGreeting(dbFirstName);
                                 }
                             }
                         }
@@ -1100,6 +1188,10 @@
         }
 
         window.hydrateUserProfileGreeting = hydrateUserProfileGreeting;
+
+        window.addEventListener('cocoscan:languagechange', () => {
+            hydrateUserProfileGreeting();
+        });
 
         window.addEventListener('offline', () => {
             hydrateUserProfileGreeting();

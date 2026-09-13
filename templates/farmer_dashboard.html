@@ -2,15 +2,13 @@
 
 {% set active_page = 'dashboard' %}
 {% set sidebar_role = 'Farmer' %}
-{% block title %}CocoScan - Farmer Dashboard{% endblock %}
+{% block title %}CocoScan - {{ t('dashboard.page_title', 'Farmer Dashboard') }}{% endblock %}
 
-
-
-{% block user_role %}Farmer{% endblock %}
+{% block user_role %}{{ t('navigation.user_role_farmer', 'Farmer') }}{% endblock %}
 
 {% block page_header %}
-<h1 style="font-size: 1.6rem; font-weight: 800; color: #0b1315; margin: 0; line-height: 1.1;">Farmer Dashboard</h1>
-<p style="font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0;">Overview of your reported and detected pests</p>
+<h1 style="font-size: 1.6rem; font-weight: 800; color: #0b1315; margin: 0; line-height: 1.1;" data-i18n="dashboard.page_title">{{ t('dashboard.page_title', 'Farmer Dashboard') }}</h1>
+<p style="font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0;" data-i18n="dashboard.page_subtitle">{{ t('dashboard.page_subtitle', 'Overview of your reported and detected pests') }}</p>
 {% endblock %}
 
 {% block metrics_grid %}
@@ -20,21 +18,21 @@
     <div style="display: flex; align-items: center; gap: 12px; color: #92400e;">
         <i class="fa-solid fa-cloud-arrow-down" style="font-size: 1.5rem; color: #d97706;"></i>
         <div>
-            <strong style="font-size: 0.95rem; display: block; color: #78350f;">Offline Access Active</strong>
-            <span style="font-size: 0.82rem; color: #92400e;">You can perform field scans and save them to local drafts without an active internet connection.</span>
+            <strong style="font-size: 0.95rem; display: block; color: #78350f;" data-i18n="dashboard.banner_offline_title">{{ t('dashboard.banner_offline_title', 'Offline Access Active') }}</strong>
+            <span style="font-size: 0.82rem; color: #92400e;" data-i18n="dashboard.banner_offline_desc">{{ t('dashboard.banner_offline_desc', 'You can perform field scans and save them to local drafts without an active internet connection.') }}</span>
         </div>
     </div>
     <a href="{{ url_for('farmer_scan') }}" style="background: #2A7B4C; color: #ffffff; padding: 8px 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(42, 123, 76, 0.2);">
-        <i class="fa-solid fa-camera"></i> Launch Scanner
+        <i class="fa-solid fa-camera"></i> <span data-i18n="dashboard.banner_offline_action">{{ t('dashboard.banner_offline_action', 'Launch Scanner') }}</span>
     </a>
 </div>
 
 <div class="metrics-row-wrapper">
     <div class="metric-card-node cases">
         <div class="metric-data">
-            <h5>Total Reported Cases</h5>
+            <h5><span data-i18n="dashboard.metric_total_cases">{{ t('dashboard.metric_total_cases', 'Total Reported Cases') }}</span></h5>
             <div class="metric-count" id="metric-total-cases">{{ metrics.total_cases }}</div>
-            <p>All Time Submitted</p>
+            <p data-i18n="dashboard.metric_total_subtext">{{ t('dashboard.metric_total_subtext', 'All Time Submitted') }}</p>
         </div>
         <div class="metric-icon-box"><i class="fa-solid fa-bug"></i></div>
     </div>
@@ -42,18 +40,18 @@
     <div class="metrics-sub-split">
         <div class="metric-card-node pending">
             <div class="metric-data">
-                <h5>Pending</h5>
+                <h5><span data-i18n="dashboard.metric_pending_cases">{{ t('dashboard.metric_pending_cases', 'Pending') }}</span></h5>
                 <div class="metric-count" id="metric-pending-cases">{{ metrics.pending_cases }}</div>
-                <p>Awaiting for Review</p>
+                <p data-i18n="dashboard.metric_pending_subtext">{{ t('dashboard.metric_pending_subtext', 'Awaiting for Review') }}</p>
             </div>
             <div class="metric-icon-box"><i class="fa-solid fa-triangle-exclamation"></i></div>
         </div>
 
         <div class="metric-card-node resolved">
             <div class="metric-data">
-                <h5>Resolved</h5>
+                <h5><span data-i18n="dashboard.metric_resolved_cases">{{ t('dashboard.metric_resolved_cases', 'Resolved') }}</span></h5>
                 <div class="metric-count" id="metric-resolved-cases">{{ metrics.resolved_cases }}</div>
-                <p>Expert Solutions</p>
+                <p data-i18n="dashboard.metric_resolved_subtext">{{ t('dashboard.metric_resolved_subtext', 'Expert Solutions') }}</p>
             </div>
             <div class="metric-icon-box"><i class="fa-solid fa-circle-check"></i></div>
         </div>
@@ -71,25 +69,22 @@
 
         <div
             style="display: inline-flex; align-items: center; gap: 6px; background: #fef3c7; color: #92400e; padding: 4px 12px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; margin-bottom: 0.75rem;">
-            <i class="fa-solid fa-wifi-slash"></i> Offline Mode Active
+            <i class="fa-solid fa-wifi-slash"></i> <span data-i18n="dashboard.modal_offline_ready_badge">{{ t('dashboard.modal_offline_ready_badge', 'Offline Mode Active') }}</span>
         </div>
 
-        <h3 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: 0.6rem;">Offline Access Ready
+        <h3 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: 0.6rem;" data-i18n="dashboard.modal_offline_ready_title">{{ t('dashboard.modal_offline_ready_title', 'Offline Access Ready') }}
         </h3>
 
-        <p style="font-size: 0.92rem; color: #475569; line-height: 1.55; margin-bottom: 1.5rem;">
-            You are offline, but you can use CocoScan and it will be saved to the drafts and later, you can access it
-            again.
-        </p>
+        <p style="font-size: 0.92rem; color: #475569; line-height: 1.55; margin-bottom: 1.5rem;" data-i18n="dashboard.modal_offline_ready_desc">{{ t('dashboard.modal_offline_ready_desc', 'You are offline, but you can use CocoScan and it will be saved to the drafts and later, you can access it again.') }}</p>
 
         <div style="display: flex; flex-direction: column; gap: 10px;">
             <a href="{{ url_for('farmer_scan') }}"
                 style="background: #2A7B4C; color: #ffffff; padding: 12px 18px; border-radius: 12px; font-size: 0.9rem; font-weight: 700; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s;">
-                <i class="fa-solid fa-camera"></i> Start Pest Scan
+                <i class="fa-solid fa-camera"></i> <span data-i18n="dashboard.modal_offline_btn_scan">{{ t('dashboard.modal_offline_btn_scan', 'Start Pest Scan') }}</span>
             </a>
             <button type="button" onclick="closeFarmerOfflineModal()"
                 style="background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; padding: 12px 18px; border-radius: 12px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.2s;">
-                Continue to Dashboard
+                <span data-i18n="dashboard.modal_offline_btn_continue">{{ t('dashboard.modal_offline_btn_continue', 'Continue to Dashboard') }}</span>
             </button>
         </div>
     </div>
@@ -122,15 +117,15 @@
 
 {% block quick_action %}
 <div class="quick-action-card">
-    <h3>Scan Now</h3>
-    <p>Upload leaf images for automated anomaly checks.</p>
+    <h3 data-i18n="dashboard.quick_action_title">{{ t('dashboard.quick_action_title', 'Scan Now') }}</h3>
+    <p data-i18n="dashboard.quick_action_desc">{{ t('dashboard.quick_action_desc', 'Upload leaf images for automated anomaly checks.') }}</p>
     <a href="{{ url_for('farmer_scan') }}" class="btn-primary-scan" style="text-decoration: none;">
-        <i class="fa-solid fa-camera"></i> Launch Scanner
+        <i class="fa-solid fa-camera"></i> <span data-i18n="dashboard.quick_action_btn">{{ t('dashboard.quick_action_btn', 'Launch Scanner') }}</span>
     </a>
 </div>
 {% endblock %}
 
-{% block js_role_name %}Farmer{% endblock %}
+{% block js_role_name %}{{ t('navigation.user_role_farmer', 'Farmer') }}{% endblock %}
 
 {% block extra_scripts %}
 <script>

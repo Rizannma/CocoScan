@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="/static/js/auth_storage.js"></script>
+    <script src="/static/js/i18n.js"></script>
     <style>
         :root {
             --bg-dark-green: #081C10;
@@ -360,27 +361,31 @@
 
             if (isFarmer) {
                 clearCountdownTimer();
-                if (title) title.textContent = "You're Offline";
-                if (desc) desc.textContent = "Your network connection is unavailable right now. Thanks to CocoScan PWA, you can still perform leaf scans in the field and view locally saved drafts without an internet connection.";
-                if (badge) badge.style.display = "inline-flex";
+                const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+                if (title) title.textContent = t("pwa_and_offline.offline_portal_title", "You're Offline");
+                if (desc) desc.textContent = t("pwa_and_offline.offline_portal_desc", "Your network connection is unavailable right now. Thanks to CocoScan PWA, you can still perform leaf scans in the field and view locally saved drafts without an internet connection.");
+                if (badge) {
+                    badge.innerHTML = `<i class="fa-solid fa-bolt"></i> ${t("pwa_and_offline.offline_portal_badge", "CocoScan Offline Mode Active")}`;
+                    badge.style.display = "inline-flex";
+                }
                 if (statusDot) statusDot.style.backgroundColor = '#2A7B4C';
-                if (footerText) footerText.textContent = "Field scans will be automatically saved to your local storage until signal is restored.";
+                if (footerText) footerText.textContent = t("pwa_and_offline.offline_portal_footer", "Field scans will be automatically saved to your local storage until signal is restored.");
                 if (actions) {
                     actions.innerHTML = `
                         <a href="/farmer/scan" class="btn btn-primary">
-                            <i class="fa-solid fa-camera"></i> Open Field Scanner
+                            <i class="fa-solid fa-camera"></i> ${t("pwa_and_offline.offline_portal_btn_scanner", "Open Field Scanner")}
                         </a>
                         <a href="/farmer/drafts" class="btn btn-secondary">
-                            <i class="fa-solid fa-folder-open"></i> View Saved Offline Drafts
+                            <i class="fa-solid fa-folder-open"></i> ${t("pwa_and_offline.offline_portal_btn_drafts", "View Saved Offline Drafts")}
                         </a>
                         <a href="/farmer/dashboard" class="btn btn-outline" style="background: rgba(0,0,0,0.04);">
-                            <i class="fa-solid fa-gauge"></i> Return to Farmer Dashboard
+                            <i class="fa-solid fa-gauge"></i> ${t("pwa_and_offline.offline_portal_btn_dashboard", "Return to Farmer Dashboard")}
                         </a>
                         <button type="button" id="retry-btn" onclick="attemptReconnect()" class="btn btn-outline">
-                            <i class="fa-solid fa-rotate-right"></i> Retry Connection
+                            <i class="fa-solid fa-rotate-right"></i> ${t("pwa_and_offline.offline_portal_btn_retry", "Retry Connection")}
                         </button>
                         <a href="/login" class="btn btn-outline" style="font-size: 0.88rem;">
-                            <i class="fa-solid fa-right-from-bracket"></i> Switch Account
+                            <i class="fa-solid fa-right-from-bracket"></i> ${t("pwa_and_offline.offline_portal_btn_switch", "Switch Account")}
                         </a>
                     `;
                 }

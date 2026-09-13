@@ -2,7 +2,7 @@
 {% set sidebar_role = 'Farmer' %}
 {% set active_page = 'drafts' %}
 
-{% block title %}CocoScan - Drafts{% endblock %}
+{% block title %}CocoScan - {{ t('drafts.page_title', 'Saved Drafts') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -560,11 +560,11 @@
 {% block content %}
 <header class="section-title-wrap">
                 <div>
-                    <h1>Saved Drafts</h1>
-                    <p>Resume, submit, or remove your saved field scan reports.</p>
+                    <h1 data-i18n="drafts.page_title">{{ t('drafts.page_title', 'Saved Drafts') }}</h1>
+                    <p data-i18n="drafts.page_subtitle">{{ t('drafts.page_subtitle', 'Resume, submit, or remove your saved field scan reports.') }}</p>
                 </div>
                 <div>
-                    <button class="btn-icon-refresh" onclick="spinAndLoadDrafts(this)" title="Refresh Layout"><i
+                    <button class="btn-icon-refresh" onclick="spinAndLoadDrafts(this)" title="{{ t('drafts.btn_refresh', 'Refresh Layout') }}"><i
                             class="fa-solid fa-arrows-rotate"></i></button>
                 </div>
             </header>
@@ -576,8 +576,8 @@
                 <div class="empty-state-icon-box">
                     <i class="fa-solid fa-file-signature"></i>
                 </div>
-                <h2>No Saved Drafts</h2>
-                <p>You don’t have any draft scans saved yet. Go to Scan Pest page to begin your first report.</p>
+                <h2 data-i18n="drafts.empty_title">{{ t('drafts.empty_title', 'No Saved Drafts') }}</h2>
+                <p data-i18n="drafts.empty_desc">{{ t('drafts.empty_desc', 'You don’t have any draft scans saved yet. Go to Scan Pest page to begin your first report.') }}</p>
             </div>
 {% endblock %}
 
@@ -671,6 +671,9 @@
                 return;
             }
             showEmptyState(false);
+
+            const t = (k, def) => window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def;
+
             drafts.sort((a, b) => new Date(b.saved_at) - new Date(a.saved_at));
             drafts.forEach((draft) => {
                 const isOfflineDraft = draft.status === 'offline_draft' || draft.status === 'offline-draft' || draft.pest === 'Offline Scan (Pending AI)' || !draft.pest || draft.pest === 'Unknown Pest';
@@ -681,30 +684,30 @@
                         <div class="draft-thumb"><img src="${draft.primary_image_data || ''}" alt="Draft thumbnail"></div>
                         <div class="draft-meta">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                                <h3>${draft.pest || 'Offline Scan'}</h3>
+                                <h3>${draft.pest || t('drafts.offline_scan_title', 'Offline Scan')}</h3>
                                 ${isOfflineDraft 
-                                    ? `<span class="draft-badge draft-badge-pending"><i class="fa-solid fa-cloud-arrow-up"></i> Pending AI</span>` 
-                                    : `<span class="draft-badge draft-badge-ready"><i class="fa-solid fa-circle-check"></i> Scanned</span>`}
+                                    ? `<span class="draft-badge draft-badge-pending"><i class="fa-solid fa-cloud-arrow-up"></i> ${t('drafts.badge_pending_ai', 'Pending AI')}</span>` 
+                                    : `<span class="draft-badge draft-badge-ready"><i class="fa-solid fa-circle-check"></i> ${t('drafts.badge_scanned', 'Scanned')}</span>`}
                             </div>
-                            <p>Captured: ${formatDateLocal(draft.photo_taken_at)}</p>
-                            <p>Saved: ${formatDateLocal(draft.saved_at)}</p>
+                            <p>${t('drafts.label_captured', 'Captured')}: ${formatDateLocal(draft.photo_taken_at)}</p>
+                            <p>${t('drafts.label_saved', 'Saved')}: ${formatDateLocal(draft.saved_at)}</p>
                         </div>
                     </div>
                     <div class="draft-card-body">
-                        <div class="draft-stat"><strong>GPS</strong><span>${draft.gps?.latitude?.toFixed(5) || 'n/a'}, ${draft.gps?.longitude?.toFixed(5) || 'n/a'}</span></div>
-                        <div class="draft-stat"><strong>Notes</strong><span>${draft.farmer_notes || draft.field_notes || 'No notes added'}</span></div>
+                        <div class="draft-stat"><strong>${t('drafts.label_gps', 'GPS')}</strong><span>${draft.gps?.latitude?.toFixed(5) || 'n/a'}, ${draft.gps?.longitude?.toFixed(5) || 'n/a'}</span></div>
+                        <div class="draft-stat"><strong>${t('drafts.label_notes', 'Notes')}</strong><span>${draft.farmer_notes || draft.field_notes || t('drafts.no_notes', 'No notes added')}</span></div>
                     </div>
                     <div class="draft-actions">
                         <div class="main-actions-row">
                             <button class="btn-control btn-edit" onclick='continueDraft(${draft.id})'>
-                                <i class="fa-solid fa-pen-to-square"></i> Continue/Edit
+                                <i class="fa-solid fa-pen-to-square"></i> ${t('drafts.btn_continue_edit', 'Continue/Edit')}
                             </button>
                             <button class="btn-control btn-submit" id="btn-scan-${draft.id}" onclick='scanAndReviewDraft(${draft.id})'>
-                                <i class="fa-solid fa-camera"></i> Scan
+                                <i class="fa-solid fa-camera"></i> ${t('drafts.btn_scan', 'Scan')}
                             </button>
                         </div>
                         <button class="btn-control btn-delete" onclick='deleteDraft(${draft.id})'>
-                            Delete Draft
+                            ${t('drafts.btn_delete_draft', 'Delete Draft')}
                         </button>
                     </div>
                 `;
@@ -724,7 +727,7 @@
 
         function continueDraft(id) {
             getDraftById(id).then((draft) => {
-                if (!draft) { alert('Draft not found.'); return; }
+                if (!draft) { alert(window.CocoScanI18n ? window.CocoScanI18n.t('drafts.draft_not_found', 'Draft not found.') : 'Draft not found.'); return; }
                 const resumePayload = {
                     ...draft,
                     mode: 'edit_draft',
@@ -732,7 +735,7 @@
                 };
                 sessionStorage.setItem('cocoscan_resume_draft', JSON.stringify(resumePayload));
                 window.location.href = '/farmer/scan';
-            }).catch(() => alert('Unable to load draft.'));
+            }).catch(() => alert(window.CocoScanI18n ? window.CocoScanI18n.t('drafts.unable_load_draft', 'Unable to load draft.') : 'Unable to load draft.'));
         }
 
         function deleteDraftById(id) {
@@ -746,7 +749,8 @@
         }
 
         function deleteDraft(id) {
-            if (!confirm('Are you sure you want to delete this saved draft?')) return;
+            const confirmMsg = window.CocoScanI18n ? window.CocoScanI18n.t('drafts.confirm_delete', 'Are you sure you want to delete this saved draft?') : 'Are you sure you want to delete this saved draft?';
+            if (!confirm(confirmMsg)) return;
             deleteDraftById(id).then(() => { loadDrafts(); }).catch(() => alert('Unable to delete draft.'));
         }
 

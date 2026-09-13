@@ -49,6 +49,7 @@ from app.session_utils import (
     is_farmer_role,
     get_remember_me_lifetime_seconds
 )
+from app.i18n import t, get_all_translations, load_translations
 
 # Configure logging
 logging.basicConfig(
@@ -83,6 +84,35 @@ load_dotenv()
 app = Flask(__name__)
 app.session_interface = RoleBasedSessionInterface()
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+def _get_current_language():
+    try:
+        current_lang = session.get("lang")
+        if not current_lang:
+            current_lang = request.cookies.get("cocoscan_lang", "en")
+        if current_lang in ["en", "tl"]:
+            return current_lang
+    except Exception:
+        pass
+    return "en"
+
+def _jinja_t(key, default=None, **kwargs):
+    lang = _get_current_language()
+    return t(key, lang=lang, default=default, **kwargs)
+
+app.jinja_env.globals['t'] = _jinja_t
+app.jinja_env.globals['get_active_language'] = _get_current_language
+app.jinja_env.globals['get_all_translations'] = get_all_translations
+
+@app.context_processor
+def inject_i18n():
+    """Injects translation helper, current language, and dictionaries into template context."""
+    current_lang = _get_current_language()
+    return {
+        "current_lang": current_lang,
+        "t": _jinja_t,
+        "farmer_i18n": get_all_translations(current_lang),
+    }
 
 def _get_real_ip():
     """Retrieve the real IP address of the client, handling reverse proxies (X-Forwarded-For)."""
@@ -336,7 +366,9 @@ def _format_time_label(value):
     return f"{hour}:{parsed.minute:02d} {suffix}"
 
 
-def _format_confirmed_schedule_label(confirmed_date, start_time, end_time):
+def _format_confirmed_schedule_label(confirmed_date, start_time, end_time, lang=None):
+    if lang is None:
+        lang = _get_current_language()
     try:
         parsed_date = datetime.strptime(str(confirmed_date or ""), "%Y-%m-%d")
     except ValueError:
@@ -346,6 +378,15 @@ def _format_confirmed_schedule_label(confirmed_date, start_time, end_time):
     end_label = _format_time_label(end_time)
     if not start_label or not end_label:
         return ""
+
+    if lang == "tl":
+        months_tl = {
+            1: "Enero", 2: "Pebrero", 3: "Marso", 4: "Abril", 5: "Mayo", 6: "Hunyo",
+            7: "Hulyo", 8: "Agosto", 9: "Setyembre", 10: "Oktubre", 11: "Nobyembre", 12: "Disyembre"
+        }
+        month_name = months_tl.get(parsed_date.month, parsed_date.strftime('%B'))
+        date_str = f"{month_name} {parsed_date.day}, {parsed_date.year}"
+        return f"Kumpirmado: {date_str}, mula {start_label} hanggang {end_label}"
 
     return f"Confirmed: {parsed_date.strftime('%B %d, %Y')}, from {start_label} to {end_label}"
 
@@ -1138,8 +1179,34 @@ def api_session_check():
         'email': user_email,
         'dashboard_url': get_role_dashboard_url(user_role)
     }), 200
-            
-    return render_template('login.html')
+
+@app.route('/api/user/language-preference', methods=['POST'])
+def api_update_language_preference():
+    """
+    Updates the user's preferred language ('en' or 'tl') in session,
+    and sets the long-lived cocoscan_lang cookie.
+    """
+    data = request.get_json(silent=True) or {}
+    lang = (data.get("language") or request.form.get("language") or "").strip().lower()
+    if lang not in ["en", "tl"]:
+        lang = "en"
+    
+    session["lang"] = lang
+    session.modified = True
+
+    response = jsonify({
+        "status": "success",
+        "language": lang,
+        "message": "Language preference updated successfully."
+    })
+    response.set_cookie(
+        "cocoscan_lang",
+        lang,
+        max_age=365 * 24 * 60 * 60,
+        samesite="Lax",
+        path="/"
+    )
+    return response, 200
 
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
@@ -1302,60 +1369,97 @@ def get_recent_activity():
         logger.error(f"Error fetching recent activity: {e}")
         return jsonify({"pending_count": 0, "updated_count": 0, "total": 0}), 200
 
-def calculate_environmental_risk(temp, humidity, rainfall):
+def _format_risk_text(level, text):
+    if not text:
+        return f"<strong>{level}</strong>"
+    clean = str(text).strip()
+    prefixes = [
+        f"<strong>{level}</strong>:",
+        f"<strong>{level}</strong>",
+        f"{level}:",
+        level,
+        "High Risk:", "Mataas na Panganib:",
+        "Moderate Risk:", "Katamtamang Panganib:",
+        "Low Risk:", "Mababang Panganib:",
+        "High Risk", "Mataas na Panganib",
+        "Moderate Risk", "Katamtamang Panganib",
+        "Low Risk", "Mababang Panganib"
+    ]
+    for p in prefixes:
+        if clean.lower().startswith(p.lower()):
+            clean = clean[len(p):].strip()
+            if clean.startswith(":"):
+                clean = clean[1:].strip()
+    return f"<strong>{level}</strong>: {clean}"
+
+
+def calculate_environmental_risk(temp, humidity, rainfall, lang=None):
     """Rule-based engine returning high-contrast solid color spaces for dark container themes"""
+    if lang is None:
+        lang = _get_current_language()
+
     if temp == "--" or humidity == "--":
         return {
             "level": "Unknown", 
             "color": "#475569", 
             "bg": "#f1f5f9", 
             "border": "#cbd5e1", 
-            "text": "Risk assessment unavailable offline."
+            "text": t("weather_widget.risk_unavailable", lang=lang, default="Risk assessment unavailable offline.")
         }
     
     try:
-        t = float(temp)
-        h = float(humidity)
+        t_val = float(temp)
+        h_val = float(humidity)
     except (ValueError, TypeError):
+        mod_level = t("weather_widget.risk_moderate_level", lang=lang, default="Moderate Risk")
+        raw_desc = t("weather_widget.risk_moderate_general_text", lang=lang, default="Standard environmental monitoring active.")
         return {
-            "level": "Moderate", 
+            "level": mod_level, 
             "color": "#b45309", 
             "bg": "#fef3c7", 
             "border": "#fde68a", 
-            "text": "Standard environmental monitoring active."
+            "text": _format_risk_text(mod_level, raw_desc)
         }
 
-    if t >= 32 and h >= 75:
+    if t_val >= 32 and h_val >= 75:
+        high_level = t("weather_widget.risk_high_level", lang=lang, default="High Risk")
+        raw_desc = t("weather_widget.risk_high_desc", lang=lang, default="Accelerated breeding climate detected for both Brontispa and Rhinoceros Beetles. Inspect young fronds immediately.")
         return {
-            "level": "High Risk",
+            "level": high_level,
             "color": "#991b1b",
             "bg": "#fee2e2",
             "border": "#fca5a5",
-            "text": "<strong>High Risk</strong>: Accelerated breeding climate detected for both Brontispa and Rhinoceros Beetles. Inspect young fronds immediately."
+            "text": _format_risk_text(high_level, raw_desc)
         }
-    elif h >= 80:
+    elif h_val >= 80:
+        mod_level = t("weather_widget.risk_moderate_level", lang=lang, default="Moderate Risk")
+        raw_desc = t("weather_widget.risk_moderate_rhino_text", lang=lang, default="High moisture levels favor Rhinoceros Beetle breeding nests and localized larval development.")
         return {
-            "level": "Moderate Risk",
+            "level": mod_level,
             "color": "#92400e",
             "bg": "#fef3c7",
             "border": "#fde68a",
-            "text": "<strong>Moderate Risk</strong>: High moisture levels favor Rhinoceros Beetle breeding nests and localized larval development."
+            "text": _format_risk_text(mod_level, raw_desc)
         }
-    elif t >= 31 and h < 65:
+    elif t_val >= 31 and h_val < 65:
+        mod_level = t("weather_widget.risk_moderate_level", lang=lang, default="Moderate Risk")
+        raw_desc = t("weather_widget.risk_moderate_brontispa_text", lang=lang, default="Warm, dry foliage layout accelerates early-stage Brontispa leaf-incubation cycles.")
         return {
-            "level": "Moderate Risk",
+            "level": mod_level,
             "color": "#92400e",
             "bg": "#fef3c7",
             "border": "#fde68a",
-            "text": "<strong>Moderate Risk</strong>: Warm, dry foliage layout accelerates early-stage Brontispa leaf-incubation cycles."
+            "text": _format_risk_text(mod_level, raw_desc)
         }
     else:
+        low_level = t("weather_widget.risk_low_level", lang=lang, default="Low Risk")
+        raw_desc = t("weather_widget.risk_low_desc", lang=lang, default="Current climate conditions are within baseline stability parameters for pest development.")
         return {
-            "level": "Low Risk",
+            "level": low_level,
             "color": "#065f46",
             "bg": "#d1fae5",
             "border": "#a7f3d0",
-            "text": "<strong>Low Risk</strong>: Current climate conditions are within baseline stability parameters for pest development."
+            "text": _format_risk_text(low_level, raw_desc)
         }
 
 

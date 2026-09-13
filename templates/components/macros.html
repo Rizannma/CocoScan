@@ -2,15 +2,15 @@
 <ul class="sidebar-menu-list">
     {% set role_lower = role|lower if role else '' %}
     {% if role_lower == 'farmer' %}
-    <li class="menu-label-sub">Main Menu</li>
+    <li class="menu-label-sub" data-i18n="navigation.menu_section_main">{{ t('navigation.menu_section_main', 'Main Menu') }}</li>
     <li><a href="/farmer/dashboard" class="menu-item-link {% if active_item == 'dashboard' %}active{% endif %}"><i
-                class="fa-solid fa-gauge-high"></i> Dashboard</a></li>
+                class="fa-solid fa-gauge-high"></i> <span data-i18n="navigation.menu_dashboard">{{ t('navigation.menu_dashboard', 'Dashboard') }}</span></a></li>
     <li><a href="/farmer/scan" class="menu-item-link {% if active_item == 'scan' %}active{% endif %}"><i
-                class="fa-solid fa-camera"></i> Scan Pest</a></li>
+                class="fa-solid fa-camera"></i> <span data-i18n="navigation.menu_scan_pest">{{ t('navigation.menu_scan_pest', 'Scan Pest') }}</span></a></li>
     <li><a href="/farmer/drafts" class="menu-item-link {% if active_item == 'drafts' %}active{% endif %}"><i
-                class="fa-solid fa-file-pen"></i> Drafts</a></li>
+                class="fa-solid fa-file-pen"></i> <span data-i18n="navigation.menu_drafts">{{ t('navigation.menu_drafts', 'Drafts') }}</span></a></li>
     <li><a href="/farmer/reports" class="menu-item-link {% if active_item == 'reports' %}active{% endif %}"><i
-                class="fa-solid fa-folder-open"></i> My Reports</a></li>
+                class="fa-solid fa-folder-open"></i> <span data-i18n="navigation.menu_my_reports">{{ t('navigation.menu_my_reports', 'My Reports') }}</span></a></li>
 
     {% elif role_lower in ['agriculturist', 'agri_expert'] %}
     <li class="menu-label-sub">Main Menu</li>

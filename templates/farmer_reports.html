@@ -2,7 +2,7 @@
 {% set sidebar_role = 'Farmer' %}
 {% set active_page = 'reports' %}
 
-{% block title %}CocoScan - My Reports{% endblock %}
+{% block title %}CocoScan - {{ t('reports.page_title', 'My Reports') }}{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -1274,11 +1274,11 @@
 {% block content %}
 <header class="section-title-wrap">
                 <div>
-                    <h1>My Reports</h1>
-                    <p>Overall submitted reports</p>
+                    <h1 data-i18n="reports.page_title">{{ t('reports.page_title', 'My Reports') }}</h1>
+                    <p data-i18n="reports.page_subtitle">{{ t('reports.page_subtitle', 'Overall submitted reports') }}</p>
                 </div>
                 <div>
-                    <button class="btn-icon-refresh" onclick="spinAndRefresh(this)" title="Refresh Layout"><i
+                    <button class="btn-icon-refresh" onclick="spinAndRefresh(this)" title="{{ t('reports.btn_refresh', 'Refresh Layout') }}"><i
                             class="fa-solid fa-arrows-rotate"></i></button>
                 </div>
             </header>
@@ -1290,13 +1290,13 @@
                         <i class="fa-solid fa-cloud-arrow-down" style="font-size: 1.2rem; color: #d97706;"></i>
                     </div>
                     <div>
-                        <strong style="font-size: 0.92rem; display: block; color: #78350f; font-weight: 700;">Offline Mode • Local Reports View</strong>
-                        <span style="font-size: 0.82rem; color: #92400e; line-height: 1.4; display: block;">Reports were synced and will load once an active internet connection has been established.</span>
+                        <strong style="font-size: 0.92rem; display: block; color: #78350f; font-weight: 700;" data-i18n="reports.offline_banner_title">{{ t('reports.offline_banner_title', 'Offline Mode • Local Reports View') }}</strong>
+                        <span style="font-size: 0.82rem; color: #92400e; line-height: 1.4; display: block;" data-i18n="reports.offline_banner_desc">{{ t('reports.offline_banner_desc', 'Reports were synced and will load once an active internet connection has been established.') }}</span>
                     </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="background: rgba(146, 64, 14, 0.1); color: #78350f; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; white-space: nowrap;">
-                        <i class="fa-solid fa-database"></i> Cached
+                        <i class="fa-solid fa-database"></i> <span data-i18n="reports.offline_cached_badge">{{ t('reports.offline_cached_badge', 'Cached') }}</span>
                     </span>
                 </div>
             </div>
@@ -1306,18 +1306,18 @@
                     style="display:flex; gap:8px; align-items:center; width:100%; position:relative; z-index:70; flex-wrap:wrap; justify-content:space-between;">
                     <div class="filter-button-group"
                         style="display:flex; gap:8px; flex:1 1 220px; min-width:0; flex-wrap:wrap;">
-                        <button id="filter-all-btn" class="chip-filter-btn">All</button>
-                        <button id="filter-status-btn" class="chip-filter-btn">Status ▾</button>
-                        <button id="filter-pest-btn" class="chip-filter-btn">Pest ▾</button>
+                        <button id="filter-all-btn" class="chip-filter-btn" data-i18n="reports.filter_all">{{ t('reports.filter_all', 'All') }}</button>
+                        <button id="filter-status-btn" class="chip-filter-btn" data-i18n="reports.filter_status">{{ t('reports.filter_status', 'Status ▾') }}</button>
+                        <button id="filter-pest-btn" class="chip-filter-btn" data-i18n="reports.filter_pest">{{ t('reports.filter_pest', 'Pest ▾') }}</button>
                         <div style="position: relative; display: inline-flex;">
-                            <button id="filter-calendar-btn" class="chip-filter-btn" title="Filter by date"><i
+                            <button id="filter-calendar-btn" class="chip-filter-btn" title="{{ t('reports.filter_by_date', 'Filter by date') }}"><i
                                     class="fa-solid fa-calendar-days"></i></button>
-                            <input type="date" id="report-date-filter" aria-label="Filter by date"
+                            <input type="date" id="report-date-filter" aria-label="{{ t('reports.filter_by_date', 'Filter by date') }}"
                                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; background: transparent;">
                         </div>
                     </div>
                     <button id="clear-filters-btn" class="btn-clear-filters" onclick="clearAllActiveFilters()">
-                        <i class="fa-solid fa-filter-circle-xmark"></i> Clear Filters
+                        <i class="fa-solid fa-filter-circle-xmark"></i> <span data-i18n="reports.clear_filters">{{ t('reports.clear_filters', 'Clear Filters') }}</span>
                     </button>
                 </div>
                 <!-- Dropdown containers for status and pest filters -->
@@ -1352,7 +1352,7 @@
     <div class="modal-screen-overlay" id="followup-modal">
         <div class="modal-sheet-sliding-card">
             <div class="modal-header-inline">
-                <h2>Follow Up Details</h2>
+                <h2 data-i18n="reports.followup_title">{{ t('reports.followup_title', 'Follow Up Details') }}</h2>
             </div>
 
             <div class="preview-media-frame">
@@ -1360,48 +1360,48 @@
             </div>
 
             <div class="image-timestamp-footer" style="padding-bottom: 0;">
-                Detected Pest: <strong id="fup-label-title">--</strong> &nbsp;|&nbsp; Confidence: <span
-                    id="fup-conf-span">--</span> &nbsp;|&nbsp; Damage: <span id="fup-damage-span">--</span>
+                <span data-i18n="reports.followup_detected_pest">{{ t('reports.followup_detected_pest', 'Detected Pest:') }}</span> <strong id="fup-label-title">--</strong> &nbsp;|&nbsp; <span data-i18n="reports.followup_confidence">{{ t('reports.followup_confidence', 'Confidence:') }}</span> <span
+                    id="fup-conf-span">--</span> &nbsp;|&nbsp; <span data-i18n="reports.followup_damage">{{ t('reports.followup_damage', 'Damage:') }}</span> <span id="fup-damage-span">--</span>
             </div>
 
             <div class="premium-form-card" style="padding: 14px 16px; background-color: #f8faf9;">
                 <p style="font-size: 0.85rem; color: var(--text-muted); font-style: italic; line-height: 1.4;">
-                    <strong>Original Notes:</strong> <span id="fup-notes-fallback"
+                    <strong data-i18n="reports.followup_orig_notes">{{ t('reports.followup_orig_notes', 'Original Notes:') }}</strong> <span id="fup-notes-fallback"
                         style="color: var(--text-dark); font-style: normal;">--</span>
                 </p>
             </div>
 
             <div class="premium-form-card">
-                <h4><i class="fa-solid fa-images"></i> Upload Follow Up Image</h4>
+                <h4 data-i18n="reports.followup_upload_heading"><i class="fa-solid fa-images"></i> {{ t('reports.followup_upload_heading', 'Upload Follow Up Image') }}</h4>
                 <div class="modern-micro-upload-zone">
                     <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <span>Capture New Update Leaf Frame</span>
+                    <span data-i18n="reports.followup_capture_frame_prompt">{{ t('reports.followup_capture_frame_prompt', 'Capture New Update Leaf Frame') }}</span>
                     <div class="followup-btn-row" style="display: flex; gap: 8px; width: 100%; margin-top: 8px;"
                         onclick="event.stopPropagation();">
                         <button class="btn-control submit-primary"
                             style="padding: 10px; font-size: 0.8rem; border-radius: 10px;"
                             onclick="alert('Camera frame simulation initialized.')"><i class="fa-solid fa-camera"></i>
-                            Take Photo</button>
+                            <span data-i18n="reports.followup_btn_take_photo">{{ t('reports.followup_btn_take_photo', 'Take Photo') }}</span></button>
                         <button class="btn-control draft-secondary"
                             style="padding: 10px; font-size: 0.8rem; border-radius: 10px;"
-                            onclick="alert('Local file explorer directory access pipeline call.')">Upload Image</button>
+                            onclick="alert('Local file explorer directory access pipeline call.')" data-i18n="reports.followup_btn_upload_image">{{ t('reports.followup_btn_upload_image', 'Upload Image') }}</button>
                     </div>
                 </div>
             </div>
 
             <div class="premium-form-card">
-                <h4><i class="fa-solid fa-comment-medical"></i> Progress Notes</h4>
+                <h4 data-i18n="reports.followup_progress_notes_heading"><i class="fa-solid fa-comment-medical"></i> {{ t('reports.followup_progress_notes_heading', 'Progress Notes') }}</h4>
                 <textarea class="notes-input-box" id="fup-input-text"
-                    placeholder="Write your additional treatment notes here..."></textarea>
+                    placeholder="{{ t('reports.followup_placeholder', 'Write your additional treatment notes here...') }}" data-i18n-placeholder="reports.followup_placeholder"></textarea>
             </div>
 
             <div class="control-action-bar">
                 <button class="btn-control submit-primary" onclick="submitFollowUpData()">
-                    <i class="fa-solid fa-paper-plane"></i> Submit Follow Up
+                    <i class="fa-solid fa-paper-plane"></i> <span data-i18n="reports.btn_submit_followup">{{ t('reports.btn_submit_followup', 'Submit Follow Up') }}</span>
                 </button>
                 <div class="secondary-actions-row">
-                    <button class="btn-control cancel-secondary" onclick="backToSummary()">
-                        Cancel
+                    <button class="btn-control cancel-secondary" onclick="backToSummary()" data-i18n="reports.btn_cancel">
+                        {{ t('reports.btn_cancel', 'Cancel') }}
                     </button>
                 </div>
             </div>
@@ -1517,10 +1517,11 @@
             const calendarBtn = document.getElementById('filter-calendar-btn');
             const statusDropdownPanel = document.querySelector('#status-dropdown .filter-dropdown-panel');
             const pestDropdownPanel = document.querySelector('#pest-dropdown .filter-dropdown-panel');
+            const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
 
             // Populate All count
             if (allBtn) {
-                allBtn.textContent = `All (${reports.length})`;
+                allBtn.textContent = `${t('reports.filter_all', 'All')} (${reports.length})`;
                 allBtn.classList.add('active-chip');
                 allBtn.addEventListener('click', () => {
                     activeStatusFilter = 'all';
@@ -1553,7 +1554,7 @@
                 const allStatBtn = document.createElement('button');
                 allStatBtn.className = `dropdown-item ${activeStatusFilter === 'all' ? 'selected' : ''}`;
                 allStatBtn.setAttribute('data-value', 'all');
-                allStatBtn.textContent = 'All Statuses';
+                allStatBtn.textContent = t('reports.filter_all_statuses', 'All Statuses');
                 allStatBtn.onclick = () => { activeStatusFilter = 'all'; currentPage = 1; closeAllDropdowns(); updateFilterButtonStates(); evaluateClearFilterButtonState(); renderReportsGrid(); };
                 statusDropdownPanel.appendChild(allStatBtn);
 
@@ -1561,7 +1562,7 @@
                     const btn = document.createElement('button');
                     btn.className = `dropdown-item ${activeStatusFilter === s ? 'selected' : ''}`;
                     btn.setAttribute('data-value', s);
-                    btn.textContent = s;
+                    btn.textContent = formatWorkflowStatusLabel(s);
                     btn.onclick = () => { activeStatusFilter = s; currentPage = 1; closeAllDropdowns(); updateFilterButtonStates(); evaluateClearFilterButtonState(); renderReportsGrid(); };
                     statusDropdownPanel.appendChild(btn);
                 });
@@ -1573,7 +1574,7 @@
                 const allPestBtn = document.createElement('button');
                 allPestBtn.className = `dropdown-item ${activePestFilter === 'all' ? 'selected' : ''}`;
                 allPestBtn.setAttribute('data-value', 'all');
-                allPestBtn.textContent = 'All Pests';
+                allPestBtn.textContent = t('reports.filter_all_pests', 'All Pests');
                 allPestBtn.onclick = () => { activePestFilter = 'all'; currentPage = 1; closeAllDropdowns(); updateFilterButtonStates(); evaluateClearFilterButtonState(); renderReportsGrid(); };
                 pestDropdownPanel.appendChild(allPestBtn);
 
@@ -1699,6 +1700,7 @@
             const statusBtn = document.getElementById('filter-status-btn');
             const pestBtn = document.getElementById('filter-pest-btn');
             const calendarBtn = document.getElementById('filter-calendar-btn');
+            const t = (k, def, params) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def, params) : def);
 
             if (!allBtn || !statusBtn || !pestBtn || !calendarBtn) return;
 
@@ -1723,9 +1725,9 @@
                 calendarBtn.classList.add('active-chip');
             }
 
-            allBtn.textContent = `All (${reports.length})`;
-            statusBtn.textContent = statusActive ? `${activeStatusFilter} ▾` : 'Status ▾';
-            pestBtn.textContent = pestActive ? `${capitalizeFilterValue(activePestFilter)} ▾` : 'Pest ▾';
+            allBtn.textContent = `${t('reports.filter_all', 'All')} (${reports.length})`;
+            statusBtn.textContent = statusActive ? `${formatWorkflowStatusLabel(activeStatusFilter)} ▾` : t('reports.filter_status', 'Status ▾');
+            pestBtn.textContent = pestActive ? `${capitalizeFilterValue(activePestFilter)} ▾` : t('reports.filter_pest', 'Pest ▾');
 
             const formattedDate = formatDateForButton(activeDateFilter);
             if (formattedDate) {
@@ -1819,7 +1821,11 @@
                 "recommendation_issued": "Recommendation Issued",
                 "ready_to_submit": "Ready to Submit"
             };
-            return labels[normalized] || String(status || "").trim() || "Unknown";
+            const defaultLabel = labels[normalized] || String(status || "").trim() || "Unknown";
+            if (window.CocoScanI18n && typeof window.CocoScanI18n.t === 'function') {
+                return window.CocoScanI18n.t(`workflow_statuses.${normalized}`, defaultLabel);
+            }
+            return defaultLabel;
         }
 
         function getWorkflowStatusBadgeStyle(status) {
@@ -1842,6 +1848,7 @@
         function renderReportsGrid() {
             const container = document.getElementById("reports-list-container");
             const allBtn = document.getElementById('filter-all-btn');
+            const t = (k, def, params) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def, params) : def);
             container.innerHTML = "";
 
             updateFilterButtonStates();
@@ -1862,8 +1869,8 @@
                             <div class="empty-state-icon-circle" style="background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.25);">
                                 <i class="fa-solid fa-cloud-arrow-down" style="color: #d97706;"></i>
                             </div>
-                            <h3>Offline Reports Sync</h3>
-                            <p>Reports were synced and will load once an active internet connection has been established.</p>
+                            <h3>${t('reports.empty_offline_title', 'Offline Reports Sync')}</h3>
+                            <p>${t('reports.empty_offline_desc', 'Reports were synced and will load once an active internet connection has been established.')}</p>
                         </div>`;
                 } else {
                     container.innerHTML = `
@@ -1871,8 +1878,8 @@
                             <div class="empty-state-icon-circle">
                                 <i class="fa-solid fa-folder-open"></i>
                             </div>
-                            <h3>No Reports Found</h3>
-                            <p>We couldn't find any records matching your criteria. Try adjustments to your text search queries or structural filters.</p>
+                            <h3>${t('reports.empty_title', 'No Reports Found')}</h3>
+                            <p>${t('reports.empty_desc', "We couldn't find any records matching your criteria. Try adjustments to your text search queries or structural filters.")}</p>
                         </div>`;
                 }
                 updatePaginationController(0);
@@ -1898,7 +1905,7 @@
                 if (readChats === 0 && totalChats === 1) {
                     unreadCount = 0;
                 }
-                const unreadBadgeHTML = unreadCount > 0 ? `<span id="unread-badge-${item.id}" class="unread-badge">${unreadCount} unread</span>` : '';
+                const unreadBadgeHTML = unreadCount > 0 ? `<span id="unread-badge-${item.id}" class="unread-badge">${t('reports.badge_unread', `${unreadCount} unread`, { count: unreadCount })}</span>` : '';
 
                 row.innerHTML = `
                     <div class="report-main-meta">
@@ -1958,6 +1965,7 @@
         /* ================== CONDITIONAL PAGINATION ================== */
         function updatePaginationController(totalMatchedCount) {
             const paginationBlock = document.getElementById("pagination-wrapper");
+            const t = (k, def, params) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def, params) : def);
             paginationBlock.innerHTML = "";
 
             const totalPagesCalculated = Math.ceil(totalMatchedCount / recordsPerPage);
@@ -1966,7 +1974,7 @@
                 const startRecord = totalMatchedCount > 0 ? Math.min(totalMatchedCount, (currentPage - 1) * recordsPerPage + 1) : 0;
                 const endRecord = Math.min(totalMatchedCount, currentPage * recordsPerPage);
                 paginationSummary.textContent = totalMatchedCount > 0
-                    ? `Showing ${startRecord}–${endRecord} of ${totalMatchedCount}`
+                    ? t('reports.pagination_showing', `Showing ${startRecord}–${endRecord} of ${totalMatchedCount}`, { start: startRecord, end: endRecord, total: totalMatchedCount })
                     : "";
             }
 
@@ -1979,7 +1987,7 @@
 
             const leftBtn = document.createElement("button");
             leftBtn.className = "page-btn";
-            leftBtn.innerHTML = "&larr; Previous";
+            leftBtn.innerHTML = t('reports.pagination_prev', "&larr; Previous");
             leftBtn.disabled = (currentPage === 1);
             leftBtn.onclick = () => { if (currentPage > 1) { currentPage--; renderReportsGrid(); } };
             paginationBlock.appendChild(leftBtn);
@@ -2002,7 +2010,7 @@
 
             const rightBtn = document.createElement("button");
             rightBtn.className = "page-btn";
-            rightBtn.innerHTML = "Next &rarr;";
+            rightBtn.innerHTML = t('reports.pagination_next', "Next &rarr;");
             rightBtn.disabled = (currentPage === totalPagesCalculated);
             rightBtn.onclick = () => { if (currentPage < totalPagesCalculated) { currentPage++; renderReportsGrid(); } };
             paginationBlock.appendChild(rightBtn);

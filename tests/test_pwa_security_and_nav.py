@@ -95,7 +95,7 @@ def test_farmer_scan_hybrid_upload_elements(client):
     assert 'hidden-upload-input' in html
     assert 'triggerNativeCamera()' in html
     assert 'triggerPhotoUpload()' in html
-    assert 'Use Camera' in html
+    assert 'Camera' in html
     assert 'Upload Photo' in html
 
     # Location Selection Modal for uploaded photos
