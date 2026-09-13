@@ -1,9 +1,11 @@
 import base64
+import gc
 import io
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+import threading
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from PIL import Image
@@ -34,11 +36,12 @@ GREEN_MEAN_THRESHOLD = 20.0
 LEAF_GREEN_RATIO_THRESHOLD = 0.05
 TARGET_SIZE = (224, 224)
 
-# Caches for loaded Keras models
+# Caches for loaded Keras models (thread-safe singletons)
 _cached_pest_model = None
 _cached_pest_path: Optional[Path] = None
 _cached_severity_model = None
 _cached_severity_path: Optional[Path] = None
+_model_lock = threading.Lock()
 
 
 def get_pest_model_path(model_path: Optional[str] = None) -> Path:
@@ -62,11 +65,15 @@ get_model_path = get_pest_model_path
 def _load_keras_model(model_path: Path):
     try:
         import keras
-        return keras.models.load_model(str(model_path), compile=False)
+        model = keras.models.load_model(str(model_path), compile=False)
+        if hasattr(model, "eval") and callable(getattr(model, "eval")):
+            model.eval()
+        return model
     except Exception as exc:
         try:
             import tensorflow as tf
-            return tf.keras.models.load_model(str(model_path), compile=False)
+            model = tf.keras.models.load_model(str(model_path), compile=False)
+            return model
         except Exception:
             raise RuntimeError(f"Failed to load Keras H5 model from {model_path}: {exc}")
 
@@ -75,9 +82,11 @@ def _get_pest_model(model_path: Optional[str] = None):
     global _cached_pest_model, _cached_pest_path
     resolved_path = get_pest_model_path(model_path)
     if _cached_pest_model is None or _cached_pest_path != resolved_path:
-        logger.info(f"Loading pest classifier model from {resolved_path}")
-        _cached_pest_model = _load_keras_model(resolved_path)
-        _cached_pest_path = resolved_path
+        with _model_lock:
+            if _cached_pest_model is None or _cached_pest_path != resolved_path:
+                logger.info(f"Loading pest classifier model globally from {resolved_path}")
+                _cached_pest_model = _load_keras_model(resolved_path)
+                _cached_pest_path = resolved_path
     return _cached_pest_model
 
 
@@ -85,10 +94,26 @@ def _get_severity_model(model_path: Optional[str] = None):
     global _cached_severity_model, _cached_severity_path
     resolved_path = get_severity_model_path(model_path)
     if _cached_severity_model is None or _cached_severity_path != resolved_path:
-        logger.info(f"Loading severity classifier model from {resolved_path}")
-        _cached_severity_model = _load_keras_model(resolved_path)
-        _cached_severity_path = resolved_path
+        with _model_lock:
+            if _cached_severity_model is None or _cached_severity_path != resolved_path:
+                logger.info(f"Loading severity classifier model globally from {resolved_path}")
+                _cached_severity_model = _load_keras_model(resolved_path)
+                _cached_severity_path = resolved_path
     return _cached_severity_model
+
+
+def preload_models(
+    pest_model_path: Optional[str] = None,
+    severity_model_path: Optional[str] = None,
+) -> Tuple[Any, Any]:
+    """
+    Preload both pest and severity models globally once at startup.
+    This prevents high latency, memory allocation spikes, and Out Of Memory (OOM) errors during inference requests.
+    """
+    pest_model = _get_pest_model(pest_model_path)
+    severity_model = _get_severity_model(severity_model_path)
+    logger.info("Global H5 models successfully preloaded and ready for inference.")
+    return pest_model, severity_model
 
 
 def _softmax(values: np.ndarray) -> np.ndarray:
@@ -106,7 +131,8 @@ def _decode_base64_image(image_data: str) -> Image.Image:
 
 
 def _validate_leaf_image(image: Image.Image):
-    array = np.asarray(image).astype(np.float32)
+    rgb_image = image.convert("RGB") if isinstance(image, Image.Image) else image
+    array = np.asarray(rgb_image).astype(np.float32)
     if array.ndim == 2:
         array = np.stack([array] * 3, axis=-1)
 
@@ -128,37 +154,106 @@ def _validate_leaf_image(image: Image.Image):
         )
 
 
-def _prepare_input(image: Image.Image) -> np.ndarray:
-    """Preprocess PIL image into a normalized float32 tensor of shape (1, 224, 224, 3)."""
-    resized = image.resize(TARGET_SIZE, Image.Resampling.BILINEAR)
-    array = np.asarray(resized).astype(np.float32)
+def _prepare_input(image: Image.Image) -> Union[np.ndarray, Any]:
+    """
+    Preprocess PIL image into a normalized float32 tensor of shape (1, 224, 224, 3)
+    and convert into a contiguous tensor compatible with the Keras PyTorch backend.
+    """
+    if not isinstance(image, Image.Image):
+        raise ValueError(f"Expected PIL Image instance, got {type(image)}")
+
+    # Ensure image is in standard 3-channel RGB
+    rgb_image = image.convert("RGB")
+
+    # Resize to standard dimensions (224, 224) using bilinear resampling
+    resized = rgb_image.resize(TARGET_SIZE, Image.Resampling.BILINEAR)
+
+    # Convert to float32 NumPy array and normalize to [0.0, 1.0]
+    array = np.asarray(resized, dtype=np.float32)
 
     if array.ndim == 2:
         array = np.stack([array] * 3, axis=-1)
     elif array.ndim == 3 and array.shape[-1] > 3:
         array = array[..., :3]
+    elif array.ndim == 3 and array.shape[-1] == 1:
+        array = np.repeat(array, 3, axis=-1)
 
     array = array / 255.0
-    return np.expand_dims(array, axis=0)
 
+    if array.ndim == 3:
+        array = np.expand_dims(array, axis=0)
 
-def _run_model_forward(model, input_tensor: np.ndarray) -> np.ndarray:
-    """Execute model prediction and return 1D numpy array of probabilities."""
+    # Guarantee contiguous C-order buffer in memory
+    array = np.ascontiguousarray(array, dtype=np.float32)
+
+    # If PyTorch is available, convert to contiguous torch.Tensor for PyTorch backend
     try:
         import torch
-        if isinstance(input_tensor, np.ndarray):
-            with torch.no_grad():
-                preds = model(input_tensor)
-                if hasattr(preds, "detach"):
-                    preds = preds.detach().cpu().numpy()
-                elif hasattr(preds, "numpy"):
-                    preds = preds.numpy()
-        else:
-            preds = model.predict(input_tensor, verbose=0)
+        tensor = torch.from_numpy(array).contiguous().float()
+        return tensor
     except Exception:
+        return array
+
+
+def _run_model_forward(model, input_tensor: Union[np.ndarray, Any]) -> np.ndarray:
+    """
+    Execute model prediction and return 1D numpy array of probabilities.
+    Runs with zero autograd overhead / inference mode and cleans up memory to prevent OOM.
+    """
+    try:
+        import torch
+        if hasattr(model, "eval") and callable(getattr(model, "eval")):
+            model.eval()
+
+        ctx = torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
+        with ctx:
+            if isinstance(input_tensor, np.ndarray):
+                tensor = torch.from_numpy(np.ascontiguousarray(input_tensor, dtype=np.float32)).contiguous().float()
+            else:
+                tensor = input_tensor
+
+            # If model has parameters on a specific device, match device
+            try:
+                if hasattr(model, "parameters"):
+                    param = next(model.parameters(), None)
+                    if param is not None and hasattr(tensor, "device") and tensor.device != param.device:
+                        tensor = tensor.to(param.device)
+            except Exception:
+                pass
+
+            try:
+                preds = model(tensor)
+            except Exception:
+                preds = model.predict(tensor, verbose=0)
+
+            if hasattr(preds, "detach"):
+                preds = preds.detach().cpu().numpy()
+            elif hasattr(preds, "cpu"):
+                preds = preds.cpu().numpy()
+            elif hasattr(preds, "numpy"):
+                preds = preds.numpy()
+            else:
+                preds = np.asarray(preds)
+
+    except ImportError:
+        if hasattr(input_tensor, "numpy"):
+            input_tensor = input_tensor.numpy()
         preds = model(input_tensor)
         if hasattr(preds, "numpy"):
             preds = preds.numpy()
+        else:
+            preds = np.asarray(preds)
+    except Exception as exc:
+        logger.warning(f"Inference primary forward pass failed ({exc}), attempting model.predict fallback...")
+        if hasattr(input_tensor, "numpy"):
+            input_tensor = input_tensor.numpy()
+        elif hasattr(input_tensor, "detach"):
+            input_tensor = input_tensor.detach().cpu().numpy()
+        preds = model.predict(input_tensor, verbose=0)
+        if hasattr(preds, "numpy"):
+            preds = preds.numpy()
+        else:
+            preds = np.asarray(preds)
 
     preds = np.squeeze(preds)
     if preds.ndim > 1 and preds.shape[0] == 1:
@@ -167,6 +262,9 @@ def _run_model_forward(model, input_tensor: np.ndarray) -> np.ndarray:
     # If the output is not normalized (logits), apply softmax
     if np.min(preds) < 0.0 or not np.isclose(np.sum(preds), 1.0, atol=1e-2):
         preds = _softmax(preds)
+
+    # Free references and run garbage collection
+    gc.collect()
 
     return preds.astype(np.float32)
 

@@ -13,19 +13,6 @@
 
 {% block metrics_grid %}
 
-<!-- Persistent Offline Notice Banner for Farmers -->
-<div id="farmer-offline-banner" style="display: none; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #f59e0b; border-radius: 16px; padding: 14px 20px; margin-bottom: 1.5rem; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.12);">
-    <div style="display: flex; align-items: center; gap: 12px; color: #92400e;">
-        <i class="fa-solid fa-cloud-arrow-down" style="font-size: 1.5rem; color: #d97706;"></i>
-        <div>
-            <strong style="font-size: 0.95rem; display: block; color: #78350f;" data-i18n="dashboard.banner_offline_title">{{ t('dashboard.banner_offline_title', 'Offline Access Active') }}</strong>
-            <span style="font-size: 0.82rem; color: #92400e;" data-i18n="dashboard.banner_offline_desc">{{ t('dashboard.banner_offline_desc', 'You can perform field scans and save them to local drafts without an active internet connection.') }}</span>
-        </div>
-    </div>
-    <a href="{{ url_for('farmer_scan') }}" style="background: #2A7B4C; color: #ffffff; padding: 8px 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 700; text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(42, 123, 76, 0.2);">
-        <i class="fa-solid fa-camera"></i> <span data-i18n="dashboard.banner_offline_action">{{ t('dashboard.banner_offline_action', 'Launch Scanner') }}</span>
-    </a>
-</div>
 
 <div class="metrics-row-wrapper">
     <div class="metric-card-node cases">
@@ -151,11 +138,7 @@
     }
 
     function updateFarmerOfflineUI() {
-        const banner = document.getElementById('farmer-offline-banner');
-        if (!navigator.onLine) {
-            if (banner) banner.style.display = 'flex';
-        } else {
-            if (banner) banner.style.display = 'none';
+        if (navigator.onLine) {
             closeFarmerOfflineModal();
             localStorage.removeItem('cocoscan_offline_active');
         }

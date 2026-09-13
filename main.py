@@ -1,4 +1,7 @@
 import os
+# Ensure Keras uses PyTorch backend globally
+os.environ.setdefault("KERAS_BACKEND", "torch")
+
 import time
 import traceback
 import logging
@@ -84,6 +87,15 @@ load_dotenv()
 app = Flask(__name__)
 app.session_interface = RoleBasedSessionInterface()
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+
+# Preload H5 AI models once globally at startup to prevent request-time memory spikes & OOM crashes
+try:
+    from model.inference import preload_models
+    _startup_pest_path = resolve_model_path('PEST_MODEL_PATH', 'pest_classifier_moderate.h5')
+    _startup_severity_path = resolve_model_path('SEVERITY_MODEL_PATH', 'severity_classifier_severe_boost.h5')
+    preload_models(pest_model_path=_startup_pest_path, severity_model_path=_startup_severity_path)
+except Exception as _startup_exc:
+    logger.warning(f"Startup global AI model preloading notice: {_startup_exc}")
 
 def _get_current_language():
     try:

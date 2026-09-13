@@ -14,6 +14,8 @@ from model.inference import (
     predict_pest_from_base64,
     predict_severity_from_base64,
     predict_all_from_base64,
+    preload_models,
+    _prepare_input,
 )
 from app.inference_pipeline import run_full_inference_pipeline
 
@@ -41,6 +43,25 @@ class TestH5Inference(unittest.TestCase):
         self.assertTrue(severity_path.exists(), f"Severity model does not exist at {severity_path}")
         self.assertTrue(str(pest_path).endswith("pest_classifier_moderate.h5"))
         self.assertTrue(str(severity_path).endswith("severity_classifier_severe_boost.h5"))
+
+    def test_global_preload_models(self):
+        pest_model, severity_model = preload_models()
+        self.assertIsNotNone(pest_model)
+        self.assertIsNotNone(severity_model)
+
+    def test_image_resizing_and_contiguous_tensor_preparation(self):
+        # Create non-standard dimension image (e.g. 800x600)
+        img = _create_synthetic_leaf_image(width=800, height=600)
+        tensor = _prepare_input(img)
+        
+        # Check shape is normalized (1, 224, 224, 3)
+        self.assertEqual(tuple(tensor.shape), (1, 224, 224, 3))
+        
+        # Check contiguous flag if tensor or numpy
+        if hasattr(tensor, "is_contiguous"):
+            self.assertTrue(tensor.is_contiguous())
+        elif hasattr(tensor, "flags"):
+            self.assertTrue(tensor.flags.c_contiguous)
 
     def test_pest_prediction_structure(self):
         img = _create_synthetic_leaf_image()
