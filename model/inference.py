@@ -1,79 +1,97 @@
-from pathlib import Path
 import base64
-import importlib
 import io
-from typing import Optional
+import logging
+import os
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 from PIL import Image
 
+# Ensure Keras uses the PyTorch backend if TensorFlow is not present
+os.environ.setdefault("KERAS_BACKEND", "torch")
+
+logger = logging.getLogger(__name__)
+
 MODEL_DIR = Path(__file__).resolve().parent.parent / "model"
-MODEL_FILE_NAME = "pest_classifier_YOLO.tflite"
-# The TFLite model outputs 4 scores. The class order is aligned to the trained labels:
+PEST_MODEL_FILE_NAME = "pest_classifier_moderate.h5"
+SEVERITY_MODEL_FILE_NAME = "severity_classifier_severe_boost.h5"
+
+# The trained 4-class pest model output order:
 # [Brontispa, Healthy Coconut Leaf, Rhinoceros Beetle, Not a Coconut Leaf Image]
 PEST_LABELS = ["Brontispa", "Healthy Coconut Leaf", "Rhinoceros Beetle", "Not a Coconut Leaf Image"]
-# Lowered confidence cutoff to 25% so more valid leaf scans are accepted.
+
+# The trained 3-class severity model output order:
+# [Mild, Moderate, Severe]
+SEVERITY_LABELS = ["Mild", "Moderate", "Severe"]
+
+# Minimum confidence cutoff for acceptable predictions
 MIN_CONFIDENCE_THRESHOLD = 0.25
 NOT_COCONUT_LEAF_LABEL = "Not a Coconut Leaf Image"
 UNKNOWN_LABEL_BASE = NOT_COCONUT_LEAF_LABEL
 MIN_IMAGE_DIMENSION = 32
 GREEN_MEAN_THRESHOLD = 20.0
 LEAF_GREEN_RATIO_THRESHOLD = 0.05
+TARGET_SIZE = (224, 224)
 
-_cached_interpreter = None
-_cached_model_path: Optional[Path] = None
-
-
-def _import_tflite_interpreter():
-    try:
-        from ai_edge_litert.interpreter import Interpreter
-        return Interpreter
-    except ImportError:
-        pass
-
-    try:
-        from tflite_runtime.interpreter import Interpreter # type: ignore
-        return Interpreter
-    except ImportError:
-        pass
-
-    try:
-        from tensorflow.lite import Interpreter
-        return Interpreter
-    except ImportError:
-        pass
-
-    try:
-        import tensorflow as tf
-        return tf.lite.Interpreter
-    except ImportError:
-        pass
-
-    raise RuntimeError(
-        "Neither ai-edge-litert, tflite-runtime, nor TensorFlow Lite is installed."
-    )
+# Caches for loaded Keras models
+_cached_pest_model = None
+_cached_pest_path: Optional[Path] = None
+_cached_severity_model = None
+_cached_severity_path: Optional[Path] = None
 
 
-def get_model_path(model_path: Optional[str] = None) -> Path:
-    target_path = Path(model_path) if model_path else MODEL_DIR / MODEL_FILE_NAME
+def get_pest_model_path(model_path: Optional[str] = None) -> Path:
+    target_path = Path(model_path) if model_path else MODEL_DIR / PEST_MODEL_FILE_NAME
     if not target_path.exists():
-        raise FileNotFoundError(f"TFLite model not found: {target_path}")
+        raise FileNotFoundError(f"Pest H5 model not found: {target_path}")
     return target_path
 
 
-def _get_interpreter(model_path: Optional[str] = None):
-    global _cached_interpreter, _cached_model_path
-    model_path = get_model_path(model_path)
-    if _cached_interpreter is None or _cached_model_path != model_path:
-        Interpreter = _import_tflite_interpreter()
-        interpreter = Interpreter(model_path=str(model_path))
-        interpreter.allocate_tensors()
-        _cached_interpreter = interpreter
-        _cached_model_path = model_path
-    return _cached_interpreter
+def get_severity_model_path(model_path: Optional[str] = None) -> Path:
+    target_path = Path(model_path) if model_path else MODEL_DIR / SEVERITY_MODEL_FILE_NAME
+    if not target_path.exists():
+        raise FileNotFoundError(f"Severity H5 model not found: {target_path}")
+    return target_path
 
 
-def _softmax(values):
+# Backward compatibility alias
+get_model_path = get_pest_model_path
+
+
+def _load_keras_model(model_path: Path):
+    try:
+        import keras
+        return keras.models.load_model(str(model_path), compile=False)
+    except Exception as exc:
+        try:
+            import tensorflow as tf
+            return tf.keras.models.load_model(str(model_path), compile=False)
+        except Exception:
+            raise RuntimeError(f"Failed to load Keras H5 model from {model_path}: {exc}")
+
+
+def _get_pest_model(model_path: Optional[str] = None):
+    global _cached_pest_model, _cached_pest_path
+    resolved_path = get_pest_model_path(model_path)
+    if _cached_pest_model is None or _cached_pest_path != resolved_path:
+        logger.info(f"Loading pest classifier model from {resolved_path}")
+        _cached_pest_model = _load_keras_model(resolved_path)
+        _cached_pest_path = resolved_path
+    return _cached_pest_model
+
+
+def _get_severity_model(model_path: Optional[str] = None):
+    global _cached_severity_model, _cached_severity_path
+    resolved_path = get_severity_model_path(model_path)
+    if _cached_severity_model is None or _cached_severity_path != resolved_path:
+        logger.info(f"Loading severity classifier model from {resolved_path}")
+        _cached_severity_model = _load_keras_model(resolved_path)
+        _cached_severity_path = resolved_path
+    return _cached_severity_model
+
+
+def _softmax(values: np.ndarray) -> np.ndarray:
     values = np.asarray(values, dtype=np.float32)
     values = values - np.max(values)
     exp_values = np.exp(values)
@@ -105,111 +123,133 @@ def _validate_leaf_image(image: Image.Image):
     green_ratio = green_mean / max(red_mean, blue_mean, 1.0)
 
     if green_mean < GREEN_MEAN_THRESHOLD or green_ratio < LEAF_GREEN_RATIO_THRESHOLD:
-        raise ValueError("Image does not appear to be a coconut leaf or plant sample. Please capture a clear photo of a coconut frond or leaf.")
+        raise ValueError(
+            "Image does not appear to be a coconut leaf or plant sample. Please capture a clear photo of a coconut frond or leaf."
+        )
 
 
-def _prepare_input(image: Image.Image, input_details):
-    shape = tuple(input_details[0]["shape"])
-    dtype = np.dtype(input_details[0]["dtype"])
+def _prepare_input(image: Image.Image) -> np.ndarray:
+    """Preprocess PIL image into a normalized float32 tensor of shape (1, 224, 224, 3)."""
+    resized = image.resize(TARGET_SIZE, Image.Resampling.BILINEAR)
+    array = np.asarray(resized).astype(np.float32)
 
-    if len(shape) == 4:
-        batch, dim1, dim2, dim3 = shape
-        if dim1 in (1, 3) and dim3 not in (1, 3):
-            # NCHW format
-            layout = 'nchw'
-            channels = dim1
-            height = dim2
-            width = dim3
-        else:
-            # NHWC format
-            layout = 'nhwc'
-            height = dim1
-            width = dim2
-            channels = dim3
-    elif len(shape) == 3:
-        layout = 'nhwc'
-        height, width, channels = shape
-    else:
-        raise ValueError(f"Unsupported input tensor shape: {shape}")
-
-    if channels not in (1, 3):
-        raise ValueError(f"Unsupported input channel count: {channels}")
-
-    # Use modern Pillow syntax for image resizing to prevent future warnings
-    image = image.resize((width, height), Image.Resampling.BILINEAR)
-    array = np.asarray(image).astype(np.float32)
-
-    if array.ndim == 2 and channels == 3:
+    if array.ndim == 2:
         array = np.stack([array] * 3, axis=-1)
+    elif array.ndim == 3 and array.shape[-1] > 3:
+        array = array[..., :3]
 
-    if array.ndim == 3 and array.shape[-1] != channels:
-        array = array[..., :channels]
+    array = array / 255.0
+    return np.expand_dims(array, axis=0)
 
-    if dtype == np.float32 or dtype == np.float64:
-        array = array / 255.0
-    else:
-        scale, zero_point = input_details[0].get("quantization", (0.0, 0))
-        if scale and zero_point is not None:
-            array = np.round(array / scale + zero_point).astype(dtype)
+
+def _run_model_forward(model, input_tensor: np.ndarray) -> np.ndarray:
+    """Execute model prediction and return 1D numpy array of probabilities."""
+    try:
+        import torch
+        if isinstance(input_tensor, np.ndarray):
+            with torch.no_grad():
+                preds = model(input_tensor)
+                if hasattr(preds, "detach"):
+                    preds = preds.detach().cpu().numpy()
+                elif hasattr(preds, "numpy"):
+                    preds = preds.numpy()
         else:
-            array = array.astype(dtype)
+            preds = model.predict(input_tensor, verbose=0)
+    except Exception:
+        preds = model(input_tensor)
+        if hasattr(preds, "numpy"):
+            preds = preds.numpy()
 
-    if len(shape) == 4:
-        if layout == 'nchw':
-            array = np.transpose(array, (2, 0, 1))
-        array = np.expand_dims(array, 0)
+    preds = np.squeeze(preds)
+    if preds.ndim > 1 and preds.shape[0] == 1:
+        preds = preds[0]
 
-    return array
+    # If the output is not normalized (logits), apply softmax
+    if np.min(preds) < 0.0 or not np.isclose(np.sum(preds), 1.0, atol=1e-2):
+        preds = _softmax(preds)
+
+    return preds.astype(np.float32)
 
 
-def _run_inference(image: Image.Image, model_path: Optional[str] = None):
+def predict_pest(image: Image.Image, model_path: Optional[str] = None) -> Dict:
+    """
+    Run pest classification on a PIL Image using pest_classifier_moderate.h5.
+    """
     _validate_leaf_image(image)
-    interpreter = _get_interpreter(model_path)
-    input_details = interpreter.get_input_details()
-    output_details = interpreter.get_output_details()
+    model = _get_pest_model(model_path)
+    input_tensor = _prepare_input(image)
+    probabilities = _run_model_forward(model, input_tensor)
 
-    input_tensor = _prepare_input(image, input_details)
-    interpreter.set_tensor(input_details[0]["index"], input_tensor)
-    interpreter.invoke()
-
-    output_data = interpreter.get_tensor(output_details[0]["index"])
-    output_data = np.squeeze(output_data)
-
-    scale, zero_point = output_details[0].get("quantization", (0.0, 0))
-    if scale and zero_point is not None:
-        output_data = scale * (output_data.astype(np.float32) - zero_point)
-
-    if output_data.ndim > 1 and output_data.shape[0] == 1:
-        output_data = output_data[0]
-
-    probabilities = _softmax(output_data)
     label_index = int(np.argmax(probabilities))
-    labels = _get_labels(len(probabilities))
-    label = labels[label_index]
+    labels = _get_labels(len(probabilities), PEST_LABELS)
+    predicted_pest = labels[label_index]
     confidence = float(probabilities[label_index])
 
-    if label == NOT_COCONUT_LEAF_LABEL:
-        raise ValueError("This appears not to be a coconut leaf image. Please upload a proper coconut leaf photo.")
+    if predicted_pest == NOT_COCONUT_LEAF_LABEL:
+        raise ValueError(
+            "This appears not to be a coconut leaf image. Please upload a proper coconut leaf photo."
+        )
 
     if confidence < MIN_CONFIDENCE_THRESHOLD:
         raise ValueError("Prediction confidence is too low. Please upload a clearer leaf image.")
 
-    return label, confidence, probabilities.tolist()
-
-
-def _get_labels(num_classes: int):
-    if num_classes <= len(PEST_LABELS):
-        return PEST_LABELS[:num_classes]
-    extra_labels = [UNKNOWN_LABEL_BASE] * (num_classes - len(PEST_LABELS))
-    return PEST_LABELS + extra_labels
-
-
-def predict_pest_from_base64(image_data: str, model_path: Optional[str] = None):
-    image = _decode_base64_image(image_data)
-    label, confidence, probabilities = _run_inference(image, model_path)
-    labels = _get_labels(len(probabilities))
     return {
-        "predicted_pest": label,
+        "predicted_pest": predicted_pest,
         "confidence_score": confidence,
         "probabilities": {labels[idx]: float(probabilities[idx]) for idx in range(len(probabilities))},
     }
+
+
+def predict_severity(image: Image.Image, model_path: Optional[str] = None) -> Dict:
+    """
+    Run severity classification on a PIL Image using severity_classifier_severe_boost.h5.
+    """
+    _validate_leaf_image(image)
+    model = _get_severity_model(model_path)
+    input_tensor = _prepare_input(image)
+    probabilities = _run_model_forward(model, input_tensor)
+
+    label_index = int(np.argmax(probabilities))
+    labels = _get_labels(len(probabilities), SEVERITY_LABELS)
+    predicted_severity = labels[label_index]
+    confidence = float(probabilities[label_index])
+
+    # Standard damage percentage mapping
+    damage_map = {"Mild": 25, "Moderate": 50, "Severe": 75}
+    damage_percentage = damage_map.get(predicted_severity, 50)
+
+    return {
+        "severity": predicted_severity,
+        "damage_percentage": damage_percentage,
+        "confidence_score": confidence,
+        "probabilities": {labels[idx]: float(probabilities[idx]) for idx in range(len(probabilities))},
+    }
+
+
+def _get_labels(num_classes: int, base_labels: List[str]) -> List[str]:
+    if num_classes <= len(base_labels):
+        return base_labels[:num_classes]
+    extra_labels = [UNKNOWN_LABEL_BASE] * (num_classes - len(base_labels))
+    return base_labels + extra_labels
+
+
+def predict_pest_from_base64(image_data: str, model_path: Optional[str] = None) -> Dict:
+    image = _decode_base64_image(image_data)
+    return predict_pest(image, model_path=model_path)
+
+
+def predict_severity_from_base64(image_data: str, model_path: Optional[str] = None) -> Dict:
+    image = _decode_base64_image(image_data)
+    return predict_severity(image, model_path=model_path)
+
+
+def predict_all_from_base64(
+    image_data: str,
+    pest_model_path: Optional[str] = None,
+    severity_model_path: Optional[str] = None,
+) -> Tuple[Dict, Dict]:
+    """Execute both pest classification and severity classification from base64 image data."""
+    image = _decode_base64_image(image_data)
+    pest_result = predict_pest(image, model_path=pest_model_path)
+    severity_result = predict_severity(image, model_path=severity_model_path)
+    return pest_result, severity_result

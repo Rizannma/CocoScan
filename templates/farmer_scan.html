@@ -482,15 +482,15 @@
 
         .upload-action-row {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             width: 100%;
-            margin-top: 8px;
+            margin-top: 10px;
         }
 
         .btn-action-trigger {
             flex: 1;
             min-height: 52px;
-            padding: 14px 16px;
+            padding: 12px 14px;
             font-size: 0.9rem;
             font-weight: 700;
             border-radius: 14px;
@@ -504,6 +504,16 @@
             color: var(--brand-dark);
             box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
             transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .btn-action-trigger span {
+            white-space: nowrap;
+        }
+
+        .btn-action-trigger i {
+            font-size: 1.05rem;
+            flex-shrink: 0;
         }
 
         .btn-action-trigger:hover,
@@ -537,6 +547,25 @@
             border-color: #86efac;
             color: #14532d;
             transform: translateY(-1px);
+        }
+
+        @media (max-width: 480px) {
+            .upload-action-row {
+                gap: 8px;
+            }
+            .btn-action-trigger {
+                padding: 12px 10px;
+                font-size: 0.82rem;
+                min-height: 48px;
+                gap: 6px;
+                white-space: nowrap;
+            }
+            .btn-action-trigger i {
+                font-size: 0.95rem;
+            }
+            .btn-action-trigger span {
+                white-space: nowrap;
+            }
         }
 
         .upload-drop-zone.drag-active {
@@ -613,13 +642,32 @@
             gap: 6px;
         }
 
-        .location-input-group label {
-            font-size: 0.82rem;
-            font-weight: 700;
-            color: #334155;
+        .location-label-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .location-field-label {
+            font-size: 0.84rem;
+            font-weight: 700;
+            color: #1e293b;
+            margin: 0;
+            line-height: 1.25;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .pin-coords-display {
+            font-size: 0.72rem;
+            color: #64748b;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+            white-space: nowrap;
+            flex-shrink: 0;
         }
 
         .location-text-field {
@@ -641,24 +689,88 @@
             box-shadow: 0 0 0 3px rgba(42, 123, 76, 0.15);
         }
 
-        .btn-current-gps-inline {
-            background: #f1f5f9;
-            color: #0f766e;
-            border: 1px solid #ccfbf1;
-            padding: 6px 12px;
-            border-radius: 8px;
-            font-size: 0.78rem;
+        .location-search-suggestions {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            z-index: 1050;
+            max-height: 190px;
+            overflow-y: auto;
+        }
+
+        .suggestion-item {
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            color: #334155;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: all 0.15s ease;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f0fdf4;
+            color: #166534;
             font-weight: 600;
+        }
+
+        .suggestion-item i {
+            color: #2A7B4C;
+            font-size: 0.85rem;
+        }
+
+        .btn-current-gps-inline {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+            padding: 5px 10px;
+            border-radius: 8px;
+            font-size: 0.76rem;
+            font-weight: 700;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             gap: 5px;
+            white-space: nowrap;
+            flex-shrink: 0;
             transition: all 0.2s ease;
         }
 
         .btn-current-gps-inline:hover {
-            background: #ccfbf1;
-            color: #115e59;
+            background: #dcfce7;
+            border-color: #86efac;
+            color: #14532d;
+        }
+
+        .btn-current-gps-inline i {
+            font-size: 0.8rem;
+            color: #16a34a;
+        }
+
+        @media (max-width: 440px) {
+            .location-label-header {
+                flex-wrap: wrap;
+                gap: 6px;
+            }
+            .location-field-label {
+                font-size: 0.8rem;
+            }
+            .btn-current-gps-inline {
+                padding: 4px 8px;
+                font-size: 0.72rem;
+            }
         }
 
         .upload-map-wrapper {
@@ -708,9 +820,11 @@
             cursor: pointer;
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             transition: all 0.2s ease;
             box-shadow: 0 4px 12px rgba(42, 123, 76, 0.25);
+            white-space: nowrap;
         }
 
         .btn-confirm-location:hover {
@@ -719,20 +833,41 @@
         }
 
         .btn-cancel-location {
-            background: #ffffff;
-            color: #64748b;
-            border: 1px solid #cbd5e1;
-            padding: 12px 18px;
+            background: #fff5f5;
+            color: #dc2626;
+            border: 1.5px solid #fca5a5;
+            padding: 12px 20px;
             border-radius: 12px;
             font-size: 0.9rem;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             transition: all 0.2s ease;
+            white-space: nowrap;
         }
 
         .btn-cancel-location:hover {
-            background: #f1f5f9;
-            color: #1e293b;
+            background: #fee2e2;
+            border-color: #f87171;
+            color: #b91c1c;
+            transform: translateY(-1px);
+        }
+
+        @media (max-width: 480px) {
+            .location-modal-footer {
+                padding: 12px 16px;
+                gap: 8px;
+            }
+            .btn-cancel-location,
+            .btn-confirm-location {
+                padding: 10px 14px;
+                font-size: 0.85rem;
+                flex: 1;
+                justify-content: center;
+                white-space: nowrap;
+            }
         }
 
         .gps-status-banner {
@@ -1316,30 +1451,35 @@
                         <h3 id="location-modal-title">
                             <i class="fa-solid fa-map-location-dot" style="color: #2A7B4C;"></i> <span data-i18n="scanner.loc_modal_title">{{ t('scanner.loc_modal_title', 'Set Tree Location') }}</span>
                         </h3>
-                        <button type="button" onclick="cancelUploadLocationModal()" style="background: none; border: none; font-size: 1.2rem; color: #94a3b8; cursor: pointer;" aria-label="Close">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
                     </div>
                     <div class="location-modal-body">
                         <p style="font-size: 0.82rem; color: #64748b; line-height: 1.45;" data-i18n="scanner.loc_modal_desc">
                             {{ t('scanner.loc_modal_desc', 'To ensure reporting accuracy for uploaded photos, please enter the farm location or tap the map to place a pin where this coconut tree is located.') }}
                         </p>
 
-                        <div class="location-input-group">
-                            <label for="manual-location-text">
-                                <span><span data-i18n="scanner.loc_label_farm">{{ t('scanner.loc_label_farm', 'Farm / Barangay Location') }}</span> <span style="color: #dc2626;">*</span></span>
+                        <div class="location-input-group" style="position: relative;">
+                            <div class="location-label-header">
+                                <label for="manual-location-text" class="location-field-label">
+                                    <span data-i18n="scanner.loc_label_farm">{{ t('scanner.loc_label_farm', 'Farm / Barangay Location') }}</span> <span style="color: #dc2626;">*</span>
+                                </label>
                                 <button type="button" class="btn-current-gps-inline" onclick="fetchDeviceLocationForMap()">
                                     <i class="fa-solid fa-crosshairs"></i> <span data-i18n="scanner.loc_btn_use_gps">{{ t('scanner.loc_btn_use_gps', 'Use Current GPS') }}</span>
                                 </button>
-                            </label>
-                            <input type="text" id="manual-location-text" class="location-text-field" placeholder="{{ t('scanner.loc_input_placeholder', 'e.g., Brgy. Malabanban Sur, Candelaria, Quezon') }}" data-i18n-placeholder="scanner.loc_input_placeholder" oninput="handleManualLocationTextInput(this.value)">
+                            </div>
+                            <div style="position: relative;">
+                                <input type="text" id="manual-location-text" class="location-text-field" placeholder="{{ t('scanner.loc_input_placeholder', 'San Nicolas, San Pablo City') }}" data-i18n-placeholder="scanner.loc_input_placeholder" oninput="handleManualLocationTextInput(this.value)" onkeydown="if(event.key === 'Enter'){ event.preventDefault(); triggerLocationSearch(this.value); }">
+                                <button type="button" id="search-location-btn" onclick="triggerLocationSearch(document.getElementById('manual-location-text').value)" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #2A7B4C; cursor: pointer; padding: 6px 8px; font-size: 0.95rem;" title="Search location">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                </button>
+                            </div>
+                            <div id="location-search-suggestions" class="location-search-suggestions" style="display: none;"></div>
                         </div>
 
                         <div class="location-input-group">
-                            <label>
-                                <span data-i18n="scanner.loc_map_pin_label">{{ t('scanner.loc_map_pin_label', 'Tap or Drag Pin on Map') }}</span>
-                                <span id="pin-coords-text" style="font-size: 0.72rem; color: #94a3b8; font-weight: 500;"></span>
-                            </label>
+                            <div class="location-label-header">
+                                <span class="location-field-label" data-i18n="scanner.loc_map_pin_label">{{ t('scanner.loc_map_pin_label', 'Tap or Drag Pin on Map') }}</span>
+                                <span id="pin-coords-text" class="pin-coords-display"></span>
+                            </div>
                             <div class="upload-map-wrapper">
                                 <div id="upload-location-map"></div>
                             </div>
@@ -1353,7 +1493,7 @@
                     <div class="location-modal-footer">
                         <button type="button" class="btn-cancel-location" onclick="cancelUploadLocationModal()" data-i18n="scanner.loc_btn_cancel">{{ t('scanner.loc_btn_cancel', 'Cancel') }}</button>
                         <button type="button" class="btn-confirm-location" id="btn-confirm-upload-location" onclick="confirmUploadLocationAndScan()">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="scanner.loc_btn_confirm_scan">{{ t('scanner.loc_btn_confirm_scan', 'Confirm & Scan') }}</span>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="scanner.loc_btn_confirm_scan">{{ t('scanner.loc_btn_confirm_scan', 'Scan Now') }}</span>
                         </button>
                     </div>
                 </div>
@@ -1606,6 +1746,16 @@
         }
 
         /* ================== LOCATION PICKER MODAL (UPLOAD WORKFLOW) ================== */
+        const DEFAULT_SAN_PABLO_LAT = 14.05857; // San Pablo City, Laguna
+        const DEFAULT_SAN_PABLO_LNG = 121.32996;
+        const DEFAULT_SAN_PABLO_NAME = "San Pablo City, Laguna";
+
+        const SAN_PABLO_BARANGAYS = [
+            "Bagong Bayan II-A", "Bagong Pook VI-C", "Barangay I-A", "Barangay I-B", "Barangay II-A", "Barangay II-B", "Barangay II-C", "Barangay II-D", "Barangay II-E", "Barangay II-F", "Barangay III-A", "Barangay III-B", "Barangay III-C", "Barangay III-D", "Barangay III-E", "Barangay III-F", "Barangay IV-A", "Barangay IV-B", "Barangay IV-C", "Barangay V-A", "Barangay V-B", "Barangay V-C", "Barangay V-D", "Barangay VI-A", "Barangay VI-B", "Bautista", "Concepcion", "Del Remedio", "Dolores", "San Antonio 1", "San Antonio 2", "San Bartolome", "San Buenaventura", "San Crispin", "San Cristobal", "San Diego", "San Francisco", "San Gabriel", "San Gregorio", "San Ignacio", "San Isidro", "San Joaquin", "San Jose", "San Juan", "San Lorenzo", "San Lucas 1", "San Lucas 2", "San Marcos", "San Mateo", "San Miguel", "San Nicolas", "San Pedro", "San Rafael", "San Roque", "San Vicente", "Santa Ana", "Santa Catalina", "Santa Cruz", "Santa Elena", "Santa Filomena", "Santa Isabel", "Santa Maria", "Santa Maria Magdalena", "Santa Monica", "Santa Veronica", "Santiago I", "Santiago II", "Santisimo Rosario", "Santo Angel", "Santo Cristo", "Santo Niño", "Soledad", "Atisan", "Balagtas", "Dapdap", "Sta. Catalina", "Sta. Cruz", "Sta. Elena"
+        ];
+
+        let locationSearchDebounceTimer = null;
+
         function openUploadLocationModal() {
             const modal = document.getElementById('upload-location-modal');
             if (modal) {
@@ -1619,6 +1769,7 @@
         function cancelUploadLocationModal() {
             const modal = document.getElementById('upload-location-modal');
             if (modal) modal.style.display = 'none';
+            hideSuggestions();
             globalActiveImagePayload = "";
             globalActiveImageFile = null;
             selectedUploadLocation = null;
@@ -1628,8 +1779,9 @@
             const mapContainer = document.getElementById('upload-location-map');
             if (!mapContainer) return;
 
-            const defaultLat = 13.9314;
-            const defaultLng = 121.6172; // Quezon Province coconut belt
+            // Default center is San Pablo City, Laguna if no active GPS
+            const initialLat = (selectedUploadLocation && selectedUploadLocation.latitude) ? selectedUploadLocation.latitude : DEFAULT_SAN_PABLO_LAT;
+            const initialLng = (selectedUploadLocation && selectedUploadLocation.longitude) ? selectedUploadLocation.longitude : DEFAULT_SAN_PABLO_LNG;
 
             if (!uploadMapInstance) {
                 if (typeof L === 'undefined') {
@@ -1640,7 +1792,7 @@
                 uploadMapInstance = L.map('upload-location-map', {
                     zoomControl: true,
                     attributionControl: false
-                }).setView([defaultLat, defaultLng], 12);
+                }).setView([initialLat, initialLng], 14);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19
@@ -1653,45 +1805,33 @@
                     iconAnchor: [17, 34]
                 });
 
-                uploadMapMarker = L.marker([defaultLat, defaultLng], {
+                uploadMapMarker = L.marker([initialLat, initialLng], {
                     draggable: true,
                     icon: customIcon
                 }).addTo(uploadMapInstance);
 
                 uploadMapMarker.on('dragend', function (e) {
                     const pos = e.target.getLatLng();
-                    onLocationSelected(pos.lat, pos.lng);
+                    onLocationSelected(pos.lat, pos.lng, true);
                 });
 
                 uploadMapInstance.on('click', function (e) {
                     uploadMapMarker.setLatLng(e.latlng);
-                    onLocationSelected(e.latlng.lat, e.latlng.lng);
+                    onLocationSelected(e.latlng.lat, e.latlng.lng, true);
                 });
 
-                // Attempt to center on device location if immediately available
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        (pos) => {
-                            const userLat = pos.coords.latitude;
-                            const userLng = pos.coords.longitude;
-                            uploadMapInstance.setView([userLat, userLng], 14);
-                            uploadMapMarker.setLatLng([userLat, userLng]);
-                            onLocationSelected(userLat, userLng);
-                        },
-                        () => {
-                            onLocationSelected(defaultLat, defaultLng);
-                        },
-                        { timeout: 5000 }
-                    );
-                } else {
-                    onLocationSelected(defaultLat, defaultLng);
-                }
+                onLocationSelected(initialLat, initialLng, false);
             } else {
                 uploadMapInstance.invalidateSize();
+                uploadMapInstance.setView([initialLat, initialLng], 14);
+                if (uploadMapMarker) {
+                    uploadMapMarker.setLatLng([initialLat, initialLng]);
+                }
+                onLocationSelected(initialLat, initialLng, false);
             }
         }
 
-        async function onLocationSelected(lat, lng) {
+        async function onLocationSelected(lat, lng, syncInput = true) {
             const pinCoords = document.getElementById('pin-coords-text');
             if (pinCoords) {
                 pinCoords.textContent = `Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
@@ -1703,10 +1843,10 @@
                 accuracy: 10,
                 source: 'map_pin',
                 timestamp: new Date().toISOString(),
-                displayName: '',
-                barangay: '',
-                municipality: '',
-                province: ''
+                displayName: selectedUploadLocation?.displayName || DEFAULT_SAN_PABLO_NAME,
+                barangay: selectedUploadLocation?.barangay || '',
+                municipality: selectedUploadLocation?.municipality || 'San Pablo City',
+                province: selectedUploadLocation?.province || 'Laguna'
             };
 
             const badge = document.getElementById('location-reverse-badge');
@@ -1727,7 +1867,7 @@
                             badgeText.textContent = data.display_name;
                             badge.style.display = 'flex';
                         }
-                        if (manualInput && !manualInput.value.trim()) {
+                        if (manualInput && syncInput) {
                             manualInput.value = data.display_name;
                         }
                     }
@@ -1735,6 +1875,114 @@
             } catch (e) {
                 console.debug('Reverse geocode note:', e);
             }
+        }
+
+        function applyLocationCoordinates(lat, lng, displayName, barangay = '', municipality = '', province = '') {
+            if (uploadMapInstance) {
+                uploadMapInstance.setView([lat, lng], 15);
+            }
+            if (uploadMapMarker) {
+                uploadMapMarker.setLatLng([lat, lng]);
+            }
+
+            const pinCoords = document.getElementById('pin-coords-text');
+            if (pinCoords) {
+                pinCoords.textContent = `Lat: ${lat.toFixed(5)}, Lon: ${lng.toFixed(5)}`;
+            }
+
+            const badge = document.getElementById('location-reverse-badge');
+            const badgeText = document.getElementById('location-reverse-text');
+            if (badge && badgeText) {
+                badgeText.textContent = displayName;
+                badge.style.display = 'flex';
+            }
+
+            selectedUploadLocation = {
+                latitude: lat,
+                longitude: lng,
+                accuracy: 10,
+                source: 'search_input',
+                timestamp: new Date().toISOString(),
+                displayName: displayName,
+                barangay: barangay,
+                municipality: municipality,
+                province: province
+            };
+        }
+
+        async function triggerLocationSearch(query) {
+            const trimmed = (query || "").trim();
+            if (!trimmed) return;
+
+            hideSuggestions();
+
+            try {
+                const resp = await fetch(`/api/geocode/search?text=${encodeURIComponent(trimmed)}`);
+                if (resp.ok) {
+                    const data = await resp.json();
+                    if (data.success && Array.isArray(data.results) && data.results.length > 0) {
+                        const first = data.results[0];
+                        applyLocationCoordinates(first.lat, first.lon, first.display_name, first.barangay, first.municipality, first.province);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.warn("Geocode search error:", e);
+            }
+
+            // Fallback: If query matches known San Pablo barangay, center on San Pablo
+            const matchedBrgy = SAN_PABLO_BARANGAYS.find(b => b.toLowerCase().includes(trimmed.toLowerCase()));
+            if (matchedBrgy) {
+                applyLocationCoordinates(DEFAULT_SAN_PABLO_LAT, DEFAULT_SAN_PABLO_LNG, `${matchedBrgy}, San Pablo City, Laguna`, matchedBrgy, "San Pablo City", "Laguna");
+            }
+        }
+
+        function handleManualLocationTextInput(text) {
+            const query = (text || "").trim();
+            clearTimeout(locationSearchDebounceTimer);
+
+            if (!query) {
+                hideSuggestions();
+                return;
+            }
+
+            showSuggestions(query);
+
+            locationSearchDebounceTimer = setTimeout(() => {
+                triggerLocationSearch(query);
+            }, 400);
+        }
+
+        function showSuggestions(query) {
+            const container = document.getElementById('location-search-suggestions');
+            if (!container) return;
+
+            const lower = query.toLowerCase();
+            const matches = SAN_PABLO_BARANGAYS.filter(b => b.toLowerCase().includes(lower)).slice(0, 5);
+
+            if (matches.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = matches.map(b => {
+                const full = `${b}, San Pablo City`;
+                return `<div class="suggestion-item" onclick="selectSuggestion('${escapeHtml(full)}', '${escapeHtml(b)}')"><i class="fa-solid fa-location-dot"></i> <span>${escapeHtml(full)}</span></div>`;
+            }).join('');
+
+            container.style.display = 'block';
+        }
+
+        function hideSuggestions() {
+            const container = document.getElementById('location-search-suggestions');
+            if (container) container.style.display = 'none';
+        }
+
+        function selectSuggestion(displayName, barangay) {
+            const input = document.getElementById('manual-location-text');
+            if (input) input.value = displayName;
+            hideSuggestions();
+            triggerLocationSearch(displayName);
         }
 
         function fetchDeviceLocationForMap() {
@@ -1749,7 +1997,7 @@
                     if (uploadMapInstance && uploadMapMarker) {
                         uploadMapInstance.setView([userLat, userLng], 15);
                         uploadMapMarker.setLatLng([userLat, userLng]);
-                        onLocationSelected(userLat, userLng);
+                        onLocationSelected(userLat, userLng, true);
                     }
                 },
                 (err) => {
@@ -1757,20 +2005,6 @@
                 },
                 { enableHighAccuracy: true, timeout: 10000 }
             );
-        }
-
-        function handleManualLocationTextInput(text) {
-            if (!selectedUploadLocation) {
-                selectedUploadLocation = {
-                    latitude: 13.9314,
-                    longitude: 121.6172,
-                    accuracy: 50,
-                    source: 'manual_input',
-                    timestamp: new Date().toISOString()
-                };
-            }
-            selectedUploadLocation.displayName = text.trim();
-            selectedUploadLocation.source = 'manual_input';
         }
 
         function confirmUploadLocationAndScan() {
@@ -1782,13 +2016,15 @@
 
             if (!selectedUploadLocation) {
                 selectedUploadLocation = {
-                    latitude: 13.9314,
-                    longitude: 121.6172,
+                    latitude: DEFAULT_SAN_PABLO_LAT,
+                    longitude: DEFAULT_SAN_PABLO_LNG,
                     accuracy: 50,
                     source: 'manual_input',
                     timestamp: new Date().toISOString(),
-                    displayName: manualText,
-                    barangay: manualText
+                    displayName: manualText || DEFAULT_SAN_PABLO_NAME,
+                    barangay: manualText || 'San Pablo City',
+                    municipality: 'San Pablo City',
+                    province: 'Laguna'
                 };
             } else if (manualText) {
                 selectedUploadLocation.displayName = manualText;
@@ -1913,6 +2149,8 @@
                 window.currentPrediction = {
                     ...data,
                     pest: data.pest,
+                    severity: data.severity || 'Moderate',
+                    damage_percentage: data.damage_percentage || 50,
                     confidence: `${data.pest_confidence}%`,
                     timestamp: formattedTimestamp,
                     location_text: locationStr,
@@ -1933,6 +2171,11 @@
                     initial_recommendations: Array.isArray(data.recommendations) ? data.recommendations : [],
                     status: 'Ready to Submit'
                 };
+
+                const sevNode = document.getElementById('report-severity-text');
+                if (sevNode) {
+                    sevNode.textContent = data.severity || 'Moderate';
+                }
 
                 renderSupportingPreviews();
                 if (typeof window.openReportModal === 'function') {
@@ -1999,6 +2242,9 @@
 
             const formData = new FormData();
             formData.append('pest_type', compiledPest);
+            formData.append('severity', predictionData.severity || 'Moderate');
+            formData.append('damage_severity', predictionData.severity || 'Moderate');
+            formData.append('damage_percentage', predictionData.damage_percentage || 50);
             formData.append('farmer_notes', additionalNotes);
             formData.append('location_notes', globalPrimaryGPS?.displayName || additionalNotes);
             formData.append('confidence', predictionData.pest_confidence || 0);
@@ -2098,6 +2344,9 @@
                 saved_at: new Date().toISOString(),
                 status: isOfflineSubmit ? 'offline_draft' : 'draft',
                 pest: compiledPest,
+                severity: window.currentPrediction?.severity || 'Moderate',
+                damage_severity: window.currentPrediction?.severity || 'Moderate',
+                damage_percentage: window.currentPrediction?.damage_percentage || 50,
                 confidence: compiledConfidence,
                 farmer_notes: additionalNotes,
                 recommendations: Array.isArray(window.currentPrediction?.recommendations) ? window.currentPrediction.recommendations : [],
@@ -2405,6 +2654,15 @@
             }
             loadDraftFromSession();
             loadAndRenderRecentHistoryLogs();
+
+            document.addEventListener('click', function (e) {
+                const suggestions = document.getElementById('location-search-suggestions');
+                const input = document.getElementById('manual-location-text');
+                const btn = document.getElementById('search-location-btn');
+                if (suggestions && e.target !== input && e.target !== btn && !suggestions.contains(e.target)) {
+                    suggestions.style.display = 'none';
+                }
+            });
         });
 
 

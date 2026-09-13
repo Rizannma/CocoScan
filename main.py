@@ -606,45 +606,148 @@ def normalize_submission_error(error_str: str) -> str:
 def reverse_geocode_latlng(latitude, longitude):
     try:
         api_key = os.getenv('GEOAPIFY_API_KEY')
-        if not api_key:
-            logger.warning("GEOAPIFY_API_KEY is not set.")
-            return {}
+        if api_key:
+            response = requests.get(
+                "https://api.geoapify.com/v1/geocode/reverse",
+                params={
+                    "lat": latitude,
+                    "lon": longitude,
+                    "apiKey": api_key,
+                },
+                timeout=10,
+            )
+            if response.ok:
+                data = response.json()
+                features = data.get("features", [])
+                if features:
+                    payload = features[0].get("properties", {})
+                    barangay = payload.get("suburb") or payload.get("village") or payload.get("neighbourhood") or payload.get("hamlet") or ""
+                    municipality = payload.get("city") or payload.get("municipality") or payload.get("town") or payload.get("county") or ""
+                    province = payload.get("state") or payload.get("province") or payload.get("region") or ""
+                    formatted = payload.get("formatted", "")
+                    return {
+                        "barangay": barangay,
+                        "municipality": municipality,
+                        "province": province,
+                        "formatted": formatted,
+                    }
 
+        # Fallback to OpenStreetMap Nominatim
         response = requests.get(
-            "https://api.geoapify.com/v1/geocode/reverse",
+            "https://nominatim.openstreetmap.org/reverse",
             params={
                 "lat": latitude,
                 "lon": longitude,
-                "apiKey": api_key,
+                "format": "json",
+                "addressdetails": 1,
             },
-            timeout=15,
+            headers={"User-Agent": "CocoScan/1.0 (contact@cocoscan.local)"},
+            timeout=10,
         )
-        if not response.ok:
-            logger.warning(f"Reverse geocode failed: {response.status_code}")
-            return {}
-
-        data = response.json()
-        features = data.get("features", [])
-        if not features:
-            return {}
-        
-        payload = features[0].get("properties", {})
-        
-        # In the Philippines, barangay is usually mapped to suburb, village, or neighbourhood in OSM/Geoapify
-        barangay = payload.get("suburb") or payload.get("village") or payload.get("neighbourhood") or payload.get("hamlet") or ""
-        municipality = payload.get("city") or payload.get("municipality") or payload.get("town") or payload.get("county") or ""
-        province = payload.get("state") or payload.get("province") or payload.get("region") or ""
-        formatted = payload.get("formatted", "")
-        
-        return {
-            "barangay": barangay,
-            "municipality": municipality,
-            "province": province,
-            "formatted": formatted,
-        }
+        if response.ok:
+            data = response.json()
+            addr = data.get("address", {})
+            barangay = addr.get("suburb") or addr.get("village") or addr.get("neighbourhood") or addr.get("hamlet") or addr.get("quarter") or ""
+            municipality = addr.get("city") or addr.get("municipality") or addr.get("town") or addr.get("county") or ""
+            province = addr.get("state") or addr.get("province") or addr.get("region") or ""
+            formatted = data.get("display_name", "")
+            return {
+                "barangay": barangay,
+                "municipality": municipality,
+                "province": province,
+                "formatted": formatted,
+            }
+        return {}
     except Exception as geocode_err:
         logger.warning(f"Reverse geocode exception: {str(geocode_err)}")
         return {}
+
+
+def forward_geocode_search(query):
+    results = []
+    query_str = (query or "").strip()
+    if not query_str:
+        return results
+
+    # 1. Try Geoapify
+    api_key = os.getenv('GEOAPIFY_API_KEY')
+    if api_key:
+        try:
+            resp = requests.get(
+                "https://api.geoapify.com/v1/geocode/search",
+                params={
+                    "text": query_str,
+                    "filter": "countrycode:ph",
+                    "bias": "proximity:121.3256,14.0683",
+                    "apiKey": api_key,
+                    "limit": 5,
+                },
+                timeout=10,
+            )
+            if resp.ok:
+                data = resp.json()
+                for feature in data.get("features", []):
+                    props = feature.get("properties", {})
+                    lat = props.get("lat")
+                    lon = props.get("lon")
+                    if lat is not None and lon is not None:
+                        barangay = props.get("suburb") or props.get("village") or props.get("neighbourhood") or props.get("hamlet") or ""
+                        municipality = props.get("city") or props.get("municipality") or props.get("town") or props.get("county") or ""
+                        province = props.get("state") or props.get("province") or props.get("region") or ""
+                        display_name = props.get("formatted") or ", ".join(filter(None, [barangay, municipality, province]))
+                        results.append({
+                            "lat": float(lat),
+                            "lon": float(lon),
+                            "display_name": display_name,
+                            "barangay": barangay,
+                            "municipality": municipality,
+                            "province": province,
+                            "formatted": props.get("formatted", "")
+                        })
+        except Exception as e:
+            logger.warning(f"Geoapify forward geocode error: {e}")
+
+    # 2. Fallback to OpenStreetMap Nominatim
+    if not results:
+        try:
+            q_param = query_str
+            if "philippines" not in q_param.lower() and "laguna" not in q_param.lower():
+                q_param = f"{query_str}, Laguna, Philippines"
+            resp = requests.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={
+                    "q": q_param,
+                    "format": "json",
+                    "addressdetails": 1,
+                    "limit": 5,
+                    "countrycodes": "ph"
+                },
+                headers={"User-Agent": "CocoScan/1.0 (contact@cocoscan.local)"},
+                timeout=10,
+            )
+            if resp.ok:
+                data = resp.json()
+                for item in data:
+                    lat = float(item.get("lat"))
+                    lon = float(item.get("lon"))
+                    addr = item.get("address", {})
+                    barangay = addr.get("suburb") or addr.get("village") or addr.get("neighbourhood") or addr.get("hamlet") or addr.get("quarter") or ""
+                    municipality = addr.get("city") or addr.get("municipality") or addr.get("town") or addr.get("county") or ""
+                    province = addr.get("state") or addr.get("province") or addr.get("region") or ""
+                    display_name = item.get("display_name", "")
+                    results.append({
+                        "lat": lat,
+                        "lon": lon,
+                        "display_name": display_name,
+                        "barangay": barangay,
+                        "municipality": municipality,
+                        "province": province,
+                        "formatted": display_name
+                    })
+        except Exception as e:
+            logger.warning(f"Nominatim forward geocode error: {e}")
+
+    return results
 
 
 def upload_image_to_supabase(file_bytes, filename, content_type="application/octet-stream"):
@@ -1809,10 +1912,18 @@ def _build_report_modal_payload(item, *, supporting_images=None, weather=None, d
     if not notes:
         notes = "No notes logged."
 
+    pest_name = item.get("pest_type") or item.get("pest") or "Unknown Pest"
+    severity_val = item.get("severity") or item.get("damage_severity") or ("Mild" if pest_name == "Healthy Coconut Leaf" else "Moderate")
+    damage_pct = item.get("damage_percentage")
+    if damage_pct is None:
+        damage_pct = 25 if severity_val == "Mild" or pest_name == "Healthy Coconut Leaf" else (75 if severity_val == "Severe" else 50)
+
     return {
         "id": report_id,
         "chat_count": chat_count,
-        "pest": item.get("pest_type") or item.get("pest") or "Unknown Pest",
+        "pest": pest_name,
+        "severity": severity_val,
+        "damage_percentage": damage_pct,
         "confidence": _format_report_confidence(item.get("confidence")),
         "status": normalize_report_status(item.get("status"), default=default_status),
         "timestamp": format_report_timestamp(item.get("created_at") or item.get("submitted_at") or item.get("photo_taken_at")),
@@ -1942,10 +2053,13 @@ def farmer_scan():
                 for item in getattr(reports_response, 'data', []) or []:
                     created_raw = item.get('submitted_at') or item.get('created_at') or ''
                     created_label = format_report_timestamp(created_raw)
+                    pest_val = item.get('pest_type') or 'Unknown Pest'
+                    sev_val = item.get('severity') or item.get('damage_severity') or ('Mild' if pest_val == 'Healthy Coconut Leaf' else 'Moderate')
 
                     recent_reports.append({
                         'id': item.get('id'),
-                        'pest': item.get('pest_type') or 'Unknown Pest',
+                        'pest': pest_val,
+                        'severity': sev_val,
                         'confidence': f"{int(float(item.get('confidence', 0)))}%" if item.get('confidence') else '90%',
                         'raw_timestamp': created_label,
                         'time_string': created_label,
@@ -1994,18 +2108,25 @@ def farmer_predict():
         
         pest_model_path = resolve_model_path(
             'PEST_MODEL_PATH',
-            'pest_classifier_YOLO.tflite'
+            'pest_classifier_moderate.h5'
+        )
+        severity_model_path = resolve_model_path(
+            'SEVERITY_MODEL_PATH',
+            'severity_classifier_severe_boost.h5'
         )
 
         if not os.path.exists(pest_model_path):
-            logger.error(f"Model not found: {pest_model_path}")
-            return jsonify({'success': False, 'error': f'Model not found: {pest_model_path}'}), 500
+            logger.error(f"Pest model not found: {pest_model_path}")
+            return jsonify({'success': False, 'error': f'Pest model not found: {pest_model_path}'}), 500
+
+        if not os.path.exists(severity_model_path):
+            logger.error(f"Severity model not found: {severity_model_path}")
+            return jsonify({'success': False, 'error': f'Severity model not found: {severity_model_path}'}), 500
 
         result = run_full_inference_pipeline(
             image,
-            '',
-            pest_model_path,
-            None,
+            pest_model_path=pest_model_path,
+            severity_model_path=severity_model_path,
             use_lite_size=False
         )
 
@@ -3372,10 +3493,18 @@ def agriculturist_mark_resolved():
 
 @app.route('/api/geocode', methods=['GET'])
 def api_geocode():
+    query = request.args.get('q') or request.args.get('query') or request.args.get('text')
+    if query:
+        results = forward_geocode_search(query)
+        return jsonify({
+            "success": True,
+            "results": results
+        })
+
     lat = request.args.get('lat')
     lon = request.args.get('lon')
     if not lat or not lon:
-        return jsonify({"success": False, "error": "Missing coordinates"}), 400
+        return jsonify({"success": False, "error": "Missing coordinates or search query"}), 400
     
     geo_data = reverse_geocode_latlng(lat, lon)
     display_name = ", ".join(filter(None, [geo_data.get("barangay"), geo_data.get("municipality"), geo_data.get("province")])) or geo_data.get("formatted") or "Unknown Location"
@@ -3383,6 +3512,18 @@ def api_geocode():
         "success": True,
         "address": geo_data,
         "display_name": display_name
+    })
+
+@app.route('/api/geocode/search', methods=['GET'])
+def api_geocode_search():
+    query = request.args.get('q') or request.args.get('query') or request.args.get('text') or ''
+    if not query.strip():
+        return jsonify({"success": False, "error": "Missing search query", "results": []}), 400
+    
+    results = forward_geocode_search(query.strip())
+    return jsonify({
+        "success": True,
+        "results": results
     })
     
 @app.route('/farmer/submit-report', methods=['POST'])

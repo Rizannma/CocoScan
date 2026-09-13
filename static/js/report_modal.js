@@ -234,6 +234,9 @@
             availabilitySlots: normalizeAvailabilitySlots(reportData.availability_slots || reportData.availability || reportData.availabilitySlots || reportData.farmer_availability || feedbackData.schedules?.map((item) => item.date ? `${item.date} ${item.time || "Morning"}`.trim() : "") || []),
             agriBookedSchedules: normalizeAvailabilitySlots(reportData.agri_booked_schedules || reportData.agri_booked_slots || reportData.booked_schedules || []),
             weather: reportData.weather || {},
+            severity: reportData.severity || reportData.damage_severity || reportData.damage || (reportData.pest === "Healthy Coconut Leaf" ? "Mild" : "Moderate"),
+            severityConfidence: reportData.severity_confidence ? normalizeConfidence(reportData.severity_confidence) : null,
+            damagePercentage: reportData.damage_percentage ?? null,
         };
     }
 
@@ -756,17 +759,29 @@
         }
     }
 
+    const SEVERITY_THEMES = {
+        "mild": {
+            backgroundColor: "#1E4620",
+            textColor: "#E6F4EA"
+        },
+        "moderate": {
+            backgroundColor: "#B06000",
+            textColor: "#FFF3E0"
+        },
+        "severe": {
+            backgroundColor: "#9C1C1C",
+            textColor: "#FCE8E6"
+        }
+    };
+
     function applyStatusStyle(report) {
         const severityBanner = document.getElementById("report-severity-banner");
         const statusNode = document.getElementById("report-status-text");
+        const pestTitle = document.getElementById("report-pest-title");
+        const severityNode = document.getElementById("report-severity-text");
 
-        const pestStyles = {
-            "rhinoceros beetle": { backgroundColor: "#164630", textColor: "#ffffff" },
-            "brontispa": { backgroundColor: "#d97706", textColor: "#ffffff" }
-        };
-
-        const pestKey = String(report.pest || "").trim().toLowerCase();
-        const bannerStyle = pestStyles[pestKey] || null;
+        const sevKey = String(report.severity || "").trim().toLowerCase();
+        const theme = SEVERITY_THEMES[sevKey] || (report.pest === "Healthy Coconut Leaf" ? SEVERITY_THEMES["mild"] : SEVERITY_THEMES["moderate"]);
 
         if (statusNode) {
             const statusStyle = getWorkflowStatusBadgeStyle(report.status || "--");
@@ -775,13 +790,17 @@
         }
 
         if (severityBanner) {
-            if (bannerStyle) {
-                severityBanner.style.backgroundColor = bannerStyle.backgroundColor;
-                severityBanner.style.color = bannerStyle.textColor;
-            } else {
-                severityBanner.style.backgroundColor = "#f8fafc";
-                severityBanner.style.color = "#102a43";
-            }
+            severityBanner.style.backgroundColor = theme.backgroundColor;
+            severityBanner.style.color = theme.textColor;
+        }
+
+        if (pestTitle) {
+            pestTitle.style.color = theme.textColor;
+        }
+
+        if (severityNode) {
+            severityNode.textContent = report.severity || "--";
+            severityNode.style.color = theme.textColor;
         }
     }
 
@@ -2407,6 +2426,8 @@
 
         if (pestTitle) pestTitle.textContent = report.pest;
         if (confidenceNode) confidenceNode.textContent = report.confidence;
+        const severityNode = document.getElementById("report-severity-text");
+        if (severityNode) severityNode.textContent = report.severity || "--";
         if (farmerNameNode) farmerNameNode.textContent = report.farmer;
         if (locationNode) locationNode.textContent = report.locationText;
         if (timestampNode) timestampNode.textContent = formatTimestamp(report.timestamp);

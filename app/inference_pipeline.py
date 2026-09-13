@@ -1,6 +1,9 @@
 """
-Integrated inference pipeline for CocoScan using the single TFLite model in the model folder.
-Handles: image preparation -> pest classification -> recommendations.
+Integrated inference pipeline for CocoScan using the two Keras H5 models:
+- pest_classifier_moderate.h5
+- severity_classifier_severe_boost.h5
+
+Handles: image preparation -> pest classification -> severity classification -> dynamic recommendations.
 """
 
 import base64
@@ -11,24 +14,34 @@ from typing import Dict, Optional, Union
 import numpy as np
 from PIL import Image
 
-from model.inference import predict_pest_from_base64
+from model.inference import (
+    predict_pest,
+    predict_pest_from_base64,
+    predict_severity,
+    predict_severity_from_base64,
+)
 
 logger = logging.getLogger(__name__)
 
-PEST_LABELS = ["Rhinoceros Beetle", "Brontispa", "Healthy Coconut Leaf"]
+PEST_LABELS = ["Brontispa", "Healthy Coconut Leaf", "Rhinoceros Beetle", "Not a Coconut Leaf Image"]
+SEVERITY_LABELS = ["Mild", "Moderate", "Severe"]
 
 
-def _to_base64(image_source: Union[str, np.ndarray, Image.Image]) -> str:
+def _to_pil_image(image_source: Union[str, np.ndarray, Image.Image]) -> Image.Image:
+    """Normalize various image source inputs into a PIL Image."""
     if isinstance(image_source, Image.Image):
-        image = image_source.convert("RGB")
-    elif isinstance(image_source, np.ndarray):
-        image = Image.fromarray(image_source.astype("uint8"), "RGB")
-    else:
-        image = Image.open(image_source).convert("RGB")
-
-    buffer = io.BytesIO()
-    image.save(buffer, format="JPEG")
-    return base64.b64encode(buffer.getvalue()).decode("ascii")
+        return image_source.convert("RGB")
+    if isinstance(image_source, np.ndarray):
+        return Image.fromarray(image_source.astype("uint8"), "RGB")
+    if isinstance(image_source, str):
+        # Base64 string or file path
+        if image_source.startswith("data:") or "," in image_source or len(image_source) > 500:
+            if "," in image_source:
+                image_source = image_source.split(",", 1)[1]
+            image_bytes = base64.b64decode(image_source)
+            return Image.open(io.BytesIO(image_bytes)).convert("RGB")
+        return Image.open(image_source).convert("RGB")
+    raise ValueError(f"Unsupported image source type: {type(image_source)}")
 
 
 def run_full_inference_pipeline(
@@ -39,38 +52,56 @@ def run_full_inference_pipeline(
     use_lite_size: bool = False,
 ) -> Dict:
     """
-    Run the single-model inference pipeline.
-    Severity classification is intentionally not used because the new TFLite model does not provide it.
+    Execute the dual-model inference pipeline:
+    1. Prepare and validate the input image.
+    2. Run pest classification using pest_classifier_moderate.h5.
+    3. Run severity classification using severity_classifier_severe_boost.h5.
+    4. Generate recommendations dynamically tailored to the detected pest and severity.
     """
     try:
-        logger.info("Starting single-model inference pipeline")
+        logger.info("Starting dual H5 model inference pipeline (pest + severity)")
 
-        payload = _to_base64(image_source)
-        inference_result = predict_pest_from_base64(payload, model_path=pest_model_path)
+        image = _to_pil_image(image_source)
 
+        # Step 1: Pest classification
+        pest_result = predict_pest(image, model_path=pest_model_path)
+        predicted_pest = pest_result["predicted_pest"]
+
+        # Step 2: Severity classification
+        severity_result = predict_severity(image, model_path=severity_model_path)
+        predicted_severity = severity_result["severity"]
+
+        # Step 3: Dynamic Recommendations based on both pest and severity
         from app.recommendations import recommend_actions
 
         recommendations_result = recommend_actions(
-            inference_result["predicted_pest"],
-            risk_score=50,
+            pest=predicted_pest,
+            severity=predicted_severity,
         )
 
-        return {
+        final_result = {
             "success": True,
-            "pest": inference_result["predicted_pest"],
-            "pest_confidence": inference_result["confidence_score"],
-            "pest_probabilities": inference_result["probabilities"],
-            "severity": "Not available",
-            "damage_percentage": None,
-            "severity_confidence": None,
-            "severity_probabilities": None,
+            "pest": predicted_pest,
+            "pest_confidence": pest_result["confidence_score"],
+            "pest_probabilities": pest_result["probabilities"],
+            "severity": predicted_severity,
+            "damage_percentage": severity_result["damage_percentage"],
+            "severity_confidence": severity_result["confidence_score"],
+            "severity_probabilities": severity_result["probabilities"],
             "recommendations": recommendations_result["recommendation"],
             "risk_level": recommendations_result["risk"],
             "urgency": recommendations_result["urgency"],
             "risk_factors": recommendations_result["risk_factors"],
         }
+
+        logger.info(
+            f"Pipeline complete: Pest='{predicted_pest}' ({pest_result['confidence_score']:.1%}), "
+            f"Severity='{predicted_severity}' ({severity_result['confidence_score']:.1%})"
+        )
+        return final_result
+
     except Exception as exc:
-        logger.error(f"Full pipeline error: {str(exc)}")
+        logger.error(f"Full inference pipeline error: {str(exc)}")
         return {
             "success": False,
             "error": str(exc),
@@ -79,4 +110,3 @@ def run_full_inference_pipeline(
             "confidence": 0.0,
             "recommendations": [],
         }
-
