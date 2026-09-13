@@ -172,5 +172,46 @@ class TestH5Inference(unittest.TestCase):
         self.assertIn('urgency', data)
 
 
+    def test_image_compression_and_downscale(self):
+        from app.image_utils import process_and_compress_image, compress_image_to_bytes
+        large_img = _create_synthetic_leaf_image(width=3000, height=2000)
+        processed = process_and_compress_image(large_img, max_dimension=1024)
+        self.assertLessEqual(processed.size[0], 1024)
+        self.assertLessEqual(processed.size[1], 1024)
+        self.assertEqual(processed.mode, "RGB")
+        
+        # Test bytes compression
+        jpeg_bytes = compress_image_to_bytes(large_img, max_dimension=1024)
+        self.assertTrue(len(jpeg_bytes) > 0)
+        self.assertLess(len(jpeg_bytes), 500000)  # Compressed under 500KB
+
+    def test_large_image_upload_endpoint(self):
+        from main import app
+        # Create a large 2400x1600 synthetic image
+        img = _create_synthetic_leaf_image(width=2400, height=1600)
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=95)
+        buf.seek(0)
+
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess['user_id'] = 'test-farmer-1'
+            sess['user_role'] = 'farmer'
+            sess['user_name'] = 'Test Farmer'
+
+        response = client.post(
+            '/farmer/predict',
+            data={'image_file': (buf, 'huge_leaf.jpg')},
+            content_type='multipart/form-data'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.get_json()
+        self.assertTrue(data['success'])
+        self.assertIn(data['pest'], PEST_LABELS)
+        self.assertIn(data['severity'], SEVERITY_LABELS)
+
+
 if __name__ == "__main__":
     unittest.main()
+

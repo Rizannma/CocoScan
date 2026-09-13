@@ -139,7 +139,8 @@ def _decode_base64_image(image_data: str) -> Image.Image:
     if "," in image_data:
         image_data = image_data.split(",", 1)[1]
     image_bytes = base64.b64decode(image_data)
-    return Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    from app.image_utils import process_and_compress_image
+    return process_and_compress_image(image_bytes, max_dimension=1024)
 
 
 def _validate_leaf_image(image: Image.Image):

@@ -29,19 +29,22 @@ SEVERITY_LABELS = ["Mild", "Moderate", "Severe"]
 
 
 def _to_pil_image(image_source: Union[str, np.ndarray, Image.Image]) -> Image.Image:
-    """Normalize various image source inputs into a PIL Image."""
+    """Normalize and downscale various image source inputs into a safe PIL Image."""
+    from app.image_utils import process_and_compress_image
+
     if isinstance(image_source, Image.Image):
-        return image_source.convert("RGB")
+        return process_and_compress_image(image_source, max_dimension=1024)
     if isinstance(image_source, np.ndarray):
-        return Image.fromarray(image_source.astype("uint8"), "RGB")
+        pil_img = Image.fromarray(image_source.astype("uint8"), "RGB")
+        return process_and_compress_image(pil_img, max_dimension=1024)
     if isinstance(image_source, str):
         # Base64 string or file path
         if image_source.startswith("data:") or "," in image_source or len(image_source) > 500:
             if "," in image_source:
                 image_source = image_source.split(",", 1)[1]
             image_bytes = base64.b64decode(image_source)
-            return Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        return Image.open(image_source).convert("RGB")
+            return process_and_compress_image(image_bytes, max_dimension=1024)
+        return process_and_compress_image(Image.open(image_source), max_dimension=1024)
     raise ValueError(f"Unsupported image source type: {type(image_source)}")
 
 

@@ -2112,10 +2112,12 @@ def farmer_predict():
             return jsonify({"error": "No image file uploaded"}), 400
 
         try:
+            from app.image_utils import process_and_compress_image
             image_bytes = image_file.read()
-            image = Image.open(BytesIO(image_bytes)).convert("RGB")
+            # Downscale large uploaded photos to safe max dimensions (1024px) right at the route
+            image = process_and_compress_image(image_bytes, max_dimension=1024)
         except Exception as e:
-            logger.error(f"Image file decoding error: {str(e)}")
+            logger.error(f"Image preprocessing/decoding error: {str(e)}")
             return jsonify({'success': False, 'error': 'Invalid uploaded image file'}), 400
         
         pest_model_path = resolve_model_path(
