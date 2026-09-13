@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cocoscan-app-shell-v17';
-const RUNTIME_CACHE = 'cocoscan-pages-runtime-v17';
-const IMAGE_CACHE = 'cocoscan-report-images-v17';
+const CACHE_NAME = 'cocoscan-app-shell-v18';
+const RUNTIME_CACHE = 'cocoscan-pages-runtime-v18';
+const IMAGE_CACHE = 'cocoscan-report-images-v18';
 
 // Only precache truly public, unauthenticated assets to prevent login redirect caching corruption
 const PRECACHE_ASSETS = [
@@ -8,12 +8,24 @@ const PRECACHE_ASSETS = [
     '/manifest.json',
     '/offline',
     '/static/js/auth_storage.js',
+    '/static/js/i18n.js',
+    '/static/i18n/farmer_strings_en.json',
+    '/static/i18n/farmer_strings_tl.json',
     '/static/css/weather_widget.css',
     '/static/js/report_modal.js',
     '/static/icons/icon-192x192.png',
     '/static/icons/icon-512x512.png',
     '/static/icons/favicon.ico',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.ttf',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-brands-400.woff2',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-brands-400.ttf',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-v4compatibility.woff2',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-v4compatibility.ttf',
+    'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'
 ];
 
@@ -21,15 +33,15 @@ const PRECACHE_ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[SW v9] Precaching Public App Shell');
+            console.log('[SW v18] Precaching Public App Shell & Webfonts');
             return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-                console.warn('[SW v9] Precache assets load warning:', err);
+                console.warn('[SW v18] Precache assets load warning:', err);
             });
         }).then(() => self.skipWaiting())
     );
 });
 
-// Activate event: Clean up legacy caches (v1-v8)
+// Activate event: Clean up legacy caches (v1-v17)
 self.addEventListener('activate', (event) => {
     const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
     event.waitUntil(
@@ -37,7 +49,7 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (!currentCaches.includes(cacheName)) {
-                        console.log('[SW v9] Deleting legacy cache:', cacheName);
+                        console.log('[SW v18] Deleting legacy cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
@@ -170,6 +182,7 @@ self.addEventListener('fetch', (event) => {
 
     // 3. Static Assets (CSS, JS, Fonts): Cache First, Network Fallback
     if (request.destination === 'style' || request.destination === 'script' || request.destination === 'font' ||
+        url.hostname.includes('cdnjs.cloudflare.com') || url.hostname.includes('fonts.googleapis.com') || url.hostname.includes('fonts.gstatic.com') ||
         url.pathname.startsWith('/static/')) {
         
         event.respondWith(
@@ -178,7 +191,7 @@ self.addEventListener('fetch', (event) => {
                     return cachedResponse;
                 }
                 return fetch(request).then((networkResponse) => {
-                    if (networkResponse && networkResponse.status === 200 && !networkResponse.redirected) {
+                    if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque') && !networkResponse.redirected) {
                         const responseToCache = networkResponse.clone();
                         caches.open(CACHE_NAME).then((cache) => {
                             cache.put(request, responseToCache);

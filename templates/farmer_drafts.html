@@ -397,30 +397,37 @@
         .draft-actions {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-top: 4px;
+            gap: 8px;
+            margin-top: 6px;
             width: 100%;
         }
 
         .main-actions-row {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             width: 100%;
         }
 
         .btn-control {
-            padding: 12px 14px;
+            padding: 10px 12px;
             border-radius: 12px;
-            font-size: 0.9rem;
+            font-size: 0.88rem;
             font-weight: 700;
             cursor: pointer;
             border: none;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             gap: 6px;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
+            min-width: 0;
+            white-space: nowrap;
+            box-sizing: border-box;
+        }
+
+        .main-actions-row .btn-control {
+            flex: 1 1 50%;
         }
 
         /* Submit: High Highlight Weight */
@@ -438,7 +445,7 @@
         .btn-control.btn-edit {
             background: #ffffff;
             color: var(--brand-dark);
-            border: 1px solid rgba(82, 130, 101, 0.25);
+            border: 1px solid rgba(82, 130, 101, 0.35);
         }
 
         .btn-control.btn-edit:hover {
@@ -446,19 +453,42 @@
             border-color: var(--primary-green);
         }
 
-        /* Delete: Subtle Alert Design block to remove overwhelming vertical block stacking */
+        /* Delete: Subtle Alert Design block */
         .btn-control.btn-delete {
             background-color: #fff5f5;
-            border: 1px solid rgba(239, 68, 68, 0.12);
+            border: 1px solid rgba(239, 68, 68, 0.15);
             color: #e53e3e;
-            padding: 10px;
-            font-size: 0.85rem;
+            padding: 9px 12px;
+            font-size: 0.84rem;
         }
 
         .btn-control.btn-delete:hover {
             background-color: #fee2e2;
             color: #9b1c1c;
             border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        @media (max-width: 480px) {
+            .draft-actions {
+                gap: 6px;
+            }
+            .main-actions-row {
+                gap: 6px;
+            }
+            .btn-control {
+                padding: 9px 6px;
+                font-size: 0.82rem;
+                gap: 5px;
+                border-radius: 10px;
+            }
+            .btn-control i {
+                font-size: 0.8rem;
+            }
+            .btn-control.btn-delete {
+                padding: 8px 10px;
+                font-size: 0.8rem;
+                border-radius: 10px;
+            }
         }
 
         /* ==========================================================================

@@ -626,7 +626,7 @@
     "empty_title": "Walang Naka-save na Draft",
     "empty_desc": "Wala ka pang naka-save na draft scan. Pumunta sa pahina ng Mag-scan ng Peste upang simulan ang iyong unang ulat.",
     "offline_scan_title": "Offline Scan",
-    "badge_pending_ai": "Naghihintay ng AI",
+    "badge_pending_ai": "Naghihintay sa Pagscan",
     "badge_scanned": "Na-scan Na",
     "label_captured": "Kinuha noong:",
     "label_saved": "Na-save noong:",
@@ -634,7 +634,7 @@
     "label_notes": "Mga Tala",
     "label_no_notes": "Walang inilagay na tala",
     "no_notes": "Walang inilagay na tala",
-    "btn_continue_edit": "Ipagpatuloy/I-edit",
+    "btn_continue_edit": "Ipagpatuloy",
     "btn_scan": "I-scan",
     "btn_delete_draft": "Burahin ang Draft",
     "btn_save_changes": "I-save ang mga Pagbabago",
@@ -724,8 +724,8 @@
     "initial_reco_tooltip_prompt": "Pindutin ang question mark icon para sa karagdagang detalye.",
     "initial_reco_empty": "Wala pang available na paunang rekomendasyon.",
     "supporting_photos_title": "Karagdagang Larawan (opsyonal)",
-    "supporting_photos_tap": "Magdagdag ng Larawan mula sa Sakahan",
-    "supporting_photos_prompt": "Magdagdag ng Larawan mula sa Sakahan",
+    "supporting_photos_tap": "Magdagdag ng Larawan",
+    "supporting_photos_prompt": "Magdagdag ng Larawan",
     "supporting_photos_subtext": "Pindutin para buksan ang gallery ng iyong telepono",
     "supporting_photos_error": "Hanggang 3 karagdagang larawan lamang ang maaaring i-upload.",
     "supporting_photos_max_error": "Hanggang 3 karagdagang larawan lamang ang maaaring i-upload.",
@@ -808,7 +808,7 @@
     "resolved": "Nalutas Na",
     "recommendation_issued": "Naibigay na ang Rekomendasyon",
     "ready_to_submit": "Handa nang Ipasa",
-    "offline_draft": "Offline Scan (Naghihintay ng AI)",
+    "offline_draft": "Offline Scan (Naghihintay sa Pagscan)",
     "draft": "Draft"
   },
   "pest_knowledge_base": {
@@ -1027,11 +1027,35 @@
       const container = root || document;
       const currentLang = CocoScanI18n.getLanguage();
 
+      // Helper to safely update text without destroying icon children (<i>, <svg>, <img>)
+      function updateTextPreservingIcons(el, newText) {
+        const icons = el.querySelectorAll("i, svg, img");
+        if (icons.length === 0) {
+          el.textContent = newText;
+          return;
+        }
+        // Find existing text node among children
+        let foundTextNode = false;
+        for (let i = 0; i < el.childNodes.length; i++) {
+          const node = el.childNodes[i];
+          if (node.nodeType === Node.TEXT_NODE && node.nodeValue.trim().length > 0) {
+            node.nodeValue = " " + newText.trim() + " ";
+            foundTextNode = true;
+            break;
+          }
+        }
+        if (!foundTextNode) {
+          el.appendChild(document.createTextNode(" " + newText.trim()));
+        }
+      }
+
       // Text content
       container.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         if (key) {
-          el.textContent = CocoScanI18n.t(key, el.textContent);
+          const defaultVal = el.textContent ? el.textContent.trim() : key;
+          const translated = CocoScanI18n.t(key, defaultVal);
+          updateTextPreservingIcons(el, translated);
         }
       });
 
@@ -1075,7 +1099,7 @@
           }
         } else {
           btn.setAttribute("data-current-lang", currentLang);
-          btn.textContent = currentLang === "tl" ? "🇵🇭 Tagalog" : "🇺🇸 English";
+          btn.innerHTML = `<i class="fa-solid fa-globe"></i> ${currentLang === "tl" ? "Tagalog" : "English"}`;
         }
       });
     }
@@ -1093,9 +1117,11 @@
   // Auto-init on DOMContentLoaded
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
+      CocoScanI18n.applyToDOM();
       CocoScanI18n.updateToggleButtons();
     });
   } else {
+    CocoScanI18n.applyToDOM();
     CocoScanI18n.updateToggleButtons();
   }
 })(window);

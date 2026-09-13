@@ -12,7 +12,16 @@
 {% endblock %}
 
 {% block metrics_grid %}
-
+<!-- Farmer-Exclusive Offline Access Notice -->
+<div id="farmer-offline-banner" class="farmer-offline-banner" style="display: none;">
+    <div class="farmer-offline-icon-box">
+        <i class="fa-solid fa-cloud-arrow-down"></i>
+    </div>
+    <div class="farmer-offline-content">
+        <h4 data-i18n="dashboard.banner_offline_title">{{ t('dashboard.banner_offline_title', 'Offline Access Active') }}</h4>
+        <p data-i18n="dashboard.banner_offline_desc">{{ t('dashboard.banner_offline_desc', 'You can perform field scans and save them to local drafts without an active internet connection.') }}</p>
+    </div>
+</div>
 
 <div class="metrics-row-wrapper">
     <div class="metric-card-node cases">
@@ -78,6 +87,77 @@
 </div>
 
 <style>
+    .farmer-offline-banner {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1.5px solid #fde68a;
+        border-left: 5px solid #f59e0b;
+        border-radius: 18px;
+        padding: 16px 18px;
+        margin-bottom: 20px;
+        align-items: flex-start;
+        gap: 14px;
+        box-shadow: 0 4px 16px rgba(245, 158, 11, 0.08);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .farmer-offline-icon-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        background: rgba(245, 158, 11, 0.18);
+        color: #d97706;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.3rem;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .farmer-offline-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .farmer-offline-content h4 {
+        font-size: 1rem;
+        font-weight: 800;
+        color: #78350f;
+        margin: 0 0 4px 0;
+        line-height: 1.3;
+    }
+
+    .farmer-offline-content p {
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: #92400e;
+        margin: 0;
+        line-height: 1.45;
+    }
+
+    @media (max-width: 480px) {
+        .farmer-offline-banner {
+            padding: 14px;
+            gap: 12px;
+            border-radius: 16px;
+            margin-bottom: 16px;
+        }
+        .farmer-offline-icon-box {
+            width: 36px;
+            height: 36px;
+            font-size: 1.15rem;
+        }
+        .farmer-offline-content h4 {
+            font-size: 0.95rem;
+        }
+        .farmer-offline-content p {
+            font-size: 0.82rem;
+            line-height: 1.4;
+        }
+    }
+
     @keyframes modalFadeIn {
         from {
             opacity: 0;
@@ -138,7 +218,12 @@
     }
 
     function updateFarmerOfflineUI() {
-        if (navigator.onLine) {
+        const banner = document.getElementById('farmer-offline-banner');
+        const isOffline = !navigator.onLine || localStorage.getItem('cocoscan_offline_active') === 'true';
+        if (banner) {
+            banner.style.display = isOffline ? 'flex' : 'none';
+        }
+        if (!isOffline) {
             closeFarmerOfflineModal();
             localStorage.removeItem('cocoscan_offline_active');
         }

@@ -554,13 +554,13 @@
 
 {% if session.get('user_role') in ['admin', 'lgu'] %}
         <div class="premium-form-card" id="report-notes-card">
-            <h4 data-i18n="modal.farmer_notes_title"><i class="fa-solid fa-pen-to-square"></i> {{ t('modal.farmer_notes_title', 'Farmer Notes') }}</h4>
+            <h4><i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.farmer_notes_title">{{ t('modal.farmer_notes_title', 'Farmer Notes') }}</span></h4>
             <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder"></textarea>
             <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
         </div>
 
             <div class="premium-reco-card" id="report-initial-card">
-            <h4 data-i18n="modal.initial_reco_title"><i class="fa-solid fa-wand-magic-sparkles"></i> {{ t('modal.initial_reco_title', 'Initial Recommendations') }}</h4>
+            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.initial_reco_title">{{ t('modal.initial_reco_title', 'Initial Recommendations') }}</span></h4>
            <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
                 {{ t('modal.initial_reco_desc', 'These are general recommendations for the detected pest to help your initial decision on what to do.') }}
             </p>
@@ -572,7 +572,7 @@
 
         {% else %}
             <div class="premium-reco-card" id="report-initial-card">
-            <h4 data-i18n="modal.initial_reco_title"><i class="fa-solid fa-wand-magic-sparkles"></i> {{ t('modal.initial_reco_title', 'Initial Recommendations') }}</h4>
+            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.initial_reco_title">{{ t('modal.initial_reco_title', 'Initial Recommendations') }}</span></h4>
            <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
                 {{ t('modal.initial_reco_desc', 'These are general recommendations for the detected pest to help your initial decision on what to do.') }}
             </p>
@@ -583,7 +583,7 @@
         </div>
 
         <div class="premium-form-card" id="report-notes-card">
-            <h4 data-i18n="modal.farmer_notes_title"><i class="fa-solid fa-pen-to-square"></i> {{ t('modal.farmer_notes_title', 'Farmer Notes') }}</h4>
+            <h4><i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.farmer_notes_title">{{ t('modal.farmer_notes_title', 'Farmer Notes') }}</span></h4>
             <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder"></textarea>
             <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
         </div>
@@ -592,7 +592,7 @@
         <!-- Expert card removed from here; placed below Additional Images for agriculturist pending view -->
 
         <div class="premium-form-card" data-scan-only>
-            <h4 data-i18n="modal.supporting_photos_title"><i class="fa-solid fa-images"></i> {{ t('modal.supporting_photos_title', 'Supporting Photos (optional)') }}</h4>
+            <h4><i class="fa-solid fa-images"></i> <span data-i18n="modal.supporting_photos_title">{{ t('modal.supporting_photos_title', 'Supporting Photos (optional)') }}</span></h4>
             <div class="modern-micro-upload-zone" onclick="triggerSupportingPhotoUpload()">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
                 <span data-i18n="modal.supporting_photos_prompt">{{ t('modal.supporting_photos_prompt', 'Add Extra Field Images') }}</span>
@@ -604,7 +604,7 @@
         </div>
 
         <div class="premium-form-card" data-readonly-only>
-            <h4 data-i18n="modal.additional_images_title"><i class="fa-solid fa-images"></i> {{ t('modal.additional_images_title', 'Additional Images') }}</h4>
+            <h4><i class="fa-solid fa-images"></i> <span data-i18n="modal.additional_images_title">{{ t('modal.additional_images_title', 'Additional Images') }}</span></h4>
             <div id="report-additional-images-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 10px;"></div>
         </div>
 
