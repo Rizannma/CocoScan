@@ -107,12 +107,24 @@ def preload_models(
     severity_model_path: Optional[str] = None,
 ) -> Tuple[Any, Any]:
     """
-    Preload both pest and severity models globally once at startup.
-    This prevents high latency, memory allocation spikes, and Out Of Memory (OOM) errors during inference requests.
+    Preload and warm up both pest and severity models globally once at startup.
+    Executes a dummy forward pass to warm up PyTorch/Keras JIT kernels and prevent worker timeouts on requests.
     """
     pest_model = _get_pest_model(pest_model_path)
     severity_model = _get_severity_model(severity_model_path)
-    logger.info("Global H5 models successfully preloaded and ready for inference.")
+
+    # Warm up models to compile JIT layers and avoid cold latency spikes on first request
+    try:
+        import torch
+        dummy = torch.zeros((1, 224, 224, 3), dtype=torch.float32).contiguous()
+        ctx = torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
+        with ctx:
+            _ = pest_model(dummy)
+            _ = severity_model(dummy)
+        logger.info("Global H5 models successfully preloaded, warmed up, and ready for inference.")
+    except Exception as warmup_err:
+        logger.warning(f"Model warmup notice: {warmup_err}")
+
     return pest_model, severity_model
 
 
@@ -131,8 +143,8 @@ def _decode_base64_image(image_data: str) -> Image.Image:
 
 
 def _validate_leaf_image(image: Image.Image):
-    rgb_image = image.convert("RGB") if isinstance(image, Image.Image) else image
-    array = np.asarray(rgb_image).astype(np.float32)
+    rgb_image = image if isinstance(image, Image.Image) and image.mode == "RGB" else image.convert("RGB")
+    array = np.asarray(rgb_image, dtype=np.float32)
     if array.ndim == 2:
         array = np.stack([array] * 3, axis=-1)
 
@@ -158,18 +170,21 @@ def _prepare_input(image: Image.Image) -> Union[np.ndarray, Any]:
     """
     Preprocess PIL image into a normalized float32 tensor of shape (1, 224, 224, 3)
     and convert into a contiguous tensor compatible with the Keras PyTorch backend.
+    Optimized for minimal allocations and maximum throughput.
     """
     if not isinstance(image, Image.Image):
         raise ValueError(f"Expected PIL Image instance, got {type(image)}")
 
-    # Ensure image is in standard 3-channel RGB
-    rgb_image = image.convert("RGB")
+    # Fast RGB conversion
+    if image.mode != "RGB":
+        image = image.convert("RGB")
 
-    # Resize to standard dimensions (224, 224) using bilinear resampling
-    resized = rgb_image.resize(TARGET_SIZE, Image.Resampling.BILINEAR)
+    # Fast Bilinear resize
+    if image.size != TARGET_SIZE:
+        image = image.resize(TARGET_SIZE, Image.Resampling.BILINEAR)
 
-    # Convert to float32 NumPy array and normalize to [0.0, 1.0]
-    array = np.asarray(resized, dtype=np.float32)
+    # Convert to float32 NumPy array and scale [0.0, 1.0]
+    array = np.asarray(image, dtype=np.float32) * (1.0 / 255.0)
 
     if array.ndim == 2:
         array = np.stack([array] * 3, axis=-1)
@@ -178,18 +193,16 @@ def _prepare_input(image: Image.Image) -> Union[np.ndarray, Any]:
     elif array.ndim == 3 and array.shape[-1] == 1:
         array = np.repeat(array, 3, axis=-1)
 
-    array = array / 255.0
-
     if array.ndim == 3:
         array = np.expand_dims(array, axis=0)
 
     # Guarantee contiguous C-order buffer in memory
     array = np.ascontiguousarray(array, dtype=np.float32)
 
-    # If PyTorch is available, convert to contiguous torch.Tensor for PyTorch backend
+    # Convert to contiguous PyTorch tensor
     try:
         import torch
-        tensor = torch.from_numpy(array).contiguous().float()
+        tensor = torch.from_numpy(array).contiguous()
         return tensor
     except Exception:
         return array
@@ -198,28 +211,16 @@ def _prepare_input(image: Image.Image) -> Union[np.ndarray, Any]:
 def _run_model_forward(model, input_tensor: Union[np.ndarray, Any]) -> np.ndarray:
     """
     Execute model prediction and return 1D numpy array of probabilities.
-    Runs with zero autograd overhead / inference mode and cleans up memory to prevent OOM.
+    Uses torch.inference_mode() to eliminate autograd overhead and execute fast.
     """
     try:
         import torch
-        if hasattr(model, "eval") and callable(getattr(model, "eval")):
-            model.eval()
-
         ctx = torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
         with ctx:
             if isinstance(input_tensor, np.ndarray):
-                tensor = torch.from_numpy(np.ascontiguousarray(input_tensor, dtype=np.float32)).contiguous().float()
+                tensor = torch.from_numpy(np.ascontiguousarray(input_tensor, dtype=np.float32)).contiguous()
             else:
                 tensor = input_tensor
-
-            # If model has parameters on a specific device, match device
-            try:
-                if hasattr(model, "parameters"):
-                    param = next(model.parameters(), None)
-                    if param is not None and hasattr(tensor, "device") and tensor.device != param.device:
-                        tensor = tensor.to(param.device)
-            except Exception:
-                pass
 
             try:
                 preds = model(tensor)
@@ -263,10 +264,73 @@ def _run_model_forward(model, input_tensor: Union[np.ndarray, Any]) -> np.ndarra
     if np.min(preds) < 0.0 or not np.isclose(np.sum(preds), 1.0, atol=1e-2):
         preds = _softmax(preds)
 
-    # Free references and run garbage collection
-    gc.collect()
-
     return preds.astype(np.float32)
+
+
+def predict_both(
+    image: Image.Image,
+    pest_model_path: Optional[str] = None,
+    severity_model_path: Optional[str] = None,
+) -> Tuple[Dict, Dict]:
+    """
+    Optimized dual inference:
+    Validates and preprocesses the image ONCE, then executes both pest and severity
+    predictions in a single torch.inference_mode() session without redundant image
+    conversions or multiple tensor allocations.
+    """
+    _validate_leaf_image(image)
+    input_tensor = _prepare_input(image)
+
+    pest_model = _get_pest_model(pest_model_path)
+    severity_model = _get_severity_model(severity_model_path)
+
+    try:
+        import torch
+        ctx = torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
+        with ctx:
+            pest_probabilities = _run_model_forward(pest_model, input_tensor)
+            severity_probabilities = _run_model_forward(severity_model, input_tensor)
+    except Exception:
+        pest_probabilities = _run_model_forward(pest_model, input_tensor)
+        severity_probabilities = _run_model_forward(severity_model, input_tensor)
+
+    # Process pest result
+    pest_idx = int(np.argmax(pest_probabilities))
+    pest_labels = _get_labels(len(pest_probabilities), PEST_LABELS)
+    predicted_pest = pest_labels[pest_idx]
+    pest_confidence = float(pest_probabilities[pest_idx])
+
+    if predicted_pest == NOT_COCONUT_LEAF_LABEL:
+        raise ValueError(
+            "This appears not to be a coconut leaf image. Please upload a proper coconut leaf photo."
+        )
+
+    if pest_confidence < MIN_CONFIDENCE_THRESHOLD:
+        raise ValueError("Prediction confidence is too low. Please upload a clearer leaf image.")
+
+    pest_result = {
+        "predicted_pest": predicted_pest,
+        "confidence_score": pest_confidence,
+        "probabilities": {pest_labels[i]: float(pest_probabilities[i]) for i in range(len(pest_probabilities))},
+    }
+
+    # Process severity result
+    sev_idx = int(np.argmax(severity_probabilities))
+    sev_labels = _get_labels(len(severity_probabilities), SEVERITY_LABELS)
+    predicted_severity = sev_labels[sev_idx]
+    sev_confidence = float(severity_probabilities[sev_idx])
+
+    damage_map = {"Mild": 25, "Moderate": 50, "Severe": 75}
+    damage_percentage = damage_map.get(predicted_severity, 50)
+
+    severity_result = {
+        "severity": predicted_severity,
+        "damage_percentage": damage_percentage,
+        "confidence_score": sev_confidence,
+        "probabilities": {sev_labels[i]: float(severity_probabilities[i]) for i in range(len(severity_probabilities))},
+    }
+
+    return pest_result, severity_result
 
 
 def predict_pest(image: Image.Image, model_path: Optional[str] = None) -> Dict:
@@ -348,6 +412,4 @@ def predict_all_from_base64(
 ) -> Tuple[Dict, Dict]:
     """Execute both pest classification and severity classification from base64 image data."""
     image = _decode_base64_image(image_data)
-    pest_result = predict_pest(image, model_path=pest_model_path)
-    severity_result = predict_severity(image, model_path=severity_model_path)
-    return pest_result, severity_result
+    return predict_both(image, pest_model_path=pest_model_path, severity_model_path=severity_model_path)

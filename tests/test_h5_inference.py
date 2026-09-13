@@ -14,6 +14,7 @@ from model.inference import (
     predict_pest_from_base64,
     predict_severity_from_base64,
     predict_all_from_base64,
+    predict_both,
     preload_models,
     _prepare_input,
 )
@@ -62,6 +63,16 @@ class TestH5Inference(unittest.TestCase):
             self.assertTrue(tensor.is_contiguous())
         elif hasattr(tensor, "flags"):
             self.assertTrue(tensor.flags.c_contiguous)
+
+    def test_predict_both_single_pass(self):
+        img = _create_synthetic_leaf_image(width=300, height=300)
+        pest_res, sev_res = predict_both(img)
+        
+        self.assertIn("predicted_pest", pest_res)
+        self.assertIn(pest_res["predicted_pest"], PEST_LABELS)
+        self.assertIn("severity", sev_res)
+        self.assertIn(sev_res["severity"], SEVERITY_LABELS)
+        self.assertIn(sev_res["damage_percentage"], [25, 50, 75])
 
     def test_pest_prediction_structure(self):
         img = _create_synthetic_leaf_image()
