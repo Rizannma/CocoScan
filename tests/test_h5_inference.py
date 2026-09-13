@@ -212,6 +212,13 @@ class TestH5Inference(unittest.TestCase):
         self.assertIn(data['severity'], SEVERITY_LABELS)
 
 
+    def test_clear_inference_memory(self):
+        from model.inference import clear_inference_memory
+        # Should execute without errors on any backend/device
+        clear_inference_memory()
+
+
 if __name__ == "__main__":
     unittest.main()
+
 

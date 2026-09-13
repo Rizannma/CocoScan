@@ -3,7 +3,7 @@ Integrated inference pipeline for CocoScan using the two Keras H5 models:
 - pest_classifier_moderate.h5
 - severity_classifier_severe_boost.h5
 
-Handles: image preparation -> single-pass dual model inference -> dynamic recommendations.
+Handles: image preparation -> single-pass dual model inference -> dynamic recommendations -> aggressive memory cleanup.
 """
 
 import base64
@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 
 from model.inference import (
+    clear_inference_memory,
     predict_both,
     predict_pest,
     predict_pest_from_base64,
@@ -57,9 +58,10 @@ def run_full_inference_pipeline(
 ) -> Dict:
     """
     Execute the dual-model inference pipeline:
-    1. Prepare and validate the input image once.
+    1. Prepare and downscale the input image once.
     2. Run both pest and severity classification in a single optimized pass.
     3. Generate recommendations dynamically tailored to the detected pest and severity.
+    4. Aggressively clear memory and GPU caches.
     """
     try:
         logger.info("Starting dual H5 model inference pipeline (pest + severity)")
@@ -75,7 +77,7 @@ def run_full_inference_pipeline(
         predicted_pest = pest_result["predicted_pest"]
         predicted_severity = severity_result["severity"]
 
-        # Step 3: Dynamic Recommendations based on both pest and severity
+        # Dynamic Recommendations based on both pest and severity
         from app.recommendations import recommend_actions
 
         recommendations_result = recommend_actions(
@@ -114,3 +116,5 @@ def run_full_inference_pipeline(
             "confidence": 0.0,
             "recommendations": [],
         }
+    finally:
+        clear_inference_memory()
