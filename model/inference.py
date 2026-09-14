@@ -159,10 +159,19 @@ def _softmax(values: np.ndarray) -> np.ndarray:
 
 
 def _decode_base64_image(image_data: str) -> Image.Image:
+    from app.image_utils import (
+        process_and_compress_image,
+        InvalidImageFormatError,
+        INVALID_IMAGE_ERROR_MESSAGE,
+    )
+    if not image_data or not isinstance(image_data, str):
+        raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
     if "," in image_data:
         image_data = image_data.split(",", 1)[1]
-    image_bytes = base64.b64decode(image_data)
-    from app.image_utils import process_and_compress_image
+    try:
+        image_bytes = base64.b64decode(image_data)
+    except Exception as b64_err:
+        raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE) from b64_err
     return process_and_compress_image(image_bytes, max_dimension=1024)
 
 

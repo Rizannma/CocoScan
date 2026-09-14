@@ -31,7 +31,11 @@ SEVERITY_LABELS = ["Mild", "Moderate", "Severe"]
 
 def _to_pil_image(image_source: Union[str, np.ndarray, Image.Image]) -> Image.Image:
     """Normalize and downscale various image source inputs into a safe PIL Image."""
-    from app.image_utils import process_and_compress_image
+    from app.image_utils import (
+        process_and_compress_image,
+        InvalidImageFormatError,
+        INVALID_IMAGE_ERROR_MESSAGE,
+    )
 
     if isinstance(image_source, Image.Image):
         return process_and_compress_image(image_source, max_dimension=1024)
@@ -43,10 +47,19 @@ def _to_pil_image(image_source: Union[str, np.ndarray, Image.Image]) -> Image.Im
         if image_source.startswith("data:") or "," in image_source or len(image_source) > 500:
             if "," in image_source:
                 image_source = image_source.split(",", 1)[1]
-            image_bytes = base64.b64decode(image_source)
+            try:
+                image_bytes = base64.b64decode(image_source)
+            except Exception as b64_err:
+                raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE) from b64_err
             return process_and_compress_image(image_bytes, max_dimension=1024)
-        return process_and_compress_image(Image.open(image_source), max_dimension=1024)
-    raise ValueError(f"Unsupported image source type: {type(image_source)}")
+        try:
+            with open(image_source, "rb") as f:
+                return process_and_compress_image(f.read(), max_dimension=1024)
+        except InvalidImageFormatError:
+            raise
+        except Exception as file_err:
+            raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE) from file_err
+    raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
 
 
 def run_full_inference_pipeline(

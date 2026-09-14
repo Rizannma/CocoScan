@@ -19,6 +19,15 @@ from PIL import Image
 import re
 import requests
 
+from app.image_utils import (
+    process_and_compress_image,
+    InvalidImageFormatError,
+    StorageLimitExceededError,
+    INVALID_IMAGE_ERROR_MESSAGE,
+    STORAGE_LIMIT_ERROR_MESSAGE,
+    is_storage_limit_error,
+)
+
 
 
 from app.validators import (
@@ -551,9 +560,12 @@ def _persist_supporting_images(report_id, files, *, uploaded_at=None):
             continue
         if not getattr(uploaded_file, "filename", None):
             continue
+        image_bytes = uploaded_file.read()
+        if not image_bytes:
+            continue
+        process_and_compress_image(image_bytes)
         safe_name = secure_filename(uploaded_file.filename or f"supporting_{index}.jpg")
         storage_name = f"visit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}_{index}_{safe_name}"
-        image_bytes = uploaded_file.read()
         image_url = upload_image_to_supabase(image_bytes, storage_name, uploaded_file.mimetype)
         if image_url:
             rows.append({
@@ -576,9 +588,12 @@ def _persist_visit_images(report_id, files, user_id, *, uploaded_at=None):
     for index, uploaded_file in enumerate(files):
         if not uploaded_file or not getattr(uploaded_file, "filename", None):
             continue
+        image_bytes = uploaded_file.read()
+        if not image_bytes:
+            continue
+        process_and_compress_image(image_bytes)
         safe_name = secure_filename(uploaded_file.filename or f"visit_{index}.jpg")
         storage_name = f"visit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}_{index}_{safe_name}"
-        image_bytes = uploaded_file.read()
         image_url = upload_image_to_supabase(image_bytes, storage_name, uploaded_file.mimetype)
         if image_url:
             rows.append({
@@ -773,17 +788,27 @@ def upload_image_to_supabase(file_bytes, filename, content_type="application/oct
         })
         # The storage API may return data with publicUrl or error fields
         if isinstance(upload_result, dict):
-            if upload_result.get('error'):
-                logger.warning(f"Supabase Storage upload error: {upload_result.get('error')}")
+            err = upload_result.get('error') or upload_result.get('message')
+            status_code = upload_result.get('statusCode') or upload_result.get('status_code')
+            if err or status_code in (413, 507):
+                logger.warning(f"Supabase Storage upload error: {err or upload_result}")
+                if is_storage_limit_error(upload_result) or (err and is_storage_limit_error(err)):
+                    raise StorageLimitExceededError(STORAGE_LIMIT_ERROR_MESSAGE)
                 return ''
         elif hasattr(upload_result, 'error') and upload_result.error:
             logger.warning(f"Supabase Storage upload error: {upload_result.error}")
+            if is_storage_limit_error(upload_result.error):
+                raise StorageLimitExceededError(STORAGE_LIMIT_ERROR_MESSAGE)
             return ''
 
         return storage_path
+    except StorageLimitExceededError:
+        raise
     except Exception as upload_err:
         logger.warning(f"Supabase Storage helper error: {str(upload_err)}")
-    return ''
+        if is_storage_limit_error(upload_err):
+            raise StorageLimitExceededError(STORAGE_LIMIT_ERROR_MESSAGE) from upload_err
+        return ''
 
 def send_status_email(user_email, user_name, status):
     """Sends a transactional HTML notification email to the user via Brevo API"""
@@ -2110,13 +2135,14 @@ def farmer_predict():
             return jsonify({"error": "No image file uploaded"}), 400
 
         try:
-            from app.image_utils import process_and_compress_image
             image_bytes = image_file.read()
+            if not image_bytes:
+                return jsonify({"error": INVALID_IMAGE_ERROR_MESSAGE}), 400
             # Downscale large uploaded photos to safe max dimensions (1024px) right at the route
             image = process_and_compress_image(image_bytes, max_dimension=1024)
-        except Exception as e:
+        except (InvalidImageFormatError, ValueError, OSError, Exception) as e:
             logger.error(f"Image preprocessing/decoding error: {str(e)}")
-            return jsonify({'success': False, 'error': 'Invalid uploaded image file'}), 400
+            return jsonify({"error": INVALID_IMAGE_ERROR_MESSAGE}), 400
         
         pest_model_path = resolve_model_path(
             'PEST_MODEL_PATH',
@@ -2143,10 +2169,13 @@ def farmer_predict():
         )
 
         if not result.get('success', False):
-            logger.warning(f"Inference pipeline failed: {result.get('error', 'Unknown error')}")
+            err_msg = result.get('error', 'Failed to process image')
+            logger.warning(f"Inference pipeline failed: {err_msg}")
+            if err_msg == INVALID_IMAGE_ERROR_MESSAGE or "invalid image" in err_msg.lower():
+                return jsonify({"error": INVALID_IMAGE_ERROR_MESSAGE}), 400
             return jsonify({
                 'success': False,
-                'error': result.get('error', 'Failed to process image'),
+                'error': err_msg,
                 'pest': 'Unknown',
                 'severity': 'Not available'
             }), 400
@@ -2171,7 +2200,15 @@ def farmer_predict():
         logger.info(f"Prediction successful: {result['pest']} - {result['severity']}")
         return jsonify(response), 200
         
+    except StorageLimitExceededError as e:
+        logger.error(f"Storage limit reached during prediction: {str(e)}")
+        return jsonify({"error": STORAGE_LIMIT_ERROR_MESSAGE}), 507
+    except InvalidImageFormatError as e:
+        logger.error(f"Invalid image format during prediction: {str(e)}")
+        return jsonify({"error": INVALID_IMAGE_ERROR_MESSAGE}), 400
     except Exception as e:
+        if is_storage_limit_error(e):
+            return jsonify({"error": STORAGE_LIMIT_ERROR_MESSAGE}), 507
         logger.error(f"Prediction route error: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -3467,7 +3504,27 @@ def agriculturist_complete_visit():
 
         _persist_visit_images(report_id, visit_files, user_id, uploaded_at=datetime.now(UTC).isoformat())
         return jsonify({'success': True, 'message': 'Visit summary and images saved successfully.'})
+    except StorageLimitExceededError as e:
+        logger.error(f"Storage limit reached during visit completion: {str(e)}")
+        return jsonify({
+            'error': STORAGE_LIMIT_ERROR_MESSAGE,
+            'message': STORAGE_LIMIT_ERROR_MESSAGE,
+            'success': False
+        }), 507
+    except InvalidImageFormatError as e:
+        logger.error(f"Invalid image uploaded during visit completion: {str(e)}")
+        return jsonify({
+            'error': INVALID_IMAGE_ERROR_MESSAGE,
+            'message': INVALID_IMAGE_ERROR_MESSAGE,
+            'success': False
+        }), 400
     except Exception as e:
+        if is_storage_limit_error(e):
+            return jsonify({
+                'error': STORAGE_LIMIT_ERROR_MESSAGE,
+                'message': STORAGE_LIMIT_ERROR_MESSAGE,
+                'success': False
+            }), 507
         logger.error(f"Error saving inspection completion: {str(e)}")
         return jsonify({'success': False, 'message': 'The visit completion note could not be saved.'}), 500
 
@@ -3602,6 +3659,53 @@ def farmer_submit_report():
         now_value = datetime.now(UTC)
         now_iso = now_value.isoformat()
 
+        # Validate incoming primary and supporting images
+        primary_image_bytes = None
+        decoded_base64_bytes = None
+        if image_file:
+            primary_image_bytes = image_file.read()
+            if primary_image_bytes:
+                try:
+                    process_and_compress_image(primary_image_bytes)
+                except (InvalidImageFormatError, ValueError, OSError, Exception) as img_val_err:
+                    logger.warning(f"Invalid primary image: {img_val_err}")
+                    return jsonify({
+                        "error": INVALID_IMAGE_ERROR_MESSAGE,
+                        "message": INVALID_IMAGE_ERROR_MESSAGE,
+                        "success": False
+                    }), 400
+        elif image_field and image_field.startswith('data:'):
+            try:
+                header, encoded = image_field.split(',', 1)
+                decoded_base64_bytes = base64.b64decode(encoded)
+                process_and_compress_image(decoded_base64_bytes)
+            except (InvalidImageFormatError, ValueError, OSError, Exception) as img_val_err:
+                logger.warning(f"Invalid base64 image: {img_val_err}")
+                return jsonify({
+                    "error": INVALID_IMAGE_ERROR_MESSAGE,
+                    "message": INVALID_IMAGE_ERROR_MESSAGE,
+                    "success": False
+                }), 400
+
+        validated_supporting_bytes = []
+        if supporting_files:
+            for index, support_file in enumerate(supporting_files):
+                if not support_file:
+                    continue
+                s_bytes = support_file.read()
+                if not s_bytes:
+                    continue
+                try:
+                    process_and_compress_image(s_bytes)
+                except (InvalidImageFormatError, ValueError, OSError, Exception) as img_val_err:
+                    logger.warning(f"Invalid supporting image #{index}: {img_val_err}")
+                    return jsonify({
+                        "error": INVALID_IMAGE_ERROR_MESSAGE,
+                        "message": INVALID_IMAGE_ERROR_MESSAGE,
+                        "success": False
+                    }), 400
+                validated_supporting_bytes.append((support_file, s_bytes))
+
         manual_barangay = request.form.get('barangay', '').strip()
         manual_municipality = request.form.get('municipality', '').strip()
         manual_province = request.form.get('province', '').strip()
@@ -3655,29 +3759,23 @@ def farmer_submit_report():
 
         report_id = report_insert.data[0].get('id') if report_insert.data and len(report_insert.data) else None
 
-        try:
-            if image_file:
-                filename = secure_filename(image_file.filename or f'image_{now_value.timestamp()}.jpg')
-                timestamp = now_value.strftime('%Y%m%d%H%M%S')
-                storage_name = f"primary_{timestamp}_{filename}"
-                image_bytes = image_file.read()
-                saved_image_url = upload_image_to_supabase(image_bytes, storage_name, image_file.mimetype)
-            elif image_field:
-                if image_field.startswith('data:'):
-                    header, encoded = image_field.split(',', 1)
-                    m = re.match(r'data:(image/\w+);base64', header)
-                    ext = 'png'
-                    if m:
-                        mime = m.group(1)
-                        ext = mime.split('/')[-1]
-                    decoded = base64.b64decode(encoded)
-                    timestamp = now_value.strftime('%Y%m%d%H%M%S')
-                    filename = f"{timestamp}_capture.{ext}"
-                    saved_image_url = upload_image_to_supabase(decoded, secure_filename(filename), f"image/{ext}")
-                else:
-                    saved_image_url = image_field
-        except Exception as image_error:
-            logger.warning(f"Failed to save uploaded image: {str(image_error)}")
+        if image_file and primary_image_bytes:
+            filename = secure_filename(image_file.filename or f'image_{now_value.timestamp()}.jpg')
+            timestamp = now_value.strftime('%Y%m%d%H%M%S')
+            storage_name = f"primary_{timestamp}_{filename}"
+            saved_image_url = upload_image_to_supabase(primary_image_bytes, storage_name, image_file.mimetype)
+        elif decoded_base64_bytes:
+            header, _ = image_field.split(',', 1)
+            m = re.match(r'data:(image/\w+);base64', header)
+            ext = 'png'
+            if m:
+                mime = m.group(1)
+                ext = mime.split('/')[-1]
+            timestamp = now_value.strftime('%Y%m%d%H%M%S')
+            filename = f"{timestamp}_capture.{ext}"
+            saved_image_url = upload_image_to_supabase(decoded_base64_bytes, secure_filename(filename), f"image/{ext}")
+        elif image_field:
+            saved_image_url = image_field
 
         if report_id and saved_image_url:
             try:
@@ -3685,15 +3783,12 @@ def farmer_submit_report():
             except Exception as update_error:
                 logger.warning(f"Unable to update report image URL: {str(update_error)}")
 
-        if report_id and supporting_files:
+        if report_id and validated_supporting_bytes:
             supporting_rows = []
             support_timestamp = now_value.strftime('%Y%m%d%H%M%S')
-            for index, support_file in enumerate(supporting_files):
-                if not support_file:
-                    continue
+            for index, (support_file, support_bytes) in enumerate(validated_supporting_bytes):
                 support_name = secure_filename(support_file.filename or f'supporting_{index}.jpg')
                 support_path_name = f"support_{support_timestamp}_{index}_{support_name}"
-                support_bytes = support_file.read()
                 support_url = upload_image_to_supabase(support_bytes, support_path_name, support_file.mimetype)
                 supporting_rows.append({
                     'report_id': report_id,
@@ -3709,8 +3804,28 @@ def farmer_submit_report():
             'message': 'Report submitted and synchronized cleanly!',
         })
 
+    except StorageLimitExceededError as storage_err:
+        logger.error(f"Supabase storage limit reached during report submission: {storage_err}")
+        return jsonify({
+            'error': STORAGE_LIMIT_ERROR_MESSAGE,
+            'message': STORAGE_LIMIT_ERROR_MESSAGE,
+            'success': False
+        }), 507
+    except InvalidImageFormatError as img_err:
+        logger.error(f"Invalid image format during report submission: {img_err}")
+        return jsonify({
+            'error': INVALID_IMAGE_ERROR_MESSAGE,
+            'message': INVALID_IMAGE_ERROR_MESSAGE,
+            'success': False
+        }), 400
     except Exception as e:
         error_str = str(e)
+        if is_storage_limit_error(e):
+            return jsonify({
+                'error': STORAGE_LIMIT_ERROR_MESSAGE,
+                'message': STORAGE_LIMIT_ERROR_MESSAGE,
+                'success': False
+            }), 507
         logger.error(f"Report submission failed: {error_str}")
         # Return a user-friendly error message
         friendly_message = normalize_submission_error(error_str)
