@@ -237,3 +237,70 @@ self.addEventListener('fetch', (event) => {
     );
 });
 
+// ==========================================================================
+// PUSH NOTIFICATIONS & DEEP-LINK CLICK HANDLER
+// ==========================================================================
+self.addEventListener('push', (event) => {
+    let payload = {
+        title: 'CocoScan Notification',
+        body: 'You have a new update on your coconut scan report.',
+        icon: '/static/icons/icon-192x192.png',
+        badge: '/static/icons/icon-72x72.png',
+        data: { url: '/farmer/reports' }
+    };
+
+    if (event.data) {
+        try {
+            const dataObj = event.data.json();
+            payload = {
+                ...payload,
+                ...dataObj,
+                data: {
+                    ...payload.data,
+                    ...(dataObj.data || {})
+                }
+            };
+        } catch (e) {
+            try {
+                payload.body = event.data.text() || payload.body;
+            } catch (err) {}
+        }
+    }
+
+    const options = {
+        body: payload.body,
+        icon: payload.icon || '/static/icons/icon-192x192.png',
+        badge: payload.badge || '/static/icons/icon-72x72.png',
+        vibrate: [100, 50, 100],
+        data: payload.data || { url: '/farmer/reports' },
+        actions: [
+            { action: 'open', title: 'View Report' }
+        ]
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(payload.title, options)
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+    const targetUrl = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/farmer/reports';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            for (let client of windowClients) {
+                if (client.url.includes(targetUrl) || client.url.includes('/farmer/reports')) {
+                    if ('focus' in client) {
+                        client.navigate(targetUrl);
+                        return client.focus();
+                    }
+                }
+            }
+            if (self.clients.openWindow) {
+                return self.clients.openWindow(targetUrl);
+            }
+        })
+    );
+});
+

@@ -86,6 +86,83 @@
     </div>
 </div>
 
+<!-- Farmer Notification Center Modal -->
+<div id="farmer-notification-center-modal" class="modal-screen-overlay" role="dialog" aria-modal="true" aria-labelledby="notif-modal-title" onclick="if(event.target === this) closeNotificationCenter();" style="z-index: 100000;">
+    <div class="modal-sheet-sliding-card notif-sheet-card">
+        <div class="notif-sheet-handle-bar"></div>
+        <div class="notif-modal-header">
+            <div class="notif-header-left">
+                <div class="notif-header-icon-box">
+                    <i class="fa-solid fa-bell"></i>
+                </div>
+                <div class="notif-header-title-box">
+                    <h3 id="notif-modal-title" data-i18n="dashboard.notif_center_title">{{ t('dashboard.notif_center_title', 'Notifications') }}</h3>
+                    <span id="notif-unread-count-text" class="notif-count-pill">0 updates</span>
+                </div>
+            </div>
+            <div class="notif-header-actions">
+                <button type="button" id="notif-mute-toggle-btn" class="notif-action-pill-btn" onclick="toggleNotificationMuteState()" title="Toggle Mute / Unmute">
+                    <i class="fa-solid fa-bell" id="notif-mute-btn-icon"></i> <span id="notif-mute-btn-text">{{ t('dashboard.notif_btn_mute', 'Mute') }}</span>
+                </button>
+                <button type="button" id="notif-clear-all-btn" class="notif-action-pill-btn danger" onclick="clearAllNotifications()" title="Clear all notifications">
+                    <i class="fa-solid fa-trash-can"></i> <span data-i18n="dashboard.notif_btn_clear_all">{{ t('dashboard.notif_btn_clear_all', 'Clear All') }}</span>
+                </button>
+                <button type="button" class="notif-close-btn" onclick="closeNotificationCenter()" aria-label="Close" title="Close">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="farmer-notifications-list" class="notif-items-scroll-area">
+            <!-- Populated dynamically via JS -->
+        </div>
+
+        <div id="farmer-notifications-empty" class="notif-empty-state" style="display: none;">
+            <div class="notif-empty-icon-box">
+                <i class="fa-solid fa-bell-slash"></i>
+            </div>
+            <h4 data-i18n="dashboard.notif_empty_title" style="font-size: 1.05rem; font-weight: 800; color: #1e293b; margin: 0 0 6px 0;">{{ t('dashboard.notif_empty_title', 'No New Notifications') }}</h4>
+            <p data-i18n="dashboard.notif_empty_desc" style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.45; max-width: 320px;">{{ t('dashboard.notif_empty_desc', 'All your coconut pest reports and visit schedules are up to date.') }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Push Notification Permission & Consent Prompt Modal -->
+<div id="farmer-push-consent-modal" class="modal-screen-overlay" role="dialog" aria-modal="true" aria-labelledby="push-consent-title" style="z-index: 100001;" onclick="if(event.target === this) dismissPushConsent(true);">
+    <div class="modal-sheet-sliding-card push-consent-card">
+        <div class="notif-sheet-handle-bar"></div>
+        <div class="push-consent-icon-box">
+            <i class="fa-solid fa-bell"></i>
+        </div>
+        <h3 id="push-consent-title" style="font-size: 1.25rem; font-weight: 800; color: #0b251a; margin-bottom: 0.5rem;" data-i18n="dashboard.push_consent_title">{{ t('dashboard.push_consent_title', 'Enable Push Notifications?') }}</h3>
+        <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 1.25rem;" data-i18n="dashboard.push_consent_desc">{{ t('dashboard.push_consent_desc', 'Receive immediate alerts on your device for expert pest diagnoses, confirmed visit dates, and discussion updates.') }}</p>
+
+        <div class="push-features-list">
+            <div class="push-feature-row">
+                <i class="fa-solid fa-circle-check" style="color: #2A7B4C; font-size: 1.05rem;"></i>
+                <span data-i18n="dashboard.push_consent_feature_reco">{{ t('dashboard.push_consent_feature_reco', 'Expert diagnosis & treatment recommendations') }}</span>
+            </div>
+            <div class="push-feature-row">
+                <i class="fa-solid fa-circle-check" style="color: #2A7B4C; font-size: 1.05rem;"></i>
+                <span data-i18n="dashboard.push_consent_feature_visit">{{ t('dashboard.push_consent_feature_visit', 'Farm visit schedules & appointment reminders') }}</span>
+            </div>
+            <div class="push-feature-row">
+                <i class="fa-solid fa-circle-check" style="color: #2A7B4C; font-size: 1.05rem;"></i>
+                <span data-i18n="dashboard.push_consent_feature_chat">{{ t('dashboard.push_consent_feature_chat', 'Real-time responses to your questions') }}</span>
+            </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 1.25rem;">
+            <button type="button" class="btn-enable-push" onclick="confirmEnablePushNotifications()">
+                <i class="fa-solid fa-bell"></i> <span data-i18n="dashboard.push_consent_btn_enable">{{ t('dashboard.push_consent_btn_enable', 'Yes, Enable Notifications') }}</span>
+            </button>
+            <button type="button" class="btn-not-now-push" onclick="dismissPushConsent(true)">
+                <span data-i18n="dashboard.push_consent_btn_mute">{{ t('dashboard.push_consent_btn_mute', 'Keep Muted / Not Now') }}</span>
+            </button>
+        </div>
+    </div>
+</div>
+
 <style>
     .farmer-offline-banner {
         background: #fef3c7;
@@ -137,46 +214,683 @@
         line-height: 1.45;
     }
 
-    @media (max-width: 480px) {
-        .farmer-offline-banner {
-            padding: 14px;
-            gap: 12px;
-            border-radius: 16px;
-            margin-bottom: 16px;
+    /* Modal Screen Overlay System */
+    .modal-screen-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(11, 37, 26, 0.6);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        z-index: 100000;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        box-sizing: border-box;
+        animation: notifFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .modal-screen-overlay * {
+        box-sizing: border-box;
+    }
+
+    @keyframes notifFadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes notifModalScaleIn {
+        from { opacity: 0; transform: scale(0.95) translateY(12px); }
+        to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    @keyframes notifSheetSlideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+
+    .notif-sheet-handle-bar {
+        display: none;
+    }
+
+    /* Notification Bell Trigger Button */
+    .farmer-notification-bell-btn {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: #ffffff;
+        border: 1.5px solid rgba(42, 123, 76, 0.22);
+        color: #2A7B4C;
+        font-size: 1.15rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        position: relative;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .farmer-notification-bell-btn:hover {
+        background: #f0fdf4;
+        border-color: #2A7B4C;
+        color: #1b5333;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(42, 123, 76, 0.18);
+    }
+
+    .farmer-notification-bell-btn:active {
+        transform: scale(0.92);
+    }
+
+    .farmer-notification-bell-btn.muted {
+        background: #f8fafc;
+        border-color: #e2e8f0;
+        color: #94a3b8;
+        box-shadow: none;
+    }
+
+    .farmer-notification-bell-btn.muted:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #64748b;
+    }
+
+    .notification-badge-counter {
+        position: absolute;
+        top: -4px;
+        right: -4px;
+        background: #dc2626;
+        color: #ffffff;
+        font-size: 0.68rem;
+        font-weight: 800;
+        min-width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4);
+        pointer-events: none;
+    }
+
+    /* Notification Center Sheet Card */
+    .notif-sheet-card {
+        max-width: 490px;
+        width: 100%;
+        background: #ffffff;
+        border-radius: 24px;
+        padding: 22px 22px 24px 22px;
+        box-shadow: 0 25px 60px -12px rgba(11, 37, 26, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
+        max-height: min(85vh, 640px);
+        animation: notifModalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+    }
+
+    .notif-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #f1f5f9;
+        margin-bottom: 14px;
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    .notif-header-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+    }
+
+    .notif-header-icon-box {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: rgba(42, 123, 76, 0.12);
+        color: #2A7B4C;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        flex-shrink: 0;
+    }
+
+    .notif-header-title-box {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+    }
+
+    .notif-header-title-box h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0b251a;
+        line-height: 1.2;
+    }
+
+    .notif-count-pill {
+        font-size: 0.72rem;
+        color: #047857;
+        font-weight: 700;
+        background: #ecfdf5;
+        padding: 2px 8px;
+        border-radius: 99px;
+        display: inline-block;
+        width: fit-content;
+        border: 1px solid rgba(42, 123, 76, 0.18);
+        line-height: 1.3;
+    }
+
+    .notif-header-actions {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .notif-action-pill-btn {
+        padding: 6px 11px;
+        border-radius: 10px;
+        font-size: 0.76rem;
+        font-weight: 700;
+        background: #f8fafc;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.15s ease;
+        white-space: nowrap;
+    }
+
+    .notif-action-pill-btn:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+        transform: translateY(-1px);
+    }
+
+    .notif-action-pill-btn.danger {
+        color: #b91c1c;
+        background: #fef2f2;
+        border-color: #fee2e2;
+    }
+
+    .notif-action-pill-btn.danger:hover {
+        background: #fee2e2;
+        border-color: #fca5a5;
+        color: #991b1b;
+    }
+
+    .notif-action-pill-btn.muted-active {
+        background: #fff1f2;
+        border-color: #fecdd3;
+        color: #e11d48;
+    }
+
+    .notif-close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        background: #f1f5f9;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    .notif-close-btn:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+        transform: scale(1.05);
+    }
+
+    .notif-items-scroll-area {
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-height: 460px;
+        padding-right: 4px;
+        margin-right: -4px;
+        flex: 1;
+        min-height: 0;
+    }
+
+    .notif-items-scroll-area::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .notif-items-scroll-area::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 99px;
+    }
+
+    .notif-item-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 11px;
+        padding: 11px 13px;
+        border-radius: 14px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        position: relative;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: 0 2px 5px rgba(15, 23, 42, 0.03);
+    }
+
+    .notif-item-card:hover {
+        background: #f8faf9;
+        border-color: #a7f3d0;
+        transform: translateY(-1px);
+        box-shadow: 0 5px 14px rgba(42, 123, 76, 0.08);
+    }
+
+    .notif-item-card.is-unread {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .notif-item-icon-box {
+        width: 34px;
+        height: 34px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.95rem;
+        flex-shrink: 0;
+        margin-top: 1px;
+    }
+
+    .notif-item-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .notif-item-top-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 2px;
+    }
+
+    .notif-item-badge {
+        font-size: 0.64rem;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        letter-spacing: 0.25px;
+        text-transform: uppercase;
+    }
+
+    .notif-item-time {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #94a3b8;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        white-space: nowrap;
+    }
+
+    .notif-item-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0 0 2px 0;
+        line-height: 1.3;
+        word-break: break-word;
+    }
+
+    .notif-item-desc {
+        font-size: 0.76rem;
+        color: #64748b;
+        margin: 0 0 4px 0;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .notif-item-footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 6px;
+    }
+
+    .notif-item-link-hint {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #2A7B4C;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: color 0.15s ease;
+    }
+
+    .notif-item-card:hover .notif-item-link-hint {
+        color: #1b5333;
+        text-decoration: underline;
+    }
+
+    .btn-clear-single-notif {
+        background: #f1f5f9;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        font-size: 0.72rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    .btn-clear-single-notif:hover {
+        opacity: 1;
+        color: #ef4444;
+        background: #fee2e2;
+        transform: scale(1.08);
+    }
+
+    .notif-empty-state {
+        text-align: center;
+        padding: 32px 16px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .notif-empty-icon-box {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: #f0fdf4;
+        color: #2A7B4C;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.45rem;
+        margin-bottom: 10px;
+        border: 2px solid rgba(42, 123, 76, 0.15);
+    }
+
+    /* Push Consent Modal Styles */
+    .push-consent-card {
+        max-width: 420px;
+        width: 100%;
+        background: #ffffff;
+        border-radius: 24px;
+        padding: 24px;
+        text-align: center;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+        animation: notifModalScaleIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        position: relative;
+    }
+
+    .push-consent-icon-box {
+        width: 64px;
+        height: 64px;
+        border-radius: 20px;
+        background: rgba(42, 123, 76, 0.12);
+        color: #2A7B4C;
+        font-size: 1.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+        box-shadow: 0 0 24px rgba(42, 123, 76, 0.2);
+    }
+
+    .push-features-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        text-align: left;
+        background: #f8faf9;
+        border: 1px solid #e5ece8;
+        border-radius: 14px;
+        padding: 12px 14px;
+        margin: 8px 0;
+    }
+
+    .push-feature-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.82rem;
+        color: #334155;
+        font-weight: 600;
+    }
+
+    .btn-enable-push {
+        background: #2A7B4C;
+        color: #ffffff;
+        border: none;
+        padding: 12px 18px;
+        border-radius: 12px;
+        font-size: 0.92rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(42, 123, 76, 0.3);
+        transition: all 0.2s ease;
+    }
+
+    .btn-enable-push:hover {
+        background: #34965e;
+        transform: translateY(-1px);
+    }
+
+    .btn-not-now-push {
+        background: #f1f5f9;
+        color: #475569;
+        border: 1px solid #e2e8f0;
+        padding: 11px 18px;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease;
+    }
+
+    .btn-not-now-push:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    @media (max-width: 640px) {
+        .modal-screen-overlay {
+            align-items: flex-end;
+            padding: 0;
         }
-        .farmer-offline-icon-box {
-            width: 36px;
-            height: 36px;
-            font-size: 1.15rem;
+
+        .notif-sheet-card {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            max-width: 100%;
+            padding: 10px 14px calc(20px + env(safe-area-inset-bottom, 16px)) 14px;
+            max-height: 78vh;
+            animation: notifSheetSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .farmer-offline-content h4 {
+
+        .notif-sheet-handle-bar {
+            display: block;
+            width: 34px;
+            height: 3.5px;
+            background: #cbd5e1;
+            border-radius: 99px;
+            margin: 0 auto 8px auto;
+        }
+
+        .push-consent-card {
+            border-bottom-left-radius: 0;
+            border-bottom-right-radius: 0;
+            border-top-left-radius: 24px;
+            border-top-right-radius: 24px;
+            max-width: 100%;
+            padding: 18px 16px calc(20px + env(safe-area-inset-bottom, 16px)) 16px;
+            animation: notifSheetSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .notif-modal-header {
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            gap: 6px;
+        }
+
+        .notif-header-left {
+            gap: 8px;
+        }
+
+        .notif-header-icon-box {
+            width: 30px;
+            height: 30px;
+            font-size: 0.88rem;
+            border-radius: 9px;
+        }
+
+        .notif-header-title-box h3 {
             font-size: 0.95rem;
         }
-        .farmer-offline-content p {
+
+        .notif-count-pill {
+            font-size: 0.62rem;
+            padding: 1px 5px;
+        }
+
+        .notif-header-actions {
+            gap: 4px;
+        }
+
+        .notif-action-pill-btn {
+            padding: 4px 7px;
+            font-size: 0.67rem;
+            border-radius: 7px;
+            gap: 3px;
+        }
+
+        .notif-action-pill-btn span {
+            font-size: 0.67rem;
+        }
+
+        .notif-action-pill-btn i {
+            font-size: 0.67rem;
+        }
+
+        .notif-close-btn {
+            width: 26px;
+            height: 26px;
             font-size: 0.82rem;
-            line-height: 1.4;
-        }
-    }
-
-    @keyframes modalFadeIn {
-        from {
-            opacity: 0;
+            border-radius: 7px;
         }
 
-        to {
-            opacity: 1;
-        }
-    }
-
-    @keyframes modalScaleIn {
-        from {
-            transform: scale(0.92) translateY(10px);
-            opacity: 0;
+        .notif-items-scroll-area {
+            gap: 6px;
+            max-height: 56vh;
+            padding-right: 2px;
         }
 
-        to {
-            transform: scale(1) translateY(0);
-            opacity: 1;
+        .notif-item-card {
+            padding: 8px 10px;
+            gap: 8px;
+            border-radius: 11px;
+            border-width: 1px;
+        }
+
+        .notif-item-icon-box {
+            width: 28px;
+            height: 28px;
+            font-size: 0.8rem;
+            border-radius: 8px;
+            margin-top: 1px;
+        }
+
+        .notif-item-top-row {
+            margin-bottom: 1px;
+            gap: 4px;
+        }
+
+        .notif-item-badge {
+            font-size: 0.58rem;
+            padding: 1px 5px;
+            border-radius: 4px;
+            letter-spacing: 0.2px;
+        }
+
+        .notif-item-time {
+            font-size: 0.63rem;
+            gap: 2px;
+        }
+
+        .notif-item-time i {
+            font-size: 0.6rem;
+        }
+
+        .notif-item-title {
+            font-size: 0.78rem;
+            line-height: 1.25;
+            margin: 0 0 1px 0;
+            font-weight: 700;
+        }
+
+        .notif-item-desc {
+            font-size: 0.7rem;
+            line-height: 1.3;
+            margin: 0 0 3px 0;
+        }
+
+        .notif-item-footer {
+            gap: 4px;
+        }
+
+        .notif-item-link-hint {
+            font-size: 0.66rem;
+            gap: 3px;
+            font-weight: 600;
+        }
+
+        .btn-clear-single-notif {
+            width: 20px;
+            height: 20px;
+            font-size: 0.68rem;
+            border-radius: 5px;
         }
     }
 </style>
@@ -195,7 +909,405 @@
 {% block js_role_name %}{{ t('navigation.user_role_farmer', 'Farmer') }}{% endblock %}
 
 {% block extra_scripts %}
+<script id="dashboard-reports-data" type="application/json">{{ (reports if reports is defined and reports else []) | tojson | safe }}</script>
 <script>
+    /* ==========================================================================
+       FARMER NOTIFICATION CENTER & MUTE/UNMUTE CONSENT LOGIC
+       ========================================================================== */
+    let rawDashboardReports = (function () {
+        try {
+            const node = document.getElementById('dashboard-reports-data');
+            if (!node) return [];
+            const txt = node.textContent || node.innerText || '[]';
+            return JSON.parse(txt) || [];
+        } catch (e) {
+            return [];
+        }
+    })();
+
+    function isPushNotificationsMuted() {
+        return localStorage.getItem('cocoscan_push_muted') === 'true';
+    }
+
+    function updateNotificationIconUI() {
+        const bellBtn = document.getElementById('farmer-notification-btn');
+        const bellIcon = document.getElementById('farmer-notification-bell-icon');
+        const badge = document.getElementById('farmer-notification-badge');
+        const muteBtnIcon = document.getElementById('notif-mute-btn-icon');
+        const muteBtnText = document.getElementById('notif-mute-btn-text');
+        const muteBtn = document.getElementById('notif-mute-toggle-btn');
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+
+        const isMuted = isPushNotificationsMuted();
+
+        if (bellBtn && bellIcon) {
+            if (isMuted) {
+                bellBtn.classList.add('muted');
+                bellIcon.className = 'fa-solid fa-bell-slash';
+                bellBtn.title = t('dashboard.notif_toast_muted', 'Notifications Muted');
+            } else {
+                bellBtn.classList.remove('muted');
+                bellIcon.className = 'fa-solid fa-bell';
+                bellBtn.title = t('dashboard.notif_center_title', 'Notifications');
+            }
+        }
+
+        if (muteBtn && muteBtnIcon && muteBtnText) {
+            if (isMuted) {
+                muteBtn.classList.add('muted-active');
+                muteBtnIcon.className = 'fa-solid fa-bell-slash';
+                muteBtnText.textContent = t('dashboard.notif_btn_unmute', 'Unmute');
+            } else {
+                muteBtn.classList.remove('muted-active');
+                muteBtnIcon.className = 'fa-solid fa-bell';
+                muteBtnText.textContent = t('dashboard.notif_btn_mute', 'Mute');
+            }
+        }
+    }
+
+    function handleNotificationIconClick(event) {
+        if (event) event.stopPropagation();
+
+        // If push permission has never been decided and notifications are not muted yet
+        const pushAsked = localStorage.getItem('cocoscan_push_asked');
+        const hasPermissionApi = 'Notification' in window;
+        const currentPermission = hasPermissionApi ? Notification.permission : 'denied';
+
+        if (!pushAsked && currentPermission === 'default') {
+            openPushConsentModal();
+            return;
+        }
+
+        openNotificationCenter();
+    }
+
+    function openNotificationCenter() {
+        renderFarmerNotifications();
+        updateNotificationIconUI();
+        const modal = document.getElementById('farmer-notification-center-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    function closeNotificationCenter() {
+        const modal = document.getElementById('farmer-notification-center-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+    }
+
+    function openPushConsentModal() {
+        closeNotificationCenter();
+        const modal = document.getElementById('farmer-push-consent-modal');
+        if (modal) {
+            modal.style.display = 'flex';
+        }
+    }
+
+    function dismissPushConsent(keepMuted = true) {
+        const modal = document.getElementById('farmer-push-consent-modal');
+        if (modal) {
+            modal.style.display = 'none';
+        }
+        localStorage.setItem('cocoscan_push_asked', 'true');
+        if (keepMuted) {
+            localStorage.setItem('cocoscan_push_muted', 'true');
+            updateNotificationIconUI();
+            showPwaToast(window.CocoScanI18n ? window.CocoScanI18n.t('dashboard.notif_toast_muted', 'Notifications muted') : 'Notifications muted');
+        }
+    }
+
+    async function confirmEnablePushNotifications() {
+        localStorage.setItem('cocoscan_push_asked', 'true');
+        localStorage.setItem('cocoscan_push_muted', 'false');
+
+        const modal = document.getElementById('farmer-push-consent-modal');
+        if (modal) modal.style.display = 'none';
+
+        if (typeof window.requestPushNotificationPermission === 'function') {
+            const granted = await window.requestPushNotificationPermission();
+            if (granted) {
+                showPwaToast(window.CocoScanI18n ? window.CocoScanI18n.t('dashboard.notif_toast_unmuted', 'Notifications enabled') : 'Notifications enabled');
+            }
+        } else if ('Notification' in window) {
+            try {
+                const res = await Notification.requestPermission();
+                if (res === 'granted' && typeof initPushNotificationSubscription === 'function') {
+                    await initPushNotificationSubscription();
+                }
+            } catch (err) {}
+        }
+
+        updateNotificationIconUI();
+        openNotificationCenter();
+    }
+
+    async function toggleNotificationMuteState() {
+        const isCurrentlyMuted = isPushNotificationsMuted();
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+
+        if (isCurrentlyMuted) {
+            // Unmute flow
+            localStorage.setItem('cocoscan_push_muted', 'false');
+            updateNotificationIconUI();
+            renderFarmerNotifications();
+            showPwaToast(t('dashboard.notif_toast_unmuted', 'Notifications unmuted'));
+
+            // Check if push permission can be requested in background
+            if ('Notification' in window && Notification.permission === 'default' && typeof window.requestPushNotificationPermission === 'function') {
+                try {
+                    window.requestPushNotificationPermission();
+                } catch (e) {}
+            }
+        } else {
+            // Mute flow
+            localStorage.setItem('cocoscan_push_muted', 'true');
+            updateNotificationIconUI();
+            renderFarmerNotifications();
+            showPwaToast(t('dashboard.notif_toast_muted', 'Notifications muted'));
+        }
+    }
+
+    function showPwaToast(msg) {
+        const toast = document.getElementById('pwa-toast');
+        const toastMsg = document.getElementById('pwa-toast-msg');
+        if (toast && toastMsg) {
+            toastMsg.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 3000);
+        }
+    }
+
+    /* ==========================================================================
+       NOTIFICATIONS AGGREGATION & RENDERING ENGINE
+       ========================================================================== */
+    function getClearedNotificationIds() {
+        try {
+            const raw = localStorage.getItem('cocoscan_cleared_notifs');
+            return raw ? JSON.parse(raw) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveClearedNotificationId(id) {
+        const current = getClearedNotificationIds();
+        if (!current.includes(id)) {
+            current.push(id);
+            localStorage.setItem('cocoscan_cleared_notifs', JSON.stringify(current));
+        }
+    }
+
+    function formatRelativeTime(isoStr) {
+        if (!isoStr) return 'Recently';
+        try {
+            const date = new Date(isoStr);
+            if (isNaN(date.getTime())) return 'Recently';
+            const now = new Date();
+            const diffSec = Math.floor((now - date) / 1000);
+            if (diffSec < 60) return 'Just now';
+            if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+            if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+            if (diffSec < 172800) return 'Yesterday';
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        } catch (e) {
+            return 'Recently';
+        }
+    }
+
+    function buildNotificationsList() {
+        const list = [];
+        const clearedIds = getClearedNotificationIds();
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+
+        // Process report records for notifications
+        if (Array.isArray(rawDashboardReports)) {
+            rawDashboardReports.forEach(report => {
+                const reportId = report.id;
+                const pest = report.pest_detected || report.pest || 'Coconut Tree';
+                const status = report.status || 'Under Review';
+                const createdAt = report.created_at || report.timestamp || '';
+                const chatsCount = (report.visit_chats && report.visit_chats[0]?.count) || report.chat_count || 0;
+
+                // 1. Recommendation Issued or Resolved
+                if (status === 'Recommendation Issued' || status === 'Resolved' || status === 'final_remarks_issued') {
+                    const notifId = `reco_${reportId}_${status}`;
+                    if (!clearedIds.includes(notifId)) {
+                        const isResolved = status === 'Resolved';
+                        list.push({
+                            id: notifId,
+                            report_id: reportId,
+                            type: isResolved ? 'resolved' : 'recommendation',
+                            tag: isResolved ? t('dashboard.notif_tag_resolved', 'Resolved') : t('dashboard.notif_tag_diagnosis', 'Diagnosis'),
+                            tagBg: isResolved ? '#dcfce7' : '#ecfdf5',
+                            tagColor: isResolved ? '#15803d' : '#047857',
+                            title: isResolved
+                                ? t('dashboard.notif_title_resolved', 'Report Resolved: {pest}').replace('{pest}', pest)
+                                : t('dashboard.notif_title_reco', 'Expert Assessment: {pest}').replace('{pest}', pest),
+                            desc: isResolved
+                                ? t('dashboard.notif_desc_resolved', 'Treatment solution confirmed and report closed.')
+                                : t('dashboard.notif_desc_reco', 'Expert management recommendations have been issued for your scan.'),
+                            timestamp: createdAt,
+                            icon: isResolved ? 'fa-circle-check' : 'fa-user-shield',
+                            iconBg: isResolved ? '#dcfce7' : '#e6f4ea',
+                            iconColor: isResolved ? '#16a34a' : '#2A7B4C',
+                            isUnread: true
+                        });
+                    }
+                }
+
+                // 2. Visit Scheduled
+                if (status === 'Visit Scheduled' || status === 'Awaiting Confirmed Schedule') {
+                    const notifId = `visit_${reportId}_${status}`;
+                    if (!clearedIds.includes(notifId)) {
+                        const isConfirmed = status === 'Visit Scheduled';
+                        list.push({
+                            id: notifId,
+                            report_id: reportId,
+                            type: 'visit',
+                            tag: t('dashboard.notif_tag_visit', 'Visit'),
+                            tagBg: '#e0f2fe',
+                            tagColor: '#0369a1',
+                            title: isConfirmed
+                                ? t('dashboard.notif_title_visit_confirmed', 'Farm Visit Confirmed: #{id}').replace('{id}', reportId)
+                                : t('dashboard.notif_title_visit_scheduled', 'Visit Scheduled: #{id}').replace('{id}', reportId),
+                            desc: t('dashboard.notif_desc_visit', 'An agriculturist has confirmed a farm inspection schedule.'),
+                            timestamp: createdAt,
+                            icon: 'fa-calendar-check',
+                            iconBg: '#e0f2fe',
+                            iconColor: '#0284c7',
+                            isUnread: true
+                        });
+                    }
+                }
+
+                // 3. Discussion Messages
+                if (chatsCount > 0) {
+                    const notifId = `chat_${reportId}_${chatsCount}`;
+                    if (!clearedIds.includes(notifId)) {
+                        list.push({
+                            id: notifId,
+                            report_id: reportId,
+                            type: 'chat',
+                            tag: t('dashboard.notif_tag_chat', 'Chat'),
+                            tagBg: '#ccfbf1',
+                            tagColor: '#0f766e',
+                            title: t('dashboard.notif_title_chat', 'New Discussion Message: #{id}').replace('{id}', reportId),
+                            desc: t('dashboard.notif_desc_chat', '{count} message(s) on your visit scheduling thread.').replace('{count}', chatsCount),
+                            timestamp: createdAt,
+                            icon: 'fa-comments',
+                            iconBg: '#ccfbf1',
+                            iconColor: '#0d9488',
+                            isUnread: true
+                        });
+                    }
+                }
+            });
+        }
+
+        return list;
+    }
+
+    function renderFarmerNotifications() {
+        const container = document.getElementById('farmer-notifications-list');
+        const emptyState = document.getElementById('farmer-notifications-empty');
+        const badge = document.getElementById('farmer-notification-badge');
+        const countText = document.getElementById('notif-unread-count-text');
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+        if (!container || !emptyState) return;
+
+        const notifs = buildNotificationsList();
+        const isMuted = isPushNotificationsMuted();
+
+        // Update badge counter
+        if (badge) {
+            if (notifs.length > 0 && !isMuted) {
+                badge.textContent = notifs.length > 9 ? '9+' : notifs.length;
+                badge.style.display = 'flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (countText) {
+            if (notifs.length === 0) {
+                countText.textContent = t('dashboard.notif_badge_empty', '0 updates');
+            } else if (notifs.length === 1) {
+                countText.textContent = t('dashboard.notif_badge_update_one', '1 update');
+            } else {
+                countText.textContent = t('dashboard.notif_badge_updates', '{count} updates').replace('{count}', notifs.length);
+            }
+        }
+
+        if (notifs.length === 0) {
+            container.style.display = 'none';
+            emptyState.style.display = 'flex';
+            return;
+        }
+
+        container.style.display = 'flex';
+        emptyState.style.display = 'none';
+        container.innerHTML = '';
+
+        notifs.forEach(item => {
+            const card = document.createElement('div');
+            card.className = `notif-item-card${item.isUnread ? ' is-unread' : ''}`;
+            card.setAttribute('data-notif-id', item.id);
+            card.innerHTML = `
+                <div class="notif-item-icon-box" style="background: ${item.iconBg}; color: ${item.iconColor};">
+                    <i class="fa-solid ${item.icon}"></i>
+                </div>
+                <div class="notif-item-content">
+                    <div class="notif-item-top-row">
+                        <span class="notif-item-badge" style="background: ${item.tagBg}; color: ${item.tagColor};">${escapeHtml(item.tag)}</span>
+                        <span class="notif-item-time"><i class="fa-regular fa-clock"></i> ${formatRelativeTime(item.timestamp)}</span>
+                    </div>
+                    <h5 class="notif-item-title">${escapeHtml(item.title)}</h5>
+                    <p class="notif-item-desc">${escapeHtml(item.desc)}</p>
+                    <div class="notif-item-footer">
+                        <span class="notif-item-link-hint"><i class="fa-solid fa-arrow-right"></i> ${escapeHtml(t('dashboard.notif_action_view', 'View Report'))}</span>
+                    </div>
+                </div>
+                <button type="button" class="btn-clear-single-notif" onclick="clearSingleNotification(event, '${item.id}')" title="${escapeHtml(t('dashboard.notif_btn_dismiss', 'Dismiss'))}" aria-label="${escapeHtml(t('dashboard.notif_btn_dismiss', 'Dismiss'))}">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
+
+            card.onclick = (e) => {
+                if (e.target.closest('.btn-clear-single-notif')) return;
+                window.location.href = `/farmer/reports?report_id=${item.report_id}`;
+            };
+
+            container.appendChild(card);
+        });
+    }
+
+    function clearSingleNotification(event, notifId) {
+        if (event) event.stopPropagation();
+        saveClearedNotificationId(notifId);
+        renderFarmerNotifications();
+        updateNotificationIconUI();
+    }
+
+    function clearAllNotifications() {
+        const notifs = buildNotificationsList();
+        notifs.forEach(item => saveClearedNotificationId(item.id));
+        renderFarmerNotifications();
+        updateNotificationIconUI();
+        showPwaToast(window.CocoScanI18n ? window.CocoScanI18n.t('dashboard.notif_toast_cleared', 'All notifications cleared') : 'All notifications cleared');
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     function closeFarmerOfflineModal() {
         const modal = document.getElementById('farmer-offline-post-login-modal');
         if (modal) modal.style.display = 'none';
@@ -205,7 +1317,6 @@
         const shouldShow = sessionStorage.getItem('cocoscan_show_offline_post_login_modal');
         if (shouldShow === 'true') {
             sessionStorage.removeItem('cocoscan_show_offline_post_login_modal');
-            // ONLY display the modal if the user is ACTUALLY offline
             if (!navigator.onLine) {
                 const modal = document.getElementById('farmer-offline-post-login-modal');
                 if (modal) {
@@ -266,6 +1377,10 @@
         }
     }
 
+    window.addEventListener('cocoscan:languagechange', () => {
+        updateNotificationIconUI();
+        renderFarmerNotifications();
+    });
     window.addEventListener('offline', () => {
         updateFarmerOfflineUI();
         syncOfflineMetrics();
@@ -280,11 +1395,15 @@
         updateFarmerOfflineUI();
         checkPostLoginOfflineNotice();
         syncOfflineMetrics();
+        updateNotificationIconUI();
+        renderFarmerNotifications();
         if (typeof hydrateUserProfileGreeting === 'function') hydrateUserProfileGreeting();
     });
     updateFarmerOfflineUI();
     checkPostLoginOfflineNotice();
     syncOfflineMetrics();
+    updateNotificationIconUI();
+    renderFarmerNotifications();
     if (typeof hydrateUserProfileGreeting === 'function') hydrateUserProfileGreeting();
 </script>
 {% endblock %}

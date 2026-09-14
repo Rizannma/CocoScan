@@ -7,14 +7,17 @@
                 inset: 0;
                 background: rgba(11, 37, 26, 0.45);
                 backdrop-filter: blur(6px);
-                z-index: 2000;
+                z-index: 100000;
                 align-items: center;
                 justify-content: center;
                 padding: 16px;
             }
 
             @media (max-width: 859px) {
-                .modal-screen-overlay { align-items: flex-end; }
+                .modal-screen-overlay {
+                    align-items: flex-end;
+                    padding: 0;
+                }
             }
             .modal-screen-overlay * {
                 box-sizing: border-box;
@@ -26,13 +29,14 @@
                 position: relative;
                 z-index: 10;
                 border-radius: 28px;
-                padding: 24px;
+                padding: 24px 24px calc(48px + env(safe-area-inset-bottom, 24px)) 24px;
                 background: #ffffff;
                 box-shadow: 0 28px 80px rgba(15, 23, 42, 0.16);
                 max-width: 960px; /* Increased for desktop split layout */
                 width: 100%;
                 max-height: min(92vh, 960px);
                 overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
                 margin: 0 auto;
             }
             @media (min-width: 860px) {
@@ -52,7 +56,11 @@
             }
             @media (max-width: 859px) {
                 .modal-sheet-sliding-card {
-                    max-width: 760px;
+                    max-width: 100%;
+                    border-bottom-left-radius: 0;
+                    border-bottom-right-radius: 0;
+                    padding: 20px 16px calc(48px + env(safe-area-inset-bottom, 24px)) 16px;
+                    max-height: 90vh;
                 }
                 .desktop-split-layout {
                     display: flex;

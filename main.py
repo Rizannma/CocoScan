@@ -523,9 +523,10 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
     if not report_id:
         raise ValueError("Missing report reference")
 
+    norm_status = normalize_report_status(status, default="Under Review")
     now_iso = datetime.now(UTC).isoformat()
     update_data = {
-        "status": normalize_report_status(status, default="Under Review"),
+        "status": norm_status,
         "updated_at": now_iso,
     }
 
@@ -543,6 +544,25 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
         update_data.update(extra_updates)
 
     update_response = supabase.table("reports").update(update_data).eq("id", report_id).execute()
+
+    try:
+        from app.push_service import send_push_notification
+        report_data = supabase.table("reports").select("user_id, user_email, pest_detected, pest").eq("id", report_id).execute()
+        rows = getattr(report_data, "data", None) or []
+        if rows:
+            r_row = rows[0]
+            target_user = r_row.get("user_id") or r_row.get("user_email")
+            pest = r_row.get("pest_detected") or r_row.get("pest") or "Coconut Report"
+            send_push_notification(
+                user_id=target_user,
+                title="CocoScan Status Update",
+                body=f"Your {pest} report status is now '{norm_status}'.",
+                report_id=report_id,
+                url=f"/farmer/reports?report_id={report_id}"
+            )
+    except Exception as p_err:
+        logger.debug(f"Push dispatch error in _update_report_workflow: {p_err}")
+
     return update_response
 
 
@@ -2037,7 +2057,7 @@ def farmer_dashboard():
         weather = get_current_weather(14.0708, 121.3256, "San Pablo City, Laguna")
         risk = calculate_environmental_risk(weather["temp"], weather["humidity"], weather["rainfall"])
 
-        return render_template('farmer_dashboard.html', user_name=user_name, metrics=metrics, weather=weather, risk=risk, chart_data=chart_data)
+        return render_template('farmer_dashboard.html', user_name=user_name, metrics=metrics, weather=weather, risk=risk, chart_data=chart_data, reports=reports)
         
     except Exception as e:
         logger.error(f"Dashboard routing exception: {str(e)}")
@@ -2048,7 +2068,8 @@ def farmer_dashboard():
             metrics={"total_cases": 0, "pending_cases": 0, "resolved_cases": 0},
             weather={"is_down": True, "temp": "--", "humidity": "--", "rainfall": "--", "description": "Offline", "icon_class": "fa-cloud-slash"},
             risk={"level": "Low", "text": "Environmental risk data offline.", "icon": "fa-shield", "color": "#16a34a"},
-            chart_data=build_dashboard_chart_payload([])
+            chart_data=build_dashboard_chart_payload([]),
+            reports=[]
         )
 
 @app.route('/farmer/scan')
@@ -3174,10 +3195,71 @@ def save_visit_chat(report_id):
             return jsonify({'success': False, 'message': 'The message could not be saved.'}), 500
 
         _update_report_workflow(report_id, 'Awaiting Confirmed Schedule')
+
+        try:
+            from app.push_service import send_push_notification
+            target_user = report_row.get('user_id') or report_row.get('user_email')
+            if user_role in {'agri_expert', 'admin', 'lgu'}:
+                send_push_notification(
+                    user_id=target_user,
+                    title="New Visit Discussion Message",
+                    body=f"Agriculturist: {message[:60]}",
+                    report_id=report_id,
+                    url=f"/farmer/reports?report_id={report_id}"
+                )
+            else:
+                send_push_notification(
+                    user_id=None,
+                    title="New Discussion Message",
+                    body=f"Farmer message on report #{report_id}: {message[:60]}",
+                    report_id=report_id,
+                    url=f"/farmer/reports?report_id={report_id}"
+                )
+        except Exception as p_err:
+            logger.debug(f"Push chat dispatch note: {p_err}")
+
         return jsonify({'success': True, 'message': 'Message sent.'})
     except Exception as e:
         logger.error(f"Error saving visit chat: {str(e)}")
         return jsonify({'success': False, 'message': 'The message could not be saved.'}), 500
+
+
+@app.route('/api/reports/<int:report_id>/mark-read', methods=['POST'])
+def api_mark_report_read(report_id):
+    user_id = _get_current_app_user_id()
+    now_iso = datetime.now(UTC).isoformat()
+    try:
+        supabase.table('reports').update({'last_read_at': now_iso}).eq('id', report_id).execute()
+    except Exception as db_err:
+        logger.debug(f"DB update last_read_at note: {db_err}")
+    return jsonify({'success': True, 'report_id': report_id, 'last_read_at': now_iso})
+
+
+@app.route('/api/push/public-key', methods=['GET'])
+def api_push_public_key():
+    try:
+        from app.push_service import get_public_key
+        pub_key = get_public_key()
+        return jsonify({'success': True, 'publicKey': pub_key, 'public_key': pub_key})
+    except Exception as e:
+        logger.error(f"Error getting VAPID public key: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+def api_push_subscribe():
+    try:
+        from app.push_service import save_subscription
+        payload = request.get_json(silent=True) or {}
+        sub_data = payload.get('subscription') or payload
+        user_id = payload.get('user_id') or _get_current_app_user_id()
+        saved = save_subscription(user_id, sub_data)
+        if saved:
+            return jsonify({'success': True, 'message': 'Subscription registered successfully.'})
+        return jsonify({'success': False, 'message': 'Invalid subscription payload.'}), 400
+    except Exception as e:
+        logger.error(f"Error registering push subscription: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 
 @app.route('/reports/<int:report_id>/request-reschedule', methods=['POST'])

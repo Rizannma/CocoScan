@@ -1602,15 +1602,35 @@
             globalActiveImagePayload = "";
             globalActiveImageFile = null;
             selectedUploadLocation = null;
+            if (uploadMapMarker && uploadMapInstance) {
+                uploadMapInstance.removeLayer(uploadMapMarker);
+                uploadMapMarker = null;
+            }
+            const pinCoords = document.getElementById('pin-coords-text');
+            if (pinCoords) pinCoords.textContent = 'Tap on map to place pin';
+            const badge = document.getElementById('location-reverse-badge');
+            if (badge) badge.style.display = 'none';
+            const manualInput = document.getElementById('manual-location-text');
+            if (manualInput) manualInput.value = '';
+        }
+
+        function createUploadMapPinIcon() {
+            return L.divIcon({
+                className: 'custom-map-pin',
+                html: '<div style="background:#2A7B4C; color:#ffffff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.35); border:2px solid #ffffff; font-size:16px;"><i class="fa-solid fa-location-dot"></i></div>',
+                iconSize: [34, 34],
+                iconAnchor: [17, 34]
+            });
         }
 
         function initUploadLocationMap() {
             const mapContainer = document.getElementById('upload-location-map');
             if (!mapContainer) return;
 
-            // Default center is San Pablo City, Laguna if no active GPS
-            const initialLat = (selectedUploadLocation && selectedUploadLocation.latitude) ? selectedUploadLocation.latitude : DEFAULT_SAN_PABLO_LAT;
-            const initialLng = (selectedUploadLocation && selectedUploadLocation.longitude) ? selectedUploadLocation.longitude : DEFAULT_SAN_PABLO_LNG;
+            const hasPreselectedLoc = !!(selectedUploadLocation && selectedUploadLocation.latitude);
+            const initialLat = hasPreselectedLoc ? selectedUploadLocation.latitude : DEFAULT_SAN_PABLO_LAT;
+            const initialLng = hasPreselectedLoc ? selectedUploadLocation.longitude : DEFAULT_SAN_PABLO_LNG;
+            const initialZoom = hasPreselectedLoc ? 15 : 13;
 
             if (!uploadMapInstance) {
                 if (typeof L === 'undefined') {
@@ -1621,42 +1641,74 @@
                 uploadMapInstance = L.map('upload-location-map', {
                     zoomControl: true,
                     attributionControl: false
-                }).setView([initialLat, initialLng], 14);
+                }).setView([initialLat, initialLng], initialZoom);
 
                 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                     maxZoom: 19
                 }).addTo(uploadMapInstance);
 
-                const customIcon = L.divIcon({
-                    className: 'custom-map-pin',
-                    html: '<div style="background:#2A7B4C; color:#ffffff; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 3px 10px rgba(0,0,0,0.35); border:2px solid #ffffff; font-size:16px;"><i class="fa-solid fa-location-dot"></i></div>',
-                    iconSize: [34, 34],
-                    iconAnchor: [17, 34]
-                });
+                if (hasPreselectedLoc) {
+                    uploadMapMarker = L.marker([initialLat, initialLng], {
+                        draggable: true,
+                        icon: createUploadMapPinIcon()
+                    }).addTo(uploadMapInstance);
 
-                uploadMapMarker = L.marker([initialLat, initialLng], {
-                    draggable: true,
-                    icon: customIcon
-                }).addTo(uploadMapInstance);
-
-                uploadMapMarker.on('dragend', function (e) {
-                    const pos = e.target.getLatLng();
-                    onLocationSelected(pos.lat, pos.lng, true);
-                });
+                    uploadMapMarker.on('dragend', function (e) {
+                        const pos = e.target.getLatLng();
+                        onLocationSelected(pos.lat, pos.lng, true);
+                    });
+                    onLocationSelected(initialLat, initialLng, false);
+                } else {
+                    const pinCoords = document.getElementById('pin-coords-text');
+                    if (pinCoords) {
+                        pinCoords.textContent = 'Tap on map to place pin';
+                    }
+                }
 
                 uploadMapInstance.on('click', function (e) {
-                    uploadMapMarker.setLatLng(e.latlng);
+                    if (!uploadMapMarker) {
+                        uploadMapMarker = L.marker(e.latlng, {
+                            draggable: true,
+                            icon: createUploadMapPinIcon()
+                        }).addTo(uploadMapInstance);
+
+                        uploadMapMarker.on('dragend', function (ev) {
+                            const pos = ev.target.getLatLng();
+                            onLocationSelected(pos.lat, pos.lng, true);
+                        });
+                    } else {
+                        uploadMapMarker.setLatLng(e.latlng);
+                    }
                     onLocationSelected(e.latlng.lat, e.latlng.lng, true);
                 });
-
-                onLocationSelected(initialLat, initialLng, false);
             } else {
                 uploadMapInstance.invalidateSize();
-                uploadMapInstance.setView([initialLat, initialLng], 14);
-                if (uploadMapMarker) {
-                    uploadMapMarker.setLatLng([initialLat, initialLng]);
+                uploadMapInstance.setView([initialLat, initialLng], initialZoom);
+                if (hasPreselectedLoc) {
+                    if (!uploadMapMarker) {
+                        uploadMapMarker = L.marker([initialLat, initialLng], {
+                            draggable: true,
+                            icon: createUploadMapPinIcon()
+                        }).addTo(uploadMapInstance);
+
+                        uploadMapMarker.on('dragend', function (e) {
+                            const pos = e.target.getLatLng();
+                            onLocationSelected(pos.lat, pos.lng, true);
+                        });
+                    } else {
+                        uploadMapMarker.setLatLng([initialLat, initialLng]);
+                    }
+                    onLocationSelected(initialLat, initialLng, false);
+                } else {
+                    if (uploadMapMarker) {
+                        uploadMapInstance.removeLayer(uploadMapMarker);
+                        uploadMapMarker = null;
+                    }
+                    const pinCoords = document.getElementById('pin-coords-text');
+                    if (pinCoords) {
+                        pinCoords.textContent = 'Tap on map to place pin';
+                    }
                 }
-                onLocationSelected(initialLat, initialLng, false);
             }
         }
 
@@ -1709,9 +1761,19 @@
         function applyLocationCoordinates(lat, lng, displayName, barangay = '', municipality = '', province = '') {
             if (uploadMapInstance) {
                 uploadMapInstance.setView([lat, lng], 15);
-            }
-            if (uploadMapMarker) {
-                uploadMapMarker.setLatLng([lat, lng]);
+                if (!uploadMapMarker) {
+                    uploadMapMarker = L.marker([lat, lng], {
+                        draggable: true,
+                        icon: createUploadMapPinIcon()
+                    }).addTo(uploadMapInstance);
+
+                    uploadMapMarker.on('dragend', function (e) {
+                        const pos = e.target.getLatLng();
+                        onLocationSelected(pos.lat, pos.lng, true);
+                    });
+                } else {
+                    uploadMapMarker.setLatLng([lat, lng]);
+                }
             }
 
             const pinCoords = document.getElementById('pin-coords-text');
@@ -1823,11 +1885,8 @@
                 (pos) => {
                     const userLat = pos.coords.latitude;
                     const userLng = pos.coords.longitude;
-                    if (uploadMapInstance && uploadMapMarker) {
-                        uploadMapInstance.setView([userLat, userLng], 15);
-                        uploadMapMarker.setLatLng([userLat, userLng]);
-                        onLocationSelected(userLat, userLng, true);
-                    }
+                    applyLocationCoordinates(userLat, userLng, "Current GPS Location");
+                    onLocationSelected(userLat, userLng, true);
                 },
                 (err) => {
                     alert('Could not retrieve device GPS location: ' + (err.message || 'Permission denied'));

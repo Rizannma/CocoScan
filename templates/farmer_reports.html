@@ -870,7 +870,7 @@
             bottom: 0;
             background: rgba(11, 37, 26, 0.4);
             backdrop-filter: blur(5px);
-            z-index: 2000;
+            z-index: 100000;
             align-items: flex-end;
             justify-content: center;
         }
@@ -888,7 +888,8 @@
             display: flex;
             flex-direction: column;
             overflow-y: auto;
-            padding: 20px 16px 24px 16px;
+            -webkit-overflow-scrolling: touch;
+            padding: 20px 16px calc(48px + env(safe-area-inset-bottom, 24px)) 16px;
             box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.15);
             animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -1283,8 +1284,78 @@
         const recordsPerPage = 6;
         let selectedReportRecord = null;
         const reportLookupParams = new URLSearchParams(window.location.search);
-        const reportIdToOpen = reportLookupParams.get("report_id");
+        const reportIdToOpen = reportLookupParams.get("report_id") || reportLookupParams.get("id");
         const openMode = reportLookupParams.get("mode") || "";
+
+        function openReportSummary(record, options = {}) {
+            if (!record) return;
+            localStorage.setItem(`read_chats_${record.id}`, String(record.chat_count || 0));
+            localStorage.setItem(`read_status_${record.id}`, record.status || '');
+            const badge = document.getElementById(`unread-badge-${record.id}`);
+            if (badge) badge.remove();
+            const rowNode = document.querySelector(`.report-row-node[data-report-id="${record.id}"]`);
+            if (rowNode) rowNode.classList.remove('is-unread');
+
+            try {
+                fetch(`/api/reports/${record.id}/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                }).catch(() => {});
+            } catch (e) {}
+
+            selectedReportRecord = record;
+            const payload = {
+                ...record,
+                mode: 'farmer',
+                primary_image: record.primary_image || record.img || record.image_url,
+                additional_images: record.additional_images || record.supporting_images || [],
+                notes: record.notes || record.farmer_notes || '',
+            };
+
+            if (typeof window.openReportModal === 'function') {
+                window.openReportModal(payload, 'farmer');
+            } else {
+                let attempts = 0;
+                const checkModal = setInterval(() => {
+                    attempts++;
+                    if (typeof window.openReportModal === 'function') {
+                        clearInterval(checkModal);
+                        window.openReportModal(payload, 'farmer');
+                    } else if (attempts > 20) {
+                        clearInterval(checkModal);
+                        console.warn('openReportModal not available to open farmer summary');
+                    }
+                }, 100);
+            }
+        }
+
+        let hasOpenedReportFromUrl = false;
+        function openReportFromQueryParams(retries = 20) {
+            try {
+                if (hasOpenedReportFromUrl) return;
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetId = urlParams.get('report_id') || urlParams.get('id');
+                if (!targetId) return;
+
+                if (!Array.isArray(reports) || reports.length === 0) {
+                    if (retries > 0) {
+                        setTimeout(() => openReportFromQueryParams(retries - 1), 100);
+                    }
+                    return;
+                }
+
+                const targetRecord = reports.find(item => String(item.id).trim() === String(targetId).trim());
+                if (targetRecord) {
+                    hasOpenedReportFromUrl = true;
+                    openReportSummary(targetRecord);
+                } else if (retries > 0) {
+                    setTimeout(() => openReportFromQueryParams(retries - 1), 150);
+                }
+            } catch (err) {
+                console.error("Error opening report from query params:", err);
+            }
+        }
+        const checkUrlParamsAndOpenReport = openReportFromQueryParams;
 
         function updateReportsOfflineBanner() {
             const banner = document.getElementById('reports-offline-banner');
@@ -1330,6 +1401,11 @@
             renderReportsGrid();
             openReportFromQueryParams();
         });
+
+        // Also trigger immediately in case DOM is already ready
+        if (document.readyState !== 'loading') {
+            openReportFromQueryParams();
+        }
 
         updateReportsOfflineBanner();
 
@@ -1722,17 +1798,24 @@
                 const row = document.createElement("div");
                 const statusLabel = formatWorkflowStatusLabel(item.status || "");
                 const statusBadge = getWorkflowStatusBadgeStyle(item.status || "");
-                const isUnread = item.status === 'Recommendation Issued';
-                row.className = `report-row-node${isUnread ? ' is-unread' : ''}`;
-                row.tabIndex = 0;
-                row.style.cursor = 'pointer';
                 const totalChats = item.chat_count || 0;
                 const readChats = parseInt(localStorage.getItem(`read_chats_${item.id}`) || '0');
-                let unreadCount = totalChats - readChats;
-                if (readChats === 0 && totalChats === 1) {
-                    unreadCount = 0;
+                const lastKnownStatus = localStorage.getItem(`read_status_${item.id}`);
+                const statusChanged = lastKnownStatus !== null && lastKnownStatus !== (item.status || '');
+                const unreadChatsCount = Math.max(0, totalChats - readChats);
+                const isUnread = unreadChatsCount > 0 || statusChanged;
+
+                row.className = `report-row-node${isUnread ? ' is-unread' : ''}`;
+                row.setAttribute('data-report-id', item.id);
+                row.tabIndex = 0;
+                row.style.cursor = 'pointer';
+
+                let unreadBadgeHTML = '';
+                if (unreadChatsCount > 0) {
+                    unreadBadgeHTML = `<span id="unread-badge-${item.id}" class="unread-badge">${t('reports.badge_unread', `${unreadChatsCount} unread`, { count: unreadChatsCount })}</span>`;
+                } else if (statusChanged) {
+                    unreadBadgeHTML = `<span id="unread-badge-${item.id}" class="unread-badge"><i class="fa-solid fa-bell"></i></span>`;
                 }
-                const unreadBadgeHTML = unreadCount > 0 ? `<span id="unread-badge-${item.id}" class="unread-badge">${t('reports.badge_unread', `${unreadCount} unread`, { count: unreadCount })}</span>` : '';
 
                 row.innerHTML = `
                     <div class="report-main-meta">
@@ -1819,18 +1902,18 @@
             leftBtn.onclick = () => { if (currentPage > 1) { currentPage--; renderReportsGrid(); } };
             paginationBlock.appendChild(leftBtn);
 
-            const pageRange = getPaginationRange(currentPage, totalPagesCalculated);
-            pageRange.forEach(item => {
-                if (item === '...') {
-                    const ellipsis = document.createElement("span");
-                    ellipsis.className = "page-ellipsis";
-                    ellipsis.textContent = "…";
-                    paginationBlock.appendChild(ellipsis);
+            const range = getPaginationRange(currentPage, totalPagesCalculated);
+            range.forEach(p => {
+                if (p === '...') {
+                    const dots = document.createElement("span");
+                    dots.className = "page-dots";
+                    dots.textContent = "…";
+                    paginationBlock.appendChild(dots);
                 } else {
                     const pageBtn = document.createElement("button");
-                    pageBtn.className = `page-btn ${item === currentPage ? 'active-page' : ''}`;
-                    pageBtn.textContent = item;
-                    pageBtn.onclick = () => { currentPage = item; renderReportsGrid(); };
+                    pageBtn.className = `page-btn${p === currentPage ? ' active' : ''}`;
+                    pageBtn.textContent = p;
+                    pageBtn.onclick = () => { currentPage = p; renderReportsGrid(); };
                     paginationBlock.appendChild(pageBtn);
                 }
             });
@@ -1844,42 +1927,6 @@
         }
 
         /* ================== DISPLAY INTERACTION PANEL CONTROLLERS ================== */
-        function openReportFromQueryParams() {
-            if (!reportIdToOpen || !Array.isArray(reports) || reports.length === 0) {
-                return;
-            }
-
-            const targetRecord = reports.find(item => String(item.id) === String(reportIdToOpen));
-            if (targetRecord) {
-                openReportSummary(targetRecord);
-            }
-        }
-
-        function openReportSummary(record, options = {}) {
-            if (record.chat_count) {
-                localStorage.setItem(`read_chats_${record.id}`, record.chat_count);
-                const badge = document.getElementById(`unread-badge-${record.id}`);
-                if (badge) badge.style.display = 'none';
-            }
-            selectedReportRecord = record;
-            const payload = {
-                ...record,
-                mode: 'farmer',
-                primary_image: record.primary_image || record.img || record.image_url,
-                additional_images: record.additional_images || record.supporting_images || [],
-                notes: record.notes || record.farmer_notes || '',
-            };
-
-            if (typeof window.openReportModal === 'function') {
-                window.openReportModal(payload, 'farmer');
-            } else {
-                setTimeout(() => {
-                    if (typeof window.openReportModal === 'function') window.openReportModal(payload, 'farmer');
-                    else console.warn('openReportModal not available to open farmer summary');
-                }, 150);
-            }
-        }
-
         function transitionToFollowUp() {
             if (!selectedReportRecord) return;
             const reportSnapshot = { ...selectedReportRecord };

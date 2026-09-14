@@ -987,6 +987,7 @@
         if (!feedbackContainer || !feedbackCard) {
             return;
         }
+        setDisplay(feedbackCard, true, "block");
 
         const isArchived = Boolean(report?.visitArchived);
         const isAgriculturist = mode === "agriculturist";
@@ -2406,151 +2407,166 @@
         currentReportModalRecord = normalizeReportData({ ...reportData, mode: currentReportModalMode });
 
         const report = currentReportModalRecord;
-        // Debug: log status and expert assessment to help trace visibility issues
         try { console.debug("[report_modal] opening report", { id: report.id, status: report.status, expertRecommendations: report.expertRecommendations }); } catch (e) { /* noop */ }
-        await loadVisitDiscussion(report);
 
-        const pestTitle = document.getElementById("report-pest-title");
-        const confidenceNode = document.getElementById("report-confidence");
-        const primaryImage = document.getElementById("report-primary-image");
-        const farmerNameNode = document.getElementById("report-farmer-name");
-        const locationNode = document.getElementById("report-location-text");
-        const timestampNode = document.getElementById("report-timestamp-text");
-        const gpsNode = document.getElementById("report-gps-text");
-        const notesInput = document.getElementById("field-notes-capture");
-        const notesDisplay = document.getElementById("report-notes-display");
-        const expertInput = document.getElementById("expert-notes-input");
-        const expertCard = document.getElementById("report-expert-card");
-
-        const isReviewed = isRecommendationIssuedStatus(report?.status || "");
-
-        if (pestTitle) pestTitle.textContent = report.pest;
-        if (confidenceNode) confidenceNode.textContent = report.confidence;
-        const severityNode = document.getElementById("report-severity-text");
-        if (severityNode) severityNode.textContent = report.severity || "--";
-        if (farmerNameNode) farmerNameNode.textContent = report.farmer;
-        if (locationNode) locationNode.textContent = report.locationText;
-        if (timestampNode) timestampNode.textContent = formatTimestamp(report.timestamp);
-        if (gpsNode) {
-            const gpsParts = [];
-            if (report.latitude !== "" && report.latitude !== null && report.longitude !== "" && report.longitude !== null) {
-                gpsParts.push(`GPS: ${report.latitude}, ${report.longitude}`);
-            }
-            if (report.accuracy) {
-                gpsParts.push(`Accuracy: ${report.accuracy}`);
-            }
-            if (report.source) {
-                gpsParts.push(`Source: ${report.source}`);
-            }
-            gpsNode.textContent = gpsParts.length > 0 ? gpsParts.join(" • ") : "GPS unavailable";
-        }
-
-        if (primaryImage) {
-            primaryImage.src = report.primaryImage || "https://images.unsplash.com/photo-1590005354167-6da97870c913?auto=format&fit=crop&w=480&q=80";
-        }
-
-        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
-        if (notesInput) {
-            notesInput.value = report.notes || "";
-        }
-        if (notesDisplay) {
-            notesDisplay.textContent = report.notes || t("modal.notes_empty", "No notes logged.");
-        }
-        if (expertInput) {
-            expertInput.value = "";
-        }
-
-        if (currentReportModalMode === "scan") {
-            const scanPreviewGrid = document.getElementById("supporting-preview-grid");
-            if (scanPreviewGrid && report.additionalImages.length === 0) {
-                renderAdditionalImages(scanPreviewGrid, []);
-            }
-        } else {
-            renderAdditionalImages(document.getElementById("report-additional-images-grid"), report.additionalImages);
-        }
-
-        const initialCard = document.getElementById("report-initial-card");
-        if (currentReportModalMode === "lgu" || currentReportModalMode === "admin") {
-            if (initialCard) {
-                initialCard.style.setProperty("display", "none", "important");
-            }
-        } else {
-            if (initialCard) setDisplay(initialCard, true, "flex");
-            renderList(document.getElementById("report-initial-list"), report.initialRecommendations, t("modal.initial_reco_empty", "No initial recommendations available."), true, true);
-        }
-
-        let expertEmptyText = t("modal.expert_assessment_empty", "No expert assessment available yet.");
-        if (currentReportModalMode === "scan") {
-            expertEmptyText = t("modal.expert_assessment_prompt", "Submit report for expert assessment");
-        }
-        renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false, false);
-
-        applyStatusStyle(report);
-        applyModeState(currentReportModalMode, report);
-        renderWorkflowActions(currentReportModalMode, report);
-
-        // Expert card visibility and input controls depend on existing assessment state
-        const statusKey = getStatusKey(report?.status || "");
-        const assessmentAlreadyIssued = ["assessment_issued", "recommendation_issued", "waiting_for_agriculturist_confirmation", "waiting_agriculturist_confirmation", "awaiting_confirmed_schedule", "visit_requested", "visit_scheduled", "visit_completed", "final_remarks_issued", "resolved", "closed"].includes(statusKey) || (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0);
-        if (expertCard) {
-            setDisplay(expertCard, true, "block");
-            const expertInput = document.getElementById("expert-notes-input");
-            const expertHelp = document.getElementById("expert-notes-help");
-            const agriSubmitBtn = document.getElementById("report-agri-submit-btn");
-            const issuerNote = document.getElementById("expert-assessment-issuer-note");
-            const showExpertControls = currentReportModalMode === "agriculturist" && !assessmentAlreadyIssued;
-            setDisplay(expertInput, showExpertControls, "block");
-            setDisplay(expertHelp, showExpertControls, "block");
-            if (agriSubmitBtn) setDisplay(agriSubmitBtn, showExpertControls, "block");
-            if (issuerNote) {
-                if (assessmentAlreadyIssued) {
-                    const name = report.reviewer_name || "PCA Agriculturist";
-                    const pos = report.reviewer_position || "Agriculturist";
-                    const off = report.reviewer_office || "";
-                    let html = `Issued by ${escapeHtml(name)}<br>${escapeHtml(pos)}`;
-                    if (off) html += `<br>${escapeHtml(off)}`;
-                    issuerNote.innerHTML = html;
-                    issuerNote.style.lineHeight = "1.4";
-                    setDisplay(issuerNote, true, "block");
-                } else {
-                    setDisplay(issuerNote, false);
-                }
-            }
-        }
-
-        // Render any farmer schedules into a dedicated display area for agriculturists
-        const schedulesNode = document.getElementById("report-farmer-preferred-schedules");
-        if (schedulesNode) {
-            schedulesNode.innerHTML = "";
-            const schedules = report.farmerSchedules || [];
-            if (Array.isArray(schedules) && schedules.length) {
-                const wrapper = document.createElement('div');
-                wrapper.style.display = 'grid';
-                wrapper.style.gap = '8px';
-                const title = document.createElement('h4');
-                title.style.margin = '0';
-                title.style.fontSize = '0.98rem';
-                title.textContent = "Farmer's Preferred Schedules";
-                wrapper.appendChild(title);
-                schedules.forEach((s, idx) => {
-                    const row = document.createElement('label');
-                    row.style.display = 'flex';
-                    row.style.alignItems = 'center';
-                    row.style.gap = '8px';
-                    row.style.fontSize = '0.95rem';
-                    row.style.color = '#64748b';
-                    row.innerHTML = `<input type="radio" name="agri-selected-schedule" value="${idx}" style="accent-color:#1d4ed8;"> ${escapeHtml(s.display)}`;
-                    wrapper.appendChild(row);
-                });
-                schedulesNode.appendChild(wrapper);
-            }
-            // Only show this card to agriculturists when schedules exist
-            setDisplay(schedulesNode, Array.isArray(schedules) && schedules.length && currentReportModalMode === 'agriculturist', 'block');
-        }
-
-        setReportModalSubmissionState(false);
+        // Immediately reveal the modal overlay
         modalRoot.classList.add("open-modal");
         modalRoot.setAttribute("aria-hidden", "false");
+        setReportModalSubmissionState(false);
+
+        const renderModalFields = () => {
+            const pestTitle = document.getElementById("report-pest-title");
+            const confidenceNode = document.getElementById("report-confidence");
+            const primaryImage = document.getElementById("report-primary-image");
+            const farmerNameNode = document.getElementById("report-farmer-name");
+            const locationNode = document.getElementById("report-location-text");
+            const timestampNode = document.getElementById("report-timestamp-text");
+            const gpsNode = document.getElementById("report-gps-text");
+            const notesInput = document.getElementById("field-notes-capture");
+            const notesDisplay = document.getElementById("report-notes-display");
+            const expertInput = document.getElementById("expert-notes-input");
+            const expertCard = document.getElementById("report-expert-card");
+
+            if (pestTitle) pestTitle.textContent = report.pest;
+            if (confidenceNode) confidenceNode.textContent = report.confidence;
+            const severityNode = document.getElementById("report-severity-text");
+            if (severityNode) severityNode.textContent = report.severity || "--";
+            if (farmerNameNode) farmerNameNode.textContent = report.farmer;
+            if (locationNode) locationNode.textContent = report.locationText;
+            if (timestampNode) timestampNode.textContent = formatTimestamp(report.timestamp);
+            if (gpsNode) {
+                const gpsParts = [];
+                if (report.latitude !== "" && report.latitude !== null && report.longitude !== "" && report.longitude !== null) {
+                    gpsParts.push(`GPS: ${report.latitude}, ${report.longitude}`);
+                }
+                if (report.accuracy) {
+                    gpsParts.push(`Accuracy: ${report.accuracy}`);
+                }
+                if (report.source) {
+                    gpsParts.push(`Source: ${report.source}`);
+                }
+                gpsNode.textContent = gpsParts.length > 0 ? gpsParts.join(" • ") : "GPS unavailable";
+            }
+
+            if (primaryImage) {
+                primaryImage.src = report.primaryImage || "https://images.unsplash.com/photo-1590005354167-6da97870c913?auto=format&fit=crop&w=480&q=80";
+            }
+
+            const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+            if (notesInput) {
+                notesInput.value = report.notes || "";
+            }
+            if (notesDisplay) {
+                notesDisplay.textContent = report.notes || t("modal.notes_empty", "No notes logged.");
+            }
+            if (expertInput) {
+                expertInput.value = "";
+            }
+
+            if (currentReportModalMode === "scan") {
+                const scanPreviewGrid = document.getElementById("supporting-preview-grid");
+                if (scanPreviewGrid && report.additionalImages.length === 0) {
+                    renderAdditionalImages(scanPreviewGrid, []);
+                }
+            } else {
+                renderAdditionalImages(document.getElementById("report-additional-images-grid"), report.additionalImages);
+            }
+
+            const initialCard = document.getElementById("report-initial-card");
+            if (currentReportModalMode === "lgu" || currentReportModalMode === "admin") {
+                if (initialCard) {
+                    initialCard.style.setProperty("display", "none", "important");
+                }
+            } else {
+                if (initialCard) setDisplay(initialCard, true, "flex");
+                renderList(document.getElementById("report-initial-list"), report.initialRecommendations, t("modal.initial_reco_empty", "No initial recommendations available."), true, true);
+            }
+
+            let expertEmptyText = t("modal.expert_assessment_empty", "No expert assessment available yet.");
+            if (currentReportModalMode === "scan") {
+                expertEmptyText = t("modal.expert_assessment_prompt", "Submit report for expert assessment");
+            }
+            renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false, false);
+
+            applyStatusStyle(report);
+            applyModeState(currentReportModalMode, report);
+            renderWorkflowActions(currentReportModalMode, report);
+
+            // Expert card visibility and input controls depend on existing assessment state
+            const statusKey = getStatusKey(report?.status || "");
+            const assessmentAlreadyIssued = ["assessment_issued", "recommendation_issued", "waiting_for_agriculturist_confirmation", "waiting_agriculturist_confirmation", "awaiting_confirmed_schedule", "visit_requested", "visit_scheduled", "visit_completed", "final_remarks_issued", "resolved", "closed"].includes(statusKey) || (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0);
+            if (expertCard) {
+                setDisplay(expertCard, true, "block");
+                const expertHelp = document.getElementById("expert-notes-help");
+                const agriSubmitBtn = document.getElementById("report-agri-submit-btn");
+                const issuerNote = document.getElementById("expert-assessment-issuer-note");
+                const showExpertControls = currentReportModalMode === "agriculturist" && !assessmentAlreadyIssued;
+                setDisplay(expertInput, showExpertControls, "block");
+                setDisplay(expertHelp, showExpertControls, "block");
+                if (agriSubmitBtn) setDisplay(agriSubmitBtn, showExpertControls, "block");
+                if (issuerNote) {
+                    if (assessmentAlreadyIssued) {
+                        const name = report.reviewer_name || "PCA Agriculturist";
+                        const pos = report.reviewer_position || "Agriculturist";
+                        const off = report.reviewer_office || "";
+                        let html = `Issued by ${escapeHtml(name)}<br>${escapeHtml(pos)}`;
+                        if (off) html += `<br>${escapeHtml(off)}`;
+                        issuerNote.innerHTML = html;
+                        issuerNote.style.lineHeight = "1.4";
+                        setDisplay(issuerNote, true, "block");
+                    } else {
+                        setDisplay(issuerNote, false);
+                    }
+                }
+            }
+
+            // Render any farmer schedules into a dedicated display area for agriculturists
+            const schedulesNode = document.getElementById("report-farmer-preferred-schedules");
+            if (schedulesNode) {
+                schedulesNode.innerHTML = "";
+                const schedules = report.farmerSchedules || [];
+                if (Array.isArray(schedules) && schedules.length) {
+                    const wrapper = document.createElement('div');
+                    wrapper.style.display = 'grid';
+                    wrapper.style.gap = '8px';
+                    const title = document.createElement('h4');
+                    title.style.margin = '0';
+                    title.style.fontSize = '0.98rem';
+                    title.textContent = "Farmer's Preferred Schedules";
+                    wrapper.appendChild(title);
+                    schedules.forEach((s, idx) => {
+                        const row = document.createElement('label');
+                        row.style.display = 'flex';
+                        row.style.alignItems = 'center';
+                        row.style.gap = '8px';
+                        row.style.fontSize = '0.95rem';
+                        row.style.color = '#64748b';
+                        row.innerHTML = `<input type="radio" name="agri-selected-schedule" value="${idx}" style="accent-color:#1d4ed8;"> ${escapeHtml(s.display)}`;
+                        wrapper.appendChild(row);
+                    });
+                    schedulesNode.appendChild(wrapper);
+                }
+                // Only show this card to agriculturists when schedules exist
+                setDisplay(schedulesNode, Array.isArray(schedules) && schedules.length && currentReportModalMode === 'agriculturist', 'block');
+            }
+        };
+
+        try {
+            renderModalFields();
+        } catch (renderErr) {
+            console.warn("Initial modal render encountered an error", renderErr);
+        }
+
+        // Fetch visit discussion messages and schedules asynchronously in background
+        try {
+            await loadVisitDiscussion(report);
+            if (currentReportModalRecord?.id === report.id) {
+                renderModalFields();
+            }
+        } catch (discErr) {
+            console.warn("Async visit discussion fetch failed", discErr);
+        }
+
         startVisitDiscussionPoll(report);
     }
 

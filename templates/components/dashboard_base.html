@@ -1022,9 +1022,19 @@
             </header>
 
             {% block main_content %}
-            <div style="margin-bottom: 18px;">
+            <div class="greeting-action-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; gap: 12px; position: relative;">
                 <p id="greeting-banner"
                     style="font-size: 1.15rem; font-weight: 700; color: #164630; margin: 0; line-height: 1.2;"></p>
+                {% block greeting_right_action %}
+                {% if session.get('user_role') == 'farmer' or sidebar_role == 'Farmer' %}
+                <div class="dashboard-notif-control-box" style="position: relative; display: flex; align-items: center;">
+                    <button type="button" id="farmer-notification-btn" class="farmer-notification-bell-btn" onclick="handleNotificationIconClick(event)" aria-label="{{ t('dashboard.notif_center_title', 'Notifications') }}" title="{{ t('dashboard.notif_center_title', 'Notifications') }}">
+                        <i class="fa-solid fa-bell" id="farmer-notification-bell-icon"></i>
+                        <span id="farmer-notification-badge" class="notification-badge-counter" style="display: none;">0</span>
+                    </button>
+                </div>
+                {% endif %}
+                {% endblock %}
             </div>
 
             {% block metrics_grid %}
