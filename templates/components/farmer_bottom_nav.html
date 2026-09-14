@@ -1,0 +1,735 @@
+<!-- CocoScan Farmer Persistent Bottom Navigation Bar & Profile Sheet -->
+<style>
+    /* ==========================================================================
+       FARMER PERSISTENT BOTTOM NAVIGATION BAR
+       ========================================================================== */
+    .farmer-bottom-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+        height: calc(66px + env(safe-area-inset-bottom, 0px));
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        background: rgba(8, 28, 16, 0.98);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-top: 1px solid rgba(74, 198, 143, 0.25);
+        z-index: 9999;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .bottom-nav-inner {
+        display: flex;
+        align-items: stretch;
+        justify-content: space-around;
+        width: 100%;
+        max-width: 600px;
+        height: 100%;
+        margin: 0 auto;
+    }
+
+    .bottom-nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-width: 48px;
+        min-height: 48px;
+        height: 100%;
+        padding: 5px 2px 7px;
+        text-decoration: none;
+        color: #94a3b8;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        position: relative;
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+        transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
+    }
+
+    .bottom-nav-item:active {
+        transform: scale(0.92);
+    }
+
+    .bottom-nav-item .nav-icon-container {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 28px;
+        border-radius: 14px;
+        font-size: 1.25rem;
+        color: #94a3b8;
+        margin-bottom: 2px;
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .bottom-nav-item.active .nav-icon-container {
+        background: rgba(74, 198, 143, 0.22);
+        color: #4ac68f;
+        box-shadow: 0 0 12px rgba(74, 198, 143, 0.3);
+    }
+
+    .bottom-nav-item.nav-item-scan .nav-icon-container {
+        color: #4ac68f;
+    }
+
+    .bottom-nav-item.nav-item-scan.active .nav-icon-container {
+        background: #2A7B4C;
+        color: #ffffff;
+        box-shadow: 0 2px 12px rgba(42, 123, 76, 0.6);
+    }
+
+    .bottom-nav-item .nav-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #94a3b8;
+        line-height: 1.1;
+        letter-spacing: -0.15px;
+        white-space: nowrap;
+        transition: color 0.2s ease, font-weight 0.2s ease;
+    }
+
+    .bottom-nav-item.active .nav-label {
+        color: #ffffff;
+        font-weight: 800;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .bottom-nav-badge {
+        position: absolute;
+        top: -3px;
+        right: -2px;
+        background: #f59e0b;
+        color: #081c10;
+        font-size: 0.65rem;
+        font-weight: 900;
+        min-width: 17px;
+        height: 17px;
+        border-radius: 999px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+        border: 1.5px solid #081c10;
+    }
+
+    /* Header Profile Avatar Button */
+    .header-profile-btn {
+        background: rgba(255, 255, 255, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        color: #ffffff;
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        -webkit-tap-highlight-color: transparent;
+        padding: 0;
+        min-width: 38px;
+    }
+
+    .header-profile-btn:hover {
+        background: rgba(255, 255, 255, 0.22);
+        border-color: var(--brand-accent);
+        transform: scale(1.05);
+    }
+
+    .header-profile-btn:active {
+        transform: scale(0.94);
+    }
+
+    .header-avatar-circle {
+        font-size: 0.95rem;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Profile & Settings Modal Sheet */
+    .farmer-profile-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 100000;
+        display: flex;
+        align-items: flex-end;
+        justify-content: center;
+        animation: modalFadeIn 0.25s ease-out;
+    }
+
+    .profile-modal-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(8, 28, 16, 0.65);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+    }
+
+    .profile-sheet-card {
+        position: relative;
+        background: #ffffff;
+        width: 100%;
+        max-width: 480px;
+        border-top-left-radius: 28px;
+        border-top-right-radius: 28px;
+        padding: 12px 20px calc(24px + env(safe-area-inset-bottom, 12px));
+        box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+        animation: sheetSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        max-height: 90vh;
+        overflow-y: auto;
+        z-index: 1;
+    }
+
+    @keyframes sheetSlideUp {
+        from { transform: translateY(100%); }
+        to { transform: translateY(0); }
+    }
+
+    .profile-sheet-handle {
+        width: 44px;
+        height: 5px;
+        background: #cbd5e1;
+        border-radius: 3px;
+        margin: 6px auto 14px;
+    }
+
+    .profile-sheet-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .profile-header-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 12px;
+        background: rgba(42, 123, 76, 0.12);
+        color: #2A7B4C;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+    }
+
+    .profile-sheet-header h3 {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0;
+        line-height: 1.2;
+    }
+
+    .profile-sheet-header p {
+        font-size: 0.75rem;
+        color: #64748b;
+        margin: 2px 0 0;
+    }
+
+    .btn-close-profile {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        color: #64748b;
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-close-profile:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .profile-identity-card {
+        background: linear-gradient(135deg, #0b251a 0%, #164630 100%);
+        color: #ffffff;
+        border-radius: 20px;
+        padding: 18px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 16px;
+        box-shadow: 0 6px 18px rgba(11, 37, 26, 0.25);
+    }
+
+    .profile-avatar-large {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        background: rgba(74, 198, 143, 0.2);
+        border: 2px solid rgba(74, 198, 143, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: #4ac68f;
+        flex-shrink: 0;
+    }
+
+    .profile-identity-info h4 {
+        font-size: 1.15rem;
+        font-weight: 800;
+        margin: 0 0 4px;
+        line-height: 1.2;
+    }
+
+    .profile-role-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: rgba(74, 198, 143, 0.2);
+        color: #4ac68f;
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .profile-sub-text {
+        font-size: 0.75rem;
+        color: rgba(255, 255, 255, 0.65);
+        margin: 0;
+    }
+
+    .profile-section-block {
+        margin-bottom: 16px;
+    }
+
+    .profile-section-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+    }
+
+    .profile-lang-selector {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .profile-lang-btn {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-radius: 14px;
+        border: 1.5px solid #e2e8f0;
+        background: #f8fafc;
+        color: #334155;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .profile-lang-btn:hover {
+        border-color: #cbd5e1;
+        background: #f1f5f9;
+    }
+
+    .profile-lang-btn.active {
+        border-color: #2A7B4C;
+        background: rgba(42, 123, 76, 0.08);
+        color: #164630;
+    }
+
+    .lang-check {
+        color: #2A7B4C;
+        font-size: 1rem;
+    }
+
+    .profile-status-card {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 12px 16px;
+    }
+
+    .status-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .status-indicator-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: #22c55e;
+    }
+
+    .status-state-text {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #15803d;
+    }
+
+    .status-subrow {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.8rem;
+        color: #64748b;
+        padding-top: 6px;
+        border-top: 1px dashed #e2e8f0;
+    }
+
+    .status-val-strong {
+        color: #0f172a;
+        font-size: 0.92rem;
+        font-weight: 800;
+    }
+
+    .profile-actions-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .btn-profile-refresh {
+        background: #f1f5f9;
+        color: #334155;
+        border: 1px solid #cbd5e1;
+        padding: 13px;
+        border-radius: 14px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        min-height: 48px;
+    }
+
+    .btn-profile-refresh:hover {
+        background: #e2e8f0;
+        color: #0f172a;
+    }
+
+    .btn-profile-logout {
+        background: #fee2e2;
+        color: #dc2626;
+        border: 1.5px solid #fca5a5;
+        padding: 13px;
+        border-radius: 14px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        min-height: 48px;
+    }
+
+    .btn-profile-logout:hover {
+        background: #fecaca;
+        color: #b91c1c;
+    }
+
+    @media (max-width: 768px) {
+        .main-content-layout {
+            padding-bottom: calc(84px + env(safe-area-inset-bottom, 16px)) !important;
+        }
+        #pwa-install-banner {
+            bottom: calc(76px + env(safe-area-inset-bottom, 16px)) !important;
+        }
+    }
+</style>
+
+<!-- Fixed Persistent Farmer Bottom Navigation Bar -->
+<nav class="farmer-bottom-nav" id="farmerBottomNav" aria-label="{{ t('navigation.app_title', 'CocoScan Navigation') }}">
+    <div class="bottom-nav-inner">
+        <a href="{{ url_for('farmer_dashboard') }}" class="bottom-nav-item {% if active_page == 'dashboard' %}active{% endif %}" id="bottom-nav-dashboard" aria-label="{{ t('navigation.menu_dashboard', 'Dashboard') }}">
+            <div class="nav-icon-container">
+                <i class="fa-solid fa-house"></i>
+            </div>
+            <span class="nav-label" data-i18n="navigation.menu_dashboard">{{ t('navigation.menu_dashboard', 'Dashboard') }}</span>
+        </a>
+
+        <a href="{{ url_for('farmer_scan') }}" class="bottom-nav-item nav-item-scan {% if active_page == 'scan' %}active{% endif %}" id="bottom-nav-scan" aria-label="{{ t('navigation.menu_scan_pest', 'Scan Pest') }}">
+            <div class="nav-icon-container">
+                <i class="fa-solid fa-camera"></i>
+            </div>
+            <span class="nav-label" data-i18n="navigation.menu_scan_pest">{{ t('navigation.menu_scan_pest', 'Scan Pest') }}</span>
+        </a>
+
+        <a href="{{ url_for('farmer_drafts') }}" class="bottom-nav-item {% if active_page == 'drafts' %}active{% endif %}" id="bottom-nav-drafts" aria-label="{{ t('navigation.menu_drafts', 'Drafts') }}">
+            <div class="nav-icon-container">
+                <i class="fa-solid fa-file-lines"></i>
+                <span class="bottom-nav-badge" id="bottom-nav-drafts-count" style="display: none;">0</span>
+            </div>
+            <span class="nav-label" data-i18n="navigation.menu_drafts">{{ t('navigation.menu_drafts', 'Drafts') }}</span>
+        </a>
+
+        <a href="{{ url_for('farmer_reports') }}" class="bottom-nav-item {% if active_page == 'reports' %}active{% endif %}" id="bottom-nav-reports" aria-label="{{ t('navigation.menu_my_reports', 'My Reports') }}">
+            <div class="nav-icon-container">
+                <i class="fa-solid fa-folder-open"></i>
+            </div>
+            <span class="nav-label" data-i18n="navigation.menu_my_reports">{{ t('navigation.menu_my_reports', 'My Reports') }}</span>
+        </a>
+    </div>
+</nav>
+
+<!-- Dedicated Farmer Profile & Settings Modal Sheet -->
+<div id="farmer-profile-modal" class="farmer-profile-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title-text">
+    <div class="profile-modal-backdrop" onclick="closeFarmerProfileModal()"></div>
+    <div class="profile-sheet-card">
+        <div class="profile-sheet-handle"></div>
+        
+        <div class="profile-sheet-header">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="profile-header-icon">
+                    <i class="fa-solid fa-sliders"></i>
+                </div>
+                <div>
+                    <h3 id="profile-modal-title-text" data-i18n="navigation.profile_modal_title">{{ t('navigation.profile_modal_title', 'Farmer Profile & Settings') }}</h3>
+                    <p data-i18n="navigation.app_subtitle">{{ t('navigation.app_subtitle', 'Coconut Pest Detection') }}</p>
+                </div>
+            </div>
+            <button type="button" class="btn-close-profile" onclick="closeFarmerProfileModal()" aria-label="Close profile modal">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="profile-sheet-body">
+            <!-- Farmer Identity Card -->
+            <div class="profile-identity-card">
+                <div class="profile-avatar-large">
+                    <i class="fa-solid fa-user-check"></i>
+                </div>
+                <div class="profile-identity-info">
+                    <h4 id="farmer-sheet-user-name">{{ user_name or 'Farmer' }}</h4>
+                    <div class="profile-role-badge">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <span data-i18n="navigation.profile_role_farmer">{{ t('navigation.profile_role_farmer', 'Registered Coconut Farmer') }}</span>
+                    </div>
+                    <p id="farmer-sheet-user-email" class="profile-sub-text">{{ session.get('user_email', '') or 'Field Operator' }}</p>
+                </div>
+            </div>
+
+            <!-- Quick Language Preference Switcher -->
+            <div class="profile-section-block">
+                <div class="profile-section-label">
+                    <i class="fa-solid fa-language"></i>
+                    <span data-i18n="navigation.profile_lang_label">{{ t('navigation.profile_lang_label', 'Language / Wika') }}</span>
+                </div>
+                <div class="profile-lang-selector">
+                    <button type="button" class="profile-lang-btn {% if current_lang != 'tl' %}active{% endif %}" onclick="setLanguageExplicit('en')">
+                        <span class="lang-flag">🇺🇸</span>
+                        <span class="lang-name">English</span>
+                        {% if current_lang != 'tl' %}<i class="fa-solid fa-circle-check lang-check"></i>{% endif %}
+                    </button>
+                    <button type="button" class="profile-lang-btn {% if current_lang == 'tl' %}active{% endif %}" onclick="setLanguageExplicit('tl')">
+                        <span class="lang-flag">🇵🇭</span>
+                        <span class="lang-name">Tagalog</span>
+                        {% if current_lang == 'tl' %}<i class="fa-solid fa-circle-check lang-check"></i>{% endif %}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Device & Connection Status -->
+            <div class="profile-section-block">
+                <div class="profile-section-label">
+                    <i class="fa-solid fa-tower-broadcast"></i>
+                    <span data-i18n="navigation.profile_sec_status">{{ t('navigation.profile_sec_status', 'Device & Sync Status') }}</span>
+                </div>
+                <div class="profile-status-card">
+                    <div class="status-row">
+                        <div class="status-indicator-dot" id="modal-conn-dot"></div>
+                        <span id="modal-conn-text" class="status-state-text" data-i18n="navigation.profile_status_online">{{ t('navigation.profile_status_online', 'Online & Synchronized') }}</span>
+                    </div>
+                    <div class="status-subrow">
+                        <span class="status-label-sub" data-i18n="navigation.profile_drafts_count">{{ t('navigation.profile_drafts_count', 'Saved Field Drafts') }}:</span>
+                        <strong id="modal-drafts-count" class="status-val-strong">0</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Account Logout & Actions -->
+            <div class="profile-actions-container">
+                <button type="button" class="btn-profile-refresh" onclick="refreshFarmerData(this)">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                    <span data-i18n="navigation.profile_btn_refresh">{{ t('navigation.profile_btn_refresh', 'Refresh App Data') }}</span>
+                </button>
+                <a href="/logout" class="btn-profile-logout" onclick="return confirmFarmerLogout(event)">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span data-i18n="navigation.profile_btn_logout">{{ t('navigation.profile_btn_logout', 'Log Out Account') }}</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openFarmerProfileModal() {
+        const modal = document.getElementById('farmer-profile-modal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+
+        // Hydrate user info from storage or session
+        const nameEl = document.getElementById('farmer-sheet-user-name');
+        const emailEl = document.getElementById('farmer-sheet-user-email');
+        const connDot = document.getElementById('modal-conn-dot');
+        const connText = document.getElementById('modal-conn-text');
+
+        const storedName = localStorage.getItem('cocoscan_user_name') || localStorage.getItem('cocoscan_user_first_name');
+        if (nameEl && storedName && storedName.trim() && !['none', 'null', 'undefined'].includes(storedName.toLowerCase())) {
+            nameEl.textContent = storedName.trim();
+        }
+        const storedEmail = localStorage.getItem('cocoscan_user_email');
+        if (emailEl && storedEmail && storedEmail.trim() && storedEmail.includes('@')) {
+            emailEl.textContent = storedEmail.trim();
+        }
+
+        // Update connection status
+        if (connDot && connText) {
+            if (navigator.onLine) {
+                connDot.style.backgroundColor = '#22c55e';
+                connText.textContent = (window.CocoScanI18n && typeof window.CocoScanI18n.t === 'function') 
+                    ? window.CocoScanI18n.t('navigation.profile_status_online', 'Online & Synchronized') 
+                    : 'Online & Synchronized';
+                connText.style.color = '#15803d';
+            } else {
+                connDot.style.backgroundColor = '#f59e0b';
+                connText.textContent = (window.CocoScanI18n && typeof window.CocoScanI18n.t === 'function') 
+                    ? window.CocoScanI18n.t('navigation.profile_status_offline', 'Offline Mode (Local Storage)') 
+                    : 'Offline Mode (Local Storage)';
+                connText.style.color = '#b45309';
+            }
+        }
+
+        updateDraftsBadgeCount();
+    }
+
+    function closeFarmerProfileModal() {
+        const modal = document.getElementById('farmer-profile-modal');
+        if (!modal) return;
+        modal.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    function setLanguageExplicit(lang) {
+        if (window.CocoScanI18n && typeof window.CocoScanI18n.setLanguage === 'function') {
+            window.CocoScanI18n.setLanguage(lang);
+        } else {
+            localStorage.setItem('cocoscan_lang', lang);
+            document.cookie = `cocoscan_lang=${lang}; path=/; max-age=31536000; SameSite=Lax`;
+            window.location.reload();
+        }
+    }
+
+    function confirmFarmerLogout(e) {
+        const msg = (window.CocoScanI18n && typeof window.CocoScanI18n.t === 'function')
+            ? window.CocoScanI18n.t('navigation.profile_logout_confirm', 'Are you sure you want to log out of CocoScan?')
+            : 'Are you sure you want to log out of CocoScan?';
+        if (!confirm(msg)) {
+            if (e) e.preventDefault();
+            return false;
+        }
+        return true;
+    }
+
+    function refreshFarmerData(btn) {
+        if (btn) {
+            const icon = btn.querySelector('i');
+            if (icon) icon.classList.add('fa-spin');
+        }
+        setTimeout(() => {
+            window.location.reload();
+        }, 250);
+    }
+
+    function updateDraftsBadgeCount() {
+        try {
+            if (window.CocoScanOfflineDB && typeof window.CocoScanOfflineDB.getAllDrafts === 'function') {
+                window.CocoScanOfflineDB.getAllDrafts().then(drafts => {
+                    const count = Array.isArray(drafts) ? drafts.length : 0;
+                    applyDraftsCount(count);
+                }).catch(() => checkLocalStorageDrafts());
+            } else {
+                checkLocalStorageDrafts();
+            }
+        } catch (e) {
+            checkLocalStorageDrafts();
+        }
+    }
+
+    function checkLocalStorageDrafts() {
+        try {
+            const raw = localStorage.getItem('cocoscan_offline_drafts') || localStorage.getItem('cocoscan_drafts');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                const count = Array.isArray(parsed) ? parsed.length : 0;
+                applyDraftsCount(count);
+            } else {
+                applyDraftsCount(0);
+            }
+        } catch(e) {
+            applyDraftsCount(0);
+        }
+    }
+
+    function applyDraftsCount(count) {
+        const badge = document.getElementById('bottom-nav-drafts-count');
+        const modalCount = document.getElementById('modal-drafts-count');
+        if (badge) {
+            if (count > 0) {
+                badge.textContent = count > 99 ? '99+' : count;
+                badge.style.display = 'inline-flex';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+        if (modalCount) {
+            modalCount.textContent = count;
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeFarmerProfileModal();
+    });
+
+    document.addEventListener('DOMContentLoaded', updateDraftsBadgeCount);
+    window.addEventListener('storage', updateDraftsBadgeCount);
+</script>

@@ -189,3 +189,68 @@ def test_farmer_submit_report_with_manual_location(client, monkeypatch):
     assert res_json.get('success') is True
 
 
+def test_farmer_bottom_navigation_bar_presence(client):
+    """Farmer views must render the persistent bottom navigation bar with all core routes and profile sheet."""
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'farmer-test-123'
+        sess['user_role'] = 'farmer'
+        sess['user_name'] = 'Farmer Juan'
+        sess['user_email'] = 'juan@cocoscan.org'
+
+    farmer_routes = ['/farmer/dashboard', '/farmer/scan', '/farmer/drafts', '/farmer/reports']
+    for route in farmer_routes:
+        resp = client.get(route)
+        assert resp.status_code == 200, f"Route {route} returned status {resp.status_code}"
+        html = resp.get_data(as_text=True)
+
+        # Persistent bottom bar container (4 primary routes, uncluttered)
+        assert 'farmer-bottom-nav' in html, f"Missing farmer-bottom-nav in {route}"
+        assert 'bottom-nav-dashboard' in html, f"Missing bottom-nav-dashboard in {route}"
+        assert 'bottom-nav-scan' in html, f"Missing bottom-nav-scan in {route}"
+        assert 'bottom-nav-drafts' in html, f"Missing bottom-nav-drafts in {route}"
+        assert 'bottom-nav-reports' in html, f"Missing bottom-nav-reports in {route}"
+        assert 'bottom-nav-profile' not in html, f"Redundant bottom-nav-profile found in {route}"
+
+        # Header profile button & language toggle
+        assert 'header-profile-btn' in html, f"Missing header-profile-btn in {route}"
+        assert 'lang-toggle-btn' in html, f"Missing lang-toggle-btn in {route}"
+
+        # Dedicated profile modal sheet
+        assert 'farmer-profile-modal' in html, f"Missing farmer-profile-modal in {route}"
+        assert 'openFarmerProfileModal()' in html, f"Missing openFarmerProfileModal trigger in {route}"
+        assert 'closeFarmerProfileModal()' in html, f"Missing closeFarmerProfileModal trigger in {route}"
+        assert '/logout' in html, f"Missing logout link in {route}"
+
+
+def test_farmer_no_sidebar_or_hamburger(client):
+    """Farmer viewports must not contain hamburger button element or slide-out sidebar drawer."""
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'a0000000-0000-0000-0000-000000000001'
+        sess['user_role'] = 'farmer'
+        sess['user_name'] = 'Farmer Juan'
+
+    farmer_routes = ['/farmer/dashboard', '/farmer/scan', '/farmer/drafts', '/farmer/reports']
+    for route in farmer_routes:
+        resp = client.get(route)
+        assert resp.status_code == 200
+        html = resp.get_data(as_text=True)
+        assert '<button class="hamburger-btn"' not in html, f"Found obsolete hamburger-btn element in {route}"
+        assert '<aside class="sidebar-wrapper"' not in html, f"Found obsolete sidebar-wrapper element in {route}"
+
+
+def test_non_farmer_retains_sidebar(client):
+    """Non-farmer views (such as Agriculturist) must retain their sidebar and hamburger navigation."""
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'a0000000-0000-0000-0000-000000000002'
+        sess['user_role'] = 'agriculturist'
+        sess['user_name'] = 'Dr. Green'
+
+    resp = client.get('/agriculturist/analytics')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '<button class="hamburger-btn"' in html
+    assert '<aside class="sidebar-wrapper"' in html
+    assert 'farmer-bottom-nav' not in html
+
+
+

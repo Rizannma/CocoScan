@@ -845,15 +845,12 @@ def send_status_email(user_email, user_name, status):
                     <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 560px; background-color: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);">
                         <!-- Header Section -->
                         <tr>
-                            <td align="center" style="padding: 36px 36px 24px 36px; background-color: #ffffff; border-bottom: 1px solid #f1f5f9;">
-                                <table border="0" cellpadding="0" cellspacing="0">
+                            <td align="center" style="padding: 36px 36px 24px 36px; background-color: #ffffff; border-bottom: 1px solid #f1f5f9; text-align: center;">
+                                <table border="0" cellpadding="0" cellspacing="0" role="presentation" align="center" style="margin: 0 auto; text-align: center;">
                                     <tr>
-                                        <td style="padding-right: 12px; vertical-align: middle;">
-                                            {cocoscan_logo_svg}
-                                        </td>
-                                        <td style="vertical-align: middle; text-align: left;">
-                                            <span style="font-size: 22px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; display: block;">CocoScan</span>
-                                            <span style="font-size: 11px; font-weight: 700; color: {status_color}; letter-spacing: 1.5px; text-transform: uppercase;">{status_title}</span>
+                                        <td align="center" style="text-align: center;">
+                                            <div style="font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px; text-align: center; margin: 0 0 4px 0; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">CocoScan</div>
+                                            <div style="font-size: 11px; font-weight: 700; color: {status_color}; letter-spacing: 1.5px; text-transform: uppercase; text-align: center; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">{status_title}</div>
                                         </td>
                                     </tr>
                                 </table>

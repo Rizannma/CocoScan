@@ -918,6 +918,7 @@
 <body>
 
     {% set role_str = ((session.get('user_role', '') if session is defined and session else '') ~ ' ' ~ (user_role if user_role is defined and user_role else '') ~ ' ' ~ (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
+    {% set is_farmer_role = 'farmer' in role_str or (not session.get('user_role') and not user_role and not sidebar_role) %}
     {% if 'lgu' in role_str or 'admin' in role_str %}
     {% block mobile_restriction_overlay %}{% endblock %}
     {% endif %}
@@ -940,20 +941,27 @@
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
-                {% if session.get('user_role') == 'farmer' or not session.get('user_role') %}
                 <button type="button" class="lang-toggle-btn" onclick="toggleLanguagePreference()" title="{{ t('navigation.lang_preference', 'Language' if current_lang != 'tl' else 'Wika') }}" aria-label="Toggle Language">
                     <i class="fa-solid fa-globe" style="font-size: 0.78rem; color: var(--brand-accent);"></i>
                     <span class="lang-en {% if current_lang != 'tl' %}active-lang{% endif %}">EN</span>
                     <span style="opacity: 0.4;">|</span>
                     <span class="lang-tl {% if current_lang == 'tl' %}active-lang{% endif %}">TL</span>
                 </button>
-                {% endif %}
+                {% if not is_farmer_role %}
                 <button class="hamburger-btn" onclick="toggleSidebarMenu()" aria-label="Toggle Navigation Menu">
                     <i class="fa-solid fa-bars" id="toggleIcon"></i>
                 </button>
+                {% else %}
+                <button type="button" class="header-profile-btn" onclick="openFarmerProfileModal()" title="{{ t('navigation.profile_modal_title', 'Farmer Profile & Settings') }}" aria-label="Open Profile and Settings">
+                    <div class="header-avatar-circle">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                </button>
+                {% endif %}
             </div>
         </header>
 
+        {% if not is_farmer_role %}
         <div class="sidebar-backdrop" id="backdrop" onclick="toggleSidebarMenu()"></div>
 
         <aside class="sidebar-wrapper" id="sidebar">
@@ -962,17 +970,6 @@
             </div>
 
             <div class="sidebar-bottom-group">
-                {% if session.get('user_role') == 'farmer' or not session.get('user_role') %}
-                <div class="sidebar-lang-container">
-                    <span style="font-size: 0.75rem; color: rgba(255,255,255,0.6); font-weight: 600;" data-i18n="navigation.lang_preference">{{ t('navigation.lang_preference', 'Language' if current_lang != 'tl' else 'Wika') }}</span>
-                    <button type="button" class="lang-toggle-btn" onclick="toggleLanguagePreference()" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color:#fff; border-radius: 16px; padding: 4px 10px; font-size: 0.72rem; cursor: pointer;">
-                        <span class="lang-en {% if current_lang != 'tl' %}active-lang{% endif %}">EN</span>
-                        <span style="opacity: 0.4;">|</span>
-                        <span class="lang-tl {% if current_lang == 'tl' %}active-lang{% endif %}">TL</span>
-                    </button>
-                </div>
-                {% endif %}
-
                 <div class="sidebar-user-footer">
                     <div class="user-meta-box">
                         <div class="user-avatar-circle"><i class="fa-solid fa-user"
@@ -986,6 +983,9 @@
                 </div>
             </div>
         </aside>
+        {% else %}
+        {% include 'components/farmer_bottom_nav.html' %}
+        {% endif %}
 
         <!-- Main Workspace Area -->
         <main class="main-content-layout">
