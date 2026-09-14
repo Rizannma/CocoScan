@@ -17,6 +17,21 @@ class MapUtilsTests(unittest.TestCase):
         self.assertEqual(filtered[0]["barangay"], "San Rafael")
         self.assertEqual(filtered[1]["barangay"], "Lumbangan")
 
+    def test_filter_map_reports_matches_severity(self):
+        reports = [
+            {"barangay": "San Rafael", "municipality": "San Pablo", "province": "Laguna", "pest_type": "Rhinoceros Beetle", "severity": "Severe"},
+            {"barangay": "Bautista", "municipality": "Calauan", "province": "Laguna", "pest_type": "Brontispa", "severity": "Mild"},
+            {"barangay": "Lumbangan", "municipality": "San Pablo", "province": "Laguna", "pest_type": "Unknown Pest", "damage_severity": "Moderate"},
+        ]
+
+        filtered = filter_map_reports(reports, severity_filter="severe")
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0]["barangay"], "San Rafael")
+
+        filtered_mod = filter_map_reports(reports, severity_filter="moderate")
+        self.assertEqual(len(filtered_mod), 1)
+        self.assertEqual(filtered_mod[0]["barangay"], "Lumbangan")
+
     def test_limit_recent_records_returns_only_five_entries(self):
         reports = [{"id": i} for i in range(1, 8)]
 
@@ -24,3 +39,4 @@ class MapUtilsTests(unittest.TestCase):
 
         self.assertEqual(len(limited), 5)
         self.assertEqual([item["id"] for item in limited], [1, 2, 3, 4, 5])
+

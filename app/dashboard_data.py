@@ -19,8 +19,49 @@ def _parse_datetime(value: Any) -> datetime | None:
         return None
 
 
+def normalize_severity(sev: Any, pest_type: Any = "") -> str:
+    """Normalize severity string to Mild, Moderate, or Severe with consistent pest fallbacks."""
+    s = str(sev or "").strip().capitalize()
+    if s in ("Mild", "Moderate", "Severe"):
+        return s
+    pest_lower = str(pest_type or "").strip().lower()
+    if "healthy" in pest_lower:
+        return "Mild"
+    return "Moderate"
+
+
 def build_dashboard_chart_payload(reports: list[Mapping[str, Any]], group_by_day: bool = False) -> dict[str, Any]:
-    """Build chart-friendly trend and distribution data from real reports."""
+    """Build chart-friendly trend, distribution, and severity breakdown data from real reports."""
+    empty_severity = {
+        "combined": {
+            "Mild": 0,
+            "Moderate": 0,
+            "Severe": 0,
+            "total": 0,
+            "labels": ["Mild", "Moderate", "Severe"],
+            "data": [0, 0, 0],
+            "colors": ["#22c55e", "#f59e0b", "#ef4444"],
+        },
+        "brontispa": {
+            "Mild": 0,
+            "Moderate": 0,
+            "Severe": 0,
+            "total": 0,
+            "labels": ["Mild", "Moderate", "Severe"],
+            "data": [0, 0, 0],
+            "colors": ["#22c55e", "#f59e0b", "#ef4444"],
+        },
+        "rhinoceros_beetle": {
+            "Mild": 0,
+            "Moderate": 0,
+            "Severe": 0,
+            "total": 0,
+            "labels": ["Mild", "Moderate", "Severe"],
+            "data": [0, 0, 0],
+            "colors": ["#22c55e", "#f59e0b", "#ef4444"],
+        },
+    }
+
     if not reports:
         return {
             "trend_labels": ["No data"],
@@ -38,25 +79,75 @@ def build_dashboard_chart_payload(reports: list[Mapping[str, Any]], group_by_day
             ],
             "distribution_labels": ["No reports yet"],
             "distribution_data": [0],
+            "severity_breakdown": empty_severity,
         }
 
     monthly_counts: dict[str, Counter[str]] = defaultdict(Counter)
     pest_counter: Counter[str] = Counter()
+    total_sev_counter: Counter[str] = Counter({"Mild": 0, "Moderate": 0, "Severe": 0})
+    brontispa_sev_counter: Counter[str] = Counter({"Mild": 0, "Moderate": 0, "Severe": 0})
+    rhino_sev_counter: Counter[str] = Counter({"Mild": 0, "Moderate": 0, "Severe": 0})
 
     for report in reports:
         created_at = report.get("created_at") or report.get("submitted_at") or report.get("photo_taken_at")
         dt = _parse_datetime(created_at)
-        if not dt:
-            continue
-
-        if group_by_day:
-            time_key = dt.strftime("%b %d")
-        else:
-            time_key = dt.strftime("%b")
-            
+        
         pest_name = str(report.get("pest_type") or "Unknown Pest").strip() or "Unknown Pest"
-        monthly_counts[time_key][pest_name] += 1
+        pest_lower = pest_name.lower()
+
+        # Normalize severity consistently
+        raw_sev = report.get("damage_severity") or report.get("severity")
+        normalized_sev = normalize_severity(raw_sev, pest_name)
+
+        total_sev_counter[normalized_sev] += 1
+
+        if "brontispa" in pest_lower:
+            brontispa_sev_counter[normalized_sev] += 1
+        elif "rhino" in pest_lower or "beetle" in pest_lower:
+            rhino_sev_counter[normalized_sev] += 1
+
+        if dt:
+            if group_by_day:
+                time_key = dt.strftime("%b %d")
+            else:
+                time_key = dt.strftime("%b")
+            monthly_counts[time_key][pest_name] += 1
+
         pest_counter[pest_name] += 1
+
+    combined_total = sum(total_sev_counter.values())
+    brontispa_total = sum(brontispa_sev_counter.values())
+    rhino_total = sum(rhino_sev_counter.values())
+
+    severity_breakdown = {
+        "combined": {
+            "Mild": total_sev_counter["Mild"],
+            "Moderate": total_sev_counter["Moderate"],
+            "Severe": total_sev_counter["Severe"],
+            "total": combined_total,
+            "labels": ["Mild", "Moderate", "Severe"],
+            "data": [total_sev_counter["Mild"], total_sev_counter["Moderate"], total_sev_counter["Severe"]],
+            "colors": ["#22c55e", "#f59e0b", "#ef4444"],
+        },
+        "brontispa": {
+            "Mild": brontispa_sev_counter["Mild"],
+            "Moderate": brontispa_sev_counter["Moderate"],
+            "Severe": brontispa_sev_counter["Severe"],
+            "total": brontispa_total,
+            "labels": ["Mild", "Moderate", "Severe"],
+            "data": [brontispa_sev_counter["Mild"], brontispa_sev_counter["Moderate"], brontispa_sev_counter["Severe"]],
+            "colors": ["#22c55e", "#f59e0b", "#ef4444"],
+        },
+        "rhinoceros_beetle": {
+            "Mild": rhino_sev_counter["Mild"],
+            "Moderate": rhino_sev_counter["Moderate"],
+            "Severe": rhino_sev_counter["Severe"],
+            "total": rhino_total,
+            "labels": ["Mild", "Moderate", "Severe"],
+            "data": [rhino_sev_counter["Mild"], rhino_sev_counter["Moderate"], rhino_sev_counter["Severe"]],
+            "colors": ["#22c55e", "#f59e0b", "#ef4444"],
+        },
+    }
 
     if not monthly_counts:
         return {
@@ -75,6 +166,7 @@ def build_dashboard_chart_payload(reports: list[Mapping[str, Any]], group_by_day
             ],
             "distribution_labels": ["No reports yet"],
             "distribution_data": [0],
+            "severity_breakdown": severity_breakdown,
         }
 
     if group_by_day:
@@ -121,4 +213,5 @@ def build_dashboard_chart_payload(reports: list[Mapping[str, Any]], group_by_day
         "trend_datasets": trend_datasets,
         "distribution_labels": distribution_labels,
         "distribution_data": distribution_data,
+        "severity_breakdown": severity_breakdown,
     }

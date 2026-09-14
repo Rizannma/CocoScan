@@ -640,6 +640,19 @@
             width: 100%;
         }
 
+        .charts-breakdown-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            width: 100%;
+        }
+
+        @media (max-width: 900px) {
+            .charts-breakdown-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
         .chart-header-inline {
             font-size: 0.85rem;
             font-weight: 700;
@@ -1275,7 +1288,128 @@
                         cutout: '65%'
                     }
                 });
+                window.chartInstances.push(distributionChart);
             }
+
+            function initSeverityBreakdownChart() {
+                const el = document.getElementById('severityBreakdownChart');
+                if (!el) return;
+                try {
+                    const existing = Chart.getChart(el);
+                    if (existing) existing.destroy();
+                } catch (e) {
+                    console.debug('No existing severity breakdown chart to destroy', e);
+                }
+                const ctx = el.getContext('2d');
+                const sevData = chartPayload?.severity_breakdown?.combined || {
+                    Mild: (Number(chartPayload?.severity_breakdown?.brontispa?.Mild) || 0) + (Number(chartPayload?.severity_breakdown?.rhinoceros_beetle?.Mild) || 0),
+                    Moderate: (Number(chartPayload?.severity_breakdown?.brontispa?.Moderate) || 0) + (Number(chartPayload?.severity_breakdown?.rhinoceros_beetle?.Moderate) || 0),
+                    Severe: (Number(chartPayload?.severity_breakdown?.brontispa?.Severe) || 0) + (Number(chartPayload?.severity_breakdown?.rhinoceros_beetle?.Severe) || 0)
+                };
+                const mildCount = Number(sevData?.Mild) || 0;
+                const modCount = Number(sevData?.Moderate) || 0;
+                const sevCount = Number(sevData?.Severe) || 0;
+                const total = mildCount + modCount + sevCount;
+                const hasData = total > 0;
+
+                const chart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: hasData ? ['Mild', 'Moderate', 'Severe'] : ['No reports yet'],
+                        datasets: [{
+                            data: hasData ? [mildCount, modCount, sevCount] : [1],
+                            backgroundColor: hasData ? ['#22c55e', '#f59e0b', '#ef4444'] : ['#e2e8f0'],
+                            borderWidth: hasData ? 3 : 1,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    font: { size: 10, weight: '600' }
+                                }
+                            },
+                            tooltip: {
+                                enabled: hasData,
+                                callbacks: {
+                                    label: function (context) {
+                                        const val = context.parsed;
+                                        const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                        return ` ${context.label}: ${val} (${pct}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+                window.chartInstances.push(chart);
+            }
+
+            function initSeverityDoughnut(canvasId, pestKey) {
+                const el = document.getElementById(canvasId);
+                if (!el) return;
+                try {
+                    const existing = Chart.getChart(el);
+                    if (existing) existing.destroy();
+                } catch (e) {
+                    console.debug('No existing severity chart to destroy', e);
+                }
+                const ctx = el.getContext('2d');
+                const sevData = chartPayload?.severity_breakdown?.[pestKey];
+                const mildCount = Number(sevData?.Mild) || 0;
+                const modCount = Number(sevData?.Moderate) || 0;
+                const sevCount = Number(sevData?.Severe) || 0;
+                const total = mildCount + modCount + sevCount;
+                const hasData = total > 0;
+
+                const chart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: hasData ? ['Mild', 'Moderate', 'Severe'] : ['No reports yet'],
+                        datasets: [{
+                            data: hasData ? [mildCount, modCount, sevCount] : [1],
+                            backgroundColor: hasData ? ['#22c55e', '#f59e0b', '#ef4444'] : ['#e2e8f0'],
+                            borderWidth: hasData ? 3 : 1,
+                            borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    font: { size: 10, weight: '600' }
+                                }
+                            },
+                            tooltip: {
+                                enabled: hasData,
+                                callbacks: {
+                                    label: function (context) {
+                                        const val = context.parsed;
+                                        const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+                                        return ` ${context.label}: ${val} (${pct}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '65%'
+                    }
+                });
+                window.chartInstances.push(chart);
+            }
+
+            initSeverityBreakdownChart();
+            initSeverityDoughnut('brontispaSeverityChart', 'brontispa');
+            initSeverityDoughnut('rhinoSeverityChart', 'rhinoceros_beetle');
         }
     </script>
     <script>

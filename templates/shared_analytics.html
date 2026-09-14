@@ -184,27 +184,63 @@
     }
 
     .charts-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
+        display: flex;
+        flex-direction: column;
         gap: 24px;
+        width: 100%;
     }
 
-    .chart-card {
+    .charts-breakdown-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        width: 100%;
+    }
+
+    @media (max-width: 900px) {
+        .charts-breakdown-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .chart-card,
+    .chart-visual-card {
         background: #fff;
         padding: 20px;
         border-radius: 12px;
         box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+        border: 1px solid #e2e8f0;
     }
 
-    .chart-card.full-width {
-        grid-column: 1 / -1;
+    .chart-card.full-width,
+    .chart-visual-card.full-width,
+    .chart-card-trend {
+        width: 100%;
     }
 
-    .chart-title {
+    .chart-title,
+    .chart-header-inline {
         font-size: 1.1rem;
         font-weight: 700;
         color: #1e293b;
         margin: 0 0 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .chart-header-inline i {
+        color: #164630;
+    }
+
+    .chart-box-render-frame {
+        position: relative;
+        width: 100%;
+        height: 260px;
+    }
+
+    .chart-card-trend .chart-box-render-frame {
+        height: 320px;
     }
 
     .chart-description {

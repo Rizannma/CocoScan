@@ -466,12 +466,51 @@
         color: #b91c1c;
     }
 
+    .main-content-layout {
+        padding-bottom: calc(120px + env(safe-area-inset-bottom, 20px)) !important;
+    }
+
     @media (max-width: 768px) {
         .main-content-layout {
-            padding-bottom: calc(84px + env(safe-area-inset-bottom, 16px)) !important;
+            padding-bottom: calc(112px + env(safe-area-inset-bottom, 16px)) !important;
         }
         #pwa-install-banner {
             bottom: calc(76px + env(safe-area-inset-bottom, 16px)) !important;
+        }
+    }
+
+    @media (min-width: 769px) {
+        .main-content-layout {
+            padding-bottom: calc(128px + env(safe-area-inset-bottom, 20px)) !important;
+        }
+
+        .farmer-profile-modal {
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+
+        .profile-sheet-card {
+            border-radius: 28px;
+            max-width: 480px;
+            padding: 24px 28px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+            animation: modalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .profile-sheet-handle {
+            display: none;
+        }
+    }
+
+    @keyframes modalPopIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: scale(1);
         }
     }
 </style>

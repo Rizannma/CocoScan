@@ -2,10 +2,11 @@ def _normalize_text(value) -> str:
     return str(value or "").strip().lower()
 
 
-def filter_map_reports(reports, search_query="", pest_filter="all"):
-    """Filter map reports by location text and optional pest type."""
+def filter_map_reports(reports, search_query="", pest_filter="all", severity_filter="all"):
+    """Filter map reports by location text, optional pest type, and optional severity level."""
     search_phrase = _normalize_text(search_query)
     pest_filter_value = _normalize_text(pest_filter or "all")
+    severity_filter_value = _normalize_text(severity_filter or "all")
 
     filtered_reports = []
     for report in reports:
@@ -17,11 +18,22 @@ def filter_map_reports(reports, search_query="", pest_filter="all"):
             ]
         ).strip().lower()
         pest_text = _normalize_text(report.get("pest_type"))
+        severity_text = _normalize_text(report.get("severity") or report.get("damage_severity") or "mild")
 
-        matches_search = not search_phrase or search_phrase in location_text or search_phrase in pest_text
+        matches_search = (
+            not search_phrase
+            or search_phrase in location_text
+            or search_phrase in pest_text
+            or search_phrase in severity_text
+        )
         matches_pest = pest_filter_value == "all" or pest_text == pest_filter_value
+        matches_severity = (
+            severity_filter_value == "all"
+            or severity_filter_value in severity_text
+            or severity_text in severity_filter_value
+        )
 
-        if matches_search and matches_pest:
+        if matches_search and matches_pest and matches_severity:
             filtered_reports.append(report)
 
     return filtered_reports

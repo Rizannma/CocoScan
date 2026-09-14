@@ -441,14 +441,14 @@
                 </div>
                 <h2 data-i18n="drafts.empty_title">{{ t('drafts.empty_title', 'No Saved Drafts') }}</h2>
                 <p data-i18n="drafts.empty_desc">{{ t('drafts.empty_desc', 'You don’t have any draft scans saved yet. Go to Scan Pest page to begin your first report.') }}</p>
+                <a href="{{ url_for('farmer_scan') }}" class="btn-control btn-submit" style="margin-top: 18px; max-width: 220px; text-decoration: none;">
+                    <i class="fa-solid fa-camera"></i> <span data-i18n="drafts.btn_scan_now">{{ t('drafts.btn_scan_now', 'Scan Pest Now') }}</span>
+                </a>
             </div>
 {% endblock %}
 
 {% block extra_scripts %}
-</div>
-
-
-
+<script>
         function spinAndLoadDrafts(btn) {
             const icon = btn.querySelector('i');
             if (icon) {

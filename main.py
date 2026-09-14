@@ -42,9 +42,10 @@ from app.report_storage import (
     resolve_field_notes,
     resolve_report_image_url,
 )
-from app.dashboard_data import build_dashboard_chart_payload
+from app.dashboard_data import build_dashboard_chart_payload, normalize_severity
 from app.model_paths import resolve_model_path
 from app.map_utils import filter_map_reports, limit_recent_records
+from app.recommendations import recommend_actions
 from app.session_utils import (
     RoleBasedSessionInterface,
     INACTIVITY_TIMEOUT_SECONDS,
@@ -2567,6 +2568,32 @@ def report_summary():
 
         dashboard_payload = build_dashboard_chart_payload(reports, group_by_day=bool(month_str))
 
+        # Compute dynamic PCA recommendations for detected pests based on period severity
+        period_recommendations = []
+        if rhino_count > 0:
+            rhino_sevs = [normalize_severity(r.get('damage_severity') or r.get('severity'), r.get('pest_type')) for r in pest_reports if 'rhino' in str(r.get('pest_type') or '').lower() or 'beetle' in str(r.get('pest_type') or '').lower()]
+            rhino_top_sev = 'Severe' if 'Severe' in rhino_sevs else ('Moderate' if 'Moderate' in rhino_sevs else 'Mild')
+            rhino_reco = recommend_actions(pest='Rhinoceros Beetle', severity=rhino_top_sev)
+            period_recommendations.append({
+                'pest': 'Rhinoceros Beetle',
+                'severity': rhino_top_sev,
+                'risk_level': rhino_reco.get('risk', 'Medium'),
+                'urgency': rhino_reco.get('urgency', 'Medium'),
+                'actions': rhino_reco.get('recommendation', []) or rhino_reco.get('recommendations', [])
+            })
+
+        if brontispa_count > 0:
+            brontispa_sevs = [normalize_severity(r.get('damage_severity') or r.get('severity'), r.get('pest_type')) for r in pest_reports if 'brontispa' in str(r.get('pest_type') or '').lower()]
+            brontispa_top_sev = 'Severe' if 'Severe' in brontispa_sevs else ('Moderate' if 'Moderate' in brontispa_sevs else 'Mild')
+            brontispa_reco = recommend_actions(pest='Brontispa', severity=brontispa_top_sev)
+            period_recommendations.append({
+                'pest': 'Brontispa',
+                'severity': brontispa_top_sev,
+                'risk_level': brontispa_reco.get('risk', 'Medium'),
+                'urgency': brontispa_reco.get('urgency', 'Medium'),
+                'actions': brontispa_reco.get('recommendation', []) or brontispa_reco.get('recommendations', [])
+            })
+
         data = {
             'explanation': explanation,
             'generated_at': generated_at,
@@ -2579,7 +2606,8 @@ def report_summary():
             'resolved_count': resolved_count,
             'in_progress_count': in_progress_count,
             'locations': locations,
-            'dashboard_payload': dashboard_payload
+            'dashboard_payload': dashboard_payload,
+            'recommendations': period_recommendations
         }
 
         return render_template('report_summary.html', data=data)
@@ -2763,6 +2791,8 @@ def render_map_view(required_role):
             record["latitude"] = lat
             record["longitude"] = lng
             record["pest_type"] = item.get("pest_type") or "Unknown Pest"
+            record["severity"] = normalize_severity(item.get("damage_severity") or item.get("severity"), item.get("pest_type"))
+            record["damage_severity"] = record["severity"]
             record["status"] = normalize_report_status(item.get("status"), default="Under Review")
             record["supporting_images"] = supporting_map.get(str(item.get("id")), [])
             record["additional_images"] = supporting_map.get(str(item.get("id")), [])
@@ -2829,7 +2859,7 @@ def agri_schedules():
             rep_id = s.get('report_id')
             rep_info = {}
             if rep_id:
-                rep_resp = supabase.table('reports').select('pest_type, barangay, municipality, status, user_id, latitude, longitude').eq('id', rep_id).execute()
+                rep_resp = supabase.table('reports').select('*').eq('id', rep_id).execute()
                 if getattr(rep_resp, 'data', None) and len(rep_resp.data) > 0:
                     rep_info = rep_resp.data[0]
             
@@ -2849,6 +2879,7 @@ def agri_schedules():
             raw_status = rep_info.get('status') or s.get('status') or 'visit_scheduled'
             normalized_status = normalize_report_status(raw_status, default="Visit Scheduled")
             badge_style = _get_status_badge_style(raw_status)
+            severity = normalize_severity(rep_info.get('damage_severity') or rep_info.get('severity'), rep_info.get('pest_type'))
                 
             enriched_schedules.append({
                 "id": s.get('id'),
@@ -2858,6 +2889,7 @@ def agri_schedules():
                 "end_time": s.get('end_time'),
                 "formatted_time": formatted_time,
                 "pest_type": rep_info.get('pest_type') or 'Pest Scan',
+                "severity": severity,
                 "barangay": rep_info.get('barangay') or '',
                 "municipality": rep_info.get('municipality') or '',
                 "location": _format_report_location(rep_info) if rep_info else "Unknown Location",

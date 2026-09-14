@@ -434,12 +434,35 @@
             transform: translateY(-1px);
         }
 
-        /* --- FILTERS CHIPS ROW --- */
+        /* --- GROUPED FILTERS CONTAINER & CHIPS ROW --- */
+        .map-filters-container {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #0b251a;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            min-width: 85px;
+        }
+
         .filter-chips-scrollrow {
             display: flex;
-            gap: 10px;
+            gap: 8px;
             overflow-x: auto;
-            padding-bottom: 4px;
+            padding-bottom: 2px;
             scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
         }
@@ -449,13 +472,13 @@
         }
 
         .chip-filter-btn {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border-light);
+            background-color: var(--bg-card, #ffffff);
+            color: var(--text-muted, #64748b);
+            border: 1px solid var(--border-light, #e2e8f0);
             padding: 8px 16px;
             border-radius: 20px;
             font-size: 0.85rem;
             font-weight: 500;
-            color: var(--text-muted);
             cursor: pointer;
             white-space: nowrap;
             display: inline-flex;
@@ -474,6 +497,63 @@
             color: #ffffff;
             border-color: #1a4d32;
             box-shadow: 0 2px 6px rgba(26, 77, 50, 0.2);
+        }
+
+        .filter-dropdown .dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            text-align: left;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: #334155;
+            border-radius: 6px;
+            transition: background-color 0.15s;
+        }
+
+        .filter-dropdown .dropdown-item:hover {
+            background-color: #f1f5f9;
+            color: #0f172a;
+        }
+
+        .filter-dropdown .dropdown-item.selected {
+            background-color: #ecfdf5;
+            color: #065f46;
+            font-weight: 700;
+        }
+
+        .sched-severity-pill {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 0.65rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .data-table-row span.sched-severity-pill.mild,
+        .sched-severity-pill.mild {
+            background: #ecfdf5 !important;
+            color: #15803d !important;
+            border: 1px solid #86efac !important;
+        }
+
+        .data-table-row span.sched-severity-pill.moderate,
+        .sched-severity-pill.moderate {
+            background: #fffbeb !important;
+            color: #d97706 !important;
+            border: 1px solid #fde68a !important;
+        }
+
+        .data-table-row span.sched-severity-pill.severe,
+        .sched-severity-pill.severe {
+            background: #fef2f2 !important;
+            color: #dc2626 !important;
+            border: 1px solid #fca5a5 !important;
         }
 
         /* ==========================================================================
@@ -789,25 +869,46 @@
                 </button>
             </div>
 
-            <div class="filter-chips-scrollrow">
-                <button class="chip-filter-btn active-chip" data-pest="all" id="chip-count-label">All (0)</button>
-                <button class="chip-filter-btn" data-pest="Rhinoceros Beetle">Rhinoceros Beetle</button>
-                <button class="chip-filter-btn" data-pest="Brontispa">Brontispa</button>
+            <!-- FILTER CONTROLS ROW -->
+            <div class="filter-buttons-row"
+                style="display:flex; gap:8px; align-items:center; width:100%; position:relative; z-index:70; flex-wrap:wrap; margin-bottom: 12px;">
+                <div class="filter-button-group" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <button id="filter-all-btn" class="chip-filter-btn active-chip">All (0)</button>
+                    <button id="filter-pest-btn" class="chip-filter-btn">Pest ▾</button>
+                    <button id="filter-severity-btn" class="chip-filter-btn">Severity ▾</button>
+                </div>
+            </div>
+            <div id="pest-dropdown" class="filter-dropdown"
+                style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
+                <div class="filter-dropdown-panel"
+                    style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:200px; max-height:240px; overflow:auto; pointer-events:auto;">
+                </div>
+            </div>
+            <div id="severity-dropdown" class="filter-dropdown"
+                style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
+                <div class="filter-dropdown-panel"
+                    style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:200px; max-height:240px; overflow:auto; pointer-events:auto;">
+                </div>
             </div>
 
             <!-- GEOSPATIAL MAP HOUSING -->
             <section class="map-card-container">
                 <div id="map-canvas" class="map-viewport-frame"></div>
 
-                <!-- Color-mapped Pest Identification Legend Elements replacing Severity colors -->
+                <!-- Severity Identification Legend Elements -->
                 <div class="map-legend-row">
+                    <span style="font-size:0.75rem; font-weight:700; color:#64748b; margin-right:4px;">Severity:</span>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background-color: var(--color-rhinoceros);"></div>
-                        <span>Rhinoceros Beetle</span>
+                        <div class="legend-dot" style="background-color: #22c55e;"></div>
+                        <span>Mild</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background-color: var(--color-brontispa);"></div>
-                        <span>Brontispa</span>
+                        <div class="legend-dot" style="background-color: #f59e0b;"></div>
+                        <span>Moderate</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background-color: #ef4444;"></div>
+                        <span>Severe</span>
                     </div>
                 </div>
             </section>
@@ -843,7 +944,6 @@
 {% block extra_scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
-</div>
 
     <!-- ==========================================================================
         CORE CORE DATA INTERACTION & MAP LIFECYCLE SCRIPTS
@@ -869,6 +969,7 @@
         let mapInstance = null;
         let markersLayerGroup = null;
         let activePestFilter = "all";
+        let activeSeverityFilter = "all";
         let searchPhrase = "";
         let mapSearchTimeout = null;
         let lastZoomedSearchPhrase = null;
@@ -884,11 +985,20 @@
 
         function getCurrentFilteredRecords() {
             return geoReportsDataset.filter(item => {
-                const locationString = `${item.barangay} ${item.municipality} ${item.province}`.toLowerCase();
+                const locationString = `${item.barangay || ''} ${item.municipality || ''} ${item.province || ''}`.toLowerCase();
                 const pestString = String(item.pest_type || "").toLowerCase();
-                const matchesSearch = !searchPhrase || locationString.includes(searchPhrase) || pestString.includes(searchPhrase);
+                const sevDetail = getSeverityDetails(item.severity || item.damage_severity, item.pest_type);
+                const sevString = sevDetail.label.toLowerCase();
+                
+                const matchesSearch = !searchPhrase || locationString.includes(searchPhrase) || pestString.includes(searchPhrase) || sevString.includes(searchPhrase);
                 const matchesPest = (activePestFilter === "all" || item.pest_type === activePestFilter);
-                return matchesSearch && matchesPest;
+                
+                let matchesSeverity = true;
+                if (activeSeverityFilter !== "all") {
+                    matchesSeverity = (sevString === activeSeverityFilter.toLowerCase());
+                }
+                
+                return matchesSearch && matchesPest && matchesSeverity;
             });
         }
 
@@ -1013,6 +1123,7 @@
                 searchBar.addEventListener("input", (e) => {
                     searchPhrase = e.target.value.toLowerCase().trim();
                     syncUrlSearchParameter();
+                    updateFilterButtonsUI();
                     evaluateClearFilterButtonState();
                     renderMapDashboardComponents();
                     triggerMapViewportUpdate(searchPhrase, getCurrentFilteredRecords(), false);
@@ -1024,6 +1135,7 @@
                         searchBar.blur();
                         searchPhrase = searchBar.value.toLowerCase().trim();
                         syncUrlSearchParameter();
+                        updateFilterButtonsUI();
                         evaluateClearFilterButtonState();
                         renderMapDashboardComponents();
                         triggerMapViewportUpdate(searchPhrase, getCurrentFilteredRecords(), true);
@@ -1031,21 +1143,121 @@
                 });
             }
 
-            document.querySelectorAll(".chip-filter-btn").forEach(chip => {
-                chip.addEventListener("click", (e) => {
-                    document.querySelectorAll(".chip-filter-btn").forEach(c => c.classList.remove("active-chip"));
-                    e.target.classList.add("active-chip");
-                    activePestFilter = e.target.getAttribute("data-pest");
+            const allBtn = document.getElementById("filter-all-btn");
+            if (allBtn) {
+                allBtn.addEventListener("click", () => {
+                    clearAllActiveFilters();
+                });
+            }
+
+            // Build Pest Dropdown
+            const pestBtn = document.getElementById("filter-pest-btn");
+            const pestPanel = document.querySelector("#pest-dropdown .filter-dropdown-panel");
+            const pestOptions = [
+                { value: "all", label: "All Pests" },
+                { value: "Rhinoceros Beetle", label: "Rhinoceros Beetle" },
+                { value: "Brontispa", label: "Brontispa" }
+            ];
+            if (pestBtn && pestPanel) {
+                let pestHtml = "";
+                pestOptions.forEach(p => {
+                    pestHtml += `<button type="button" class="dropdown-item ${activePestFilter === p.value ? 'selected' : ''}" data-value="${p.value}">${p.label}</button>`;
+                });
+                pestPanel.innerHTML = pestHtml;
+
+                pestBtn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    const rect = pestBtn.getBoundingClientRect();
+                    pestPanel.style.top = `${rect.bottom + 6}px`;
+                    pestPanel.style.left = `${rect.left}px`;
+                    const isVisible = pestPanel.style.display === "block";
+                    document.querySelectorAll(".filter-dropdown-panel").forEach(p => p.style.display = "none");
+                    pestPanel.style.display = isVisible ? "none" : "block";
+                });
+
+                pestPanel.addEventListener("click", function (e) {
+                    const item = e.target.closest(".dropdown-item");
+                    if (!item) return;
+                    activePestFilter = item.getAttribute("data-value");
+                    pestPanel.style.display = "none";
+                    pestPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activePestFilter));
+                    updateFilterButtonsUI();
                     evaluateClearFilterButtonState();
                     renderMapDashboardComponents();
                 });
+            }
+
+            // Build Severity Dropdown
+            const sevBtn = document.getElementById("filter-severity-btn");
+            const sevPanel = document.querySelector("#severity-dropdown .filter-dropdown-panel");
+            const sevOptions = [
+                { value: "all", label: "All Severities" },
+                { value: "Mild", label: "Mild" },
+                { value: "Moderate", label: "Moderate" },
+                { value: "Severe", label: "Severe" }
+            ];
+            if (sevBtn && sevPanel) {
+                let sevHtml = "";
+                sevOptions.forEach(s => {
+                    sevHtml += `<button type="button" class="dropdown-item ${activeSeverityFilter === s.value ? 'selected' : ''}" data-value="${s.value}">${s.label}</button>`;
+                });
+                sevPanel.innerHTML = sevHtml;
+
+                sevBtn.addEventListener("click", function (e) {
+                    e.stopPropagation();
+                    const rect = sevBtn.getBoundingClientRect();
+                    sevPanel.style.top = `${rect.bottom + 6}px`;
+                    sevPanel.style.left = `${rect.left}px`;
+                    const isVisible = sevPanel.style.display === "block";
+                    document.querySelectorAll(".filter-dropdown-panel").forEach(p => p.style.display = "none");
+                    sevPanel.style.display = isVisible ? "none" : "block";
+                });
+
+                sevPanel.addEventListener("click", function (e) {
+                    const item = e.target.closest(".dropdown-item");
+                    if (!item) return;
+                    activeSeverityFilter = item.getAttribute("data-value");
+                    sevPanel.style.display = "none";
+                    sevPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activeSeverityFilter));
+                    updateFilterButtonsUI();
+                    evaluateClearFilterButtonState();
+                    renderMapDashboardComponents();
+                });
+            }
+
+            document.addEventListener("click", function (e) {
+                if (!e.target.closest(".filter-dropdown") && !e.target.closest(".chip-filter-btn")) {
+                    document.querySelectorAll(".filter-dropdown-panel").forEach(p => p.style.display = "none");
+                }
             });
+
+            updateFilterButtonsUI();
+        }
+
+        function updateFilterButtonsUI() {
+            const allBtn = document.getElementById("filter-all-btn");
+            const pestBtn = document.getElementById("filter-pest-btn");
+            const sevBtn = document.getElementById("filter-severity-btn");
+
+            const isAllActive = (activePestFilter === "all" && activeSeverityFilter === "all" && !searchPhrase);
+            if (allBtn) {
+                allBtn.classList.toggle("active-chip", isAllActive);
+                allBtn.textContent = `All (${geoReportsDataset.length})`;
+            }
+            if (pestBtn) {
+                pestBtn.classList.toggle("active-chip", activePestFilter !== "all");
+                pestBtn.textContent = activePestFilter !== "all" ? `${activePestFilter} ▾` : "Pest ▾";
+            }
+            if (sevBtn) {
+                sevBtn.classList.toggle("active-chip", activeSeverityFilter !== "all");
+                sevBtn.textContent = activeSeverityFilter !== "all" ? `${activeSeverityFilter} ▾` : "Severity ▾";
+            }
         }
 
         function evaluateClearFilterButtonState() {
             const clearBtn = document.getElementById("clear-filters-btn");
             if (clearBtn) {
-                if (searchPhrase !== "" || activePestFilter !== "all") {
+                if (searchPhrase !== "" || activePestFilter !== "all" || activeSeverityFilter !== "all") {
                     clearBtn.style.display = "inline-flex";
                 } else {
                     clearBtn.style.display = "none";
@@ -1054,16 +1266,24 @@
         }
 
         function clearAllActiveFilters() {
-            document.getElementById("map-search-input").value = "";
-
-            document.querySelectorAll(".chip-filter-btn").forEach(c => c.classList.remove("active-chip"));
-            const allChip = document.querySelector('.chip-filter-btn[data-pest="all"]');
-            if (allChip) allChip.classList.add("active-chip");
+            const searchInput = document.getElementById("map-search-input");
+            if (searchInput) searchInput.value = "";
 
             searchPhrase = "";
             activePestFilter = "all";
+            activeSeverityFilter = "all";
             lastZoomedSearchPhrase = null;
 
+            const pestPanel = document.querySelector("#pest-dropdown .filter-dropdown-panel");
+            if (pestPanel) {
+                pestPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === "all"));
+            }
+            const sevPanel = document.querySelector("#severity-dropdown .filter-dropdown-panel");
+            if (sevPanel) {
+                sevPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === "all"));
+            }
+
+            updateFilterButtonsUI();
             syncUrlSearchParameter();
             evaluateClearFilterButtonState();
             renderMapDashboardComponents();
@@ -1086,19 +1306,71 @@
             return "#64748b";                                       // Fallback gray
         }
 
+        function getSeverityDetails(sev, pestType) {
+            const s = String(sev || "").toLowerCase().trim();
+            if (s.includes("severe")) {
+                return {
+                    label: "Severe",
+                    class: "severe",
+                    hex: "#ef4444",
+                    bg: "#fef2f2",
+                    color: "#dc2626",
+                    border: "#fca5a5"
+                };
+            }
+            if (s.includes("mod")) {
+                return {
+                    label: "Moderate",
+                    class: "moderate",
+                    hex: "#f59e0b",
+                    bg: "#fffbeb",
+                    color: "#d97706",
+                    border: "#fde68a"
+                };
+            }
+            if (s.includes("mild")) {
+                return {
+                    label: "Mild",
+                    class: "mild",
+                    hex: "#22c55e",
+                    bg: "#ecfdf5",
+                    color: "#15803d",
+                    border: "#86efac"
+                };
+            }
+            if (String(pestType || "").toLowerCase().includes("healthy")) {
+                return {
+                    label: "Mild",
+                    class: "mild",
+                    hex: "#22c55e",
+                    bg: "#ecfdf5",
+                    color: "#15803d",
+                    border: "#86efac"
+                };
+            }
+            return {
+                label: "Moderate",
+                class: "moderate",
+                hex: "#f59e0b",
+                bg: "#fffbeb",
+                color: "#d97706",
+                border: "#fde68a"
+            };
+        }
+
         function renderMapDashboardComponents() {
             // Clean layer arrays prior to rebuild processing loops
             markersLayerGroup.clearLayers();
             const listContainer = document.getElementById("location-list-container");
             if (listContainer) listContainer.innerHTML = "";
 
-            // Filter context validation - search by pest name AND location
+            // Filter context validation - search by pest name, severity, AND location
             let filteredRecords = getCurrentFilteredRecords();
 
             // Update label metrics counter
             const labelCount = document.getElementById("chip-count-label");
             if (labelCount && activePestFilter === "all") {
-                labelCount.textContent = `All (${filteredRecords.length})`;
+                labelCount.textContent = `All Pests (${filteredRecords.length})`;
             }
 
             if (filteredRecords.length === 0) {
@@ -1110,9 +1382,11 @@
 
             // Render all filtered records on map
             filteredRecords.forEach(record => {
-                const markerColor = getPestHexColorCode(record.pest_type);
+                const sevInfo = getSeverityDetails(record.severity || record.damage_severity, record.pest_type);
+                const markerColor = sevInfo.hex;
+                const pestColor = getPestHexColorCode(record.pest_type);
 
-                // Build modern dynamic map pins replacing old system images
+                // Build modern dynamic map pins reflecting severity
                 const dynamicMarkerHtml = `
                     <div class="custom-map-marker-pin" style="background-color: ${markerColor};">
                         <i class="fa-solid fa-location-dot"></i>
@@ -1127,13 +1401,16 @@
 
                 const mapMarker = L.marker([record.latitude, record.longitude], { icon: LeafletCustomIcon });
                 const popupHtml = `
-                    <div style="min-width: 170px; padding: 4px; font-family: inherit;">
-                        <h4 style="margin: 0 0 2px 0; font-size: 0.9rem; color: #0b251a;">${record.barangay}</h4>
+                    <div style="min-width: 175px; padding: 4px; font-family: inherit;">
+                        <h4 style="margin: 0 0 2px 0; font-size: 0.9rem; color: #0b251a; font-weight:700;">${record.barangay}</h4>
                         <p style="margin: 0 0 6px 0; font-size: 0.75rem; color: #64748b;">${record.municipality}, ${record.province}</p>
-                        <div style="font-weight: 700; font-size: 0.78rem; color: ${markerColor}; margin-bottom: 8px;">
+                        <div style="font-weight: 700; font-size: 0.8rem; color: ${pestColor}; margin-bottom: 4px;">
                             ${record.pest_type}
                         </div>
-                        <button class="btn-view-action" style="width: 100%; padding: 6px 12px; font-size: 0.75rem;" onclick="openSpecificReportModal('${record.id}')">
+                        <div style="font-size: 0.8rem; font-weight: 700; color: ${sevInfo.color || sevInfo.hex}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
+                            ${sevInfo.label}
+                        </div>
+                        <button class="btn-view-action" style="width: 100%; padding: 6px 12px; font-size: 0.75rem; margin-top: 0;" onclick="openSpecificReportModal('${record.id}')">
                             <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Specific Report
                         </button>
                     </div>
@@ -1147,16 +1424,19 @@
             const recentRecords = filteredRecords.slice(0, 5);
             if (listContainer && recentRecords.length > 0) {
                 recentRecords.forEach(record => {
-                    const markerColor = getPestHexColorCode(record.pest_type);
+                    const sevInfo = getSeverityDetails(record.severity || record.damage_severity, record.pest_type);
+                    const pestColor = getPestHexColorCode(record.pest_type);
                     const nodeRow = document.createElement("div");
                     nodeRow.className = "location-node-row";
                     nodeRow.innerHTML = `
-                        <div class="location-node-info">
+                        <div class="location-node-info" style="width: 100%;">
                             <h4>${record.barangay}</h4>
                             <p>${record.municipality}, ${record.province}</p>
-                            <p style="font-size:0.7rem; font-weight:600; color:${markerColor}; margin-top:3px;">${record.pest_type}</p>
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
+                                <span style="font-size:0.75rem; font-weight:600; color:${pestColor};">${record.pest_type}</span>
+                                <span class="sched-severity-pill ${sevInfo.class}" style="font-size:0.65rem; padding:2px 8px;">${sevInfo.label}</span>
+                            </div>
                         </div>
-                        <div class="pest-indicator-pill" style="background-color: ${markerColor};"></div>
                     `;
                     nodeRow.onclick = () => {
                         mapInstance.panTo([record.latitude, record.longitude]);
@@ -1181,6 +1461,7 @@
             // Use report_modal.js helper to get the proper display label
             const cleanDisplayStatus = (typeof getWorkflowStatusDisplayLabel === 'function') ? getWorkflowStatusDisplayLabel(record.status) : record.status;
             const isPendingState = ["Pending", "under_review", "ready_to_submit"].includes(record.status);
+            const sevInfo = getSeverityDetails(record.severity || record.damage_severity, record.pest_type);
 
             activeState.innerHTML = `
                 <div style="width:100%;">
@@ -1194,7 +1475,13 @@
                     <div class="detail-data-table">
                         <div class="data-table-row">
                             <span>Detected Pest</span>
-                            <span style="color: ${getPestHexColorCode(record.pest_type)}">${record.pest_type}</span>
+                            <span style="color: ${getPestHexColorCode(record.pest_type)}; font-weight: 700;">${record.pest_type}</span>
+                        </div>
+                        <div class="data-table-row">
+                            <span>Severity Level</span>
+                            <div>
+                                <span class="sched-severity-pill ${sevInfo.class}" style="color:${sevInfo.color} !important; background-color:${sevInfo.bg} !important; border:1px solid ${sevInfo.border} !important;">${sevInfo.label}</span>
+                            </div>
                         </div>
                         <div class="data-table-row">
                             <span>Report Matrix Ref</span>
