@@ -51,7 +51,7 @@ from app.report_storage import (
     resolve_field_notes,
     resolve_report_image_url,
 )
-from app.dashboard_data import build_dashboard_chart_payload, normalize_severity
+from app.dashboard_data import build_dashboard_chart_payload, normalize_severity, normalize_pest_type, _parse_datetime
 from app.model_paths import resolve_model_path
 from app.map_utils import filter_map_reports, limit_recent_records
 from app.recommendations import recommend_actions
@@ -2499,7 +2499,7 @@ def api_analytics():
         }
 
         for r in reports:
-            pest_raw = str(r.get('pest_type') or '').strip().lower()
+            pest_canonical = normalize_pest_type(r.get('pest_type')).lower()
             status = str(r.get('status') or '').strip().lower()
             
             mapped_status = 'in_progress'
@@ -2508,8 +2508,8 @@ def api_analytics():
             elif is_resolved_report_status(status):
                 mapped_status = 'resolved'
                 
-            if pest_raw in status_breakdown:
-                status_breakdown[pest_raw][mapped_status] += 1
+            if pest_canonical in status_breakdown:
+                status_breakdown[pest_canonical][mapped_status] += 1
             status_breakdown['total'][mapped_status] += 1
                 
         # Generate chart payload using existing dashboard logic
@@ -2566,7 +2566,7 @@ def report_summary():
         week_str = request.args.get('week')
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
-        explanation = "This report covers all historical data across all active regions."
+        explanation = ""
         
         if month_str:
             try:
@@ -2614,15 +2614,31 @@ def report_summary():
 
         generated_at = datetime.now().strftime("%B %d, %Y %I:%M %p")
         
-        start_label = start_date_str or 'Beginning'
-        end_label = end_date_str or 'Present'
-        try:
-            if start_date_str:
+        if start_date_str and end_date_str:
+            try:
                 start_label = datetime.strptime(start_date_str, '%Y-%m-%d').strftime('%b %d, %Y')
-            if end_date_str:
+            except Exception:
+                start_label = start_date_str
+            try:
                 end_label = datetime.strptime(end_date_str.split('T')[0], '%Y-%m-%d').strftime('%b %d, %Y')
-        except Exception:
-            pass
+            except Exception:
+                end_label = end_date_str
+        elif start_date_str and not end_date_str:
+            try:
+                start_label = datetime.strptime(start_date_str, '%Y-%m-%d').strftime('%b %d, %Y')
+            except Exception:
+                start_label = start_date_str
+            end_label = datetime.now().strftime('%b %d, %Y')
+        else:
+            dates_source = pest_reports if pest_reports else reports
+            report_dates = [_parse_report_timestamp(r.get('created_at') or r.get('submitted_at') or r.get('photo_taken_at')) for r in dates_source]
+            valid_dates = [d for d in report_dates if d is not None]
+            if valid_dates:
+                start_label = min(valid_dates).strftime('%b %d, %Y')
+                end_label = max(valid_dates).strftime('%b %d, %Y')
+            else:
+                start_label = datetime.now().strftime('%b %d, %Y')
+                end_label = datetime.now().strftime('%b %d, %Y')
 
         dashboard_payload = build_dashboard_chart_payload(reports, group_by_day=bool(month_str))
 

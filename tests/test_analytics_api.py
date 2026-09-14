@@ -202,3 +202,106 @@ class AnalyticsApiTests(unittest.TestCase):
         self.assertEqual(payload["status_breakdown"]["total"]["pending"], 0)
         self.assertEqual(payload["status_breakdown"]["total"]["resolved"], 0)
 
+    def test_report_summary_all_time_uses_actual_dates_and_omits_historical_banner(self):
+        class FakeResponse:
+            def __init__(self, data):
+                self.data = data
+
+        class FakeQuery:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def select(self, *args, **kwargs):
+                return self
+
+            def order(self, *args, **kwargs):
+                return self
+
+            def execute(self):
+                return FakeResponse(self.rows)
+
+        class FakeSupabaseClient:
+            def table(self, _table_name):
+                return FakeQuery([
+                    {
+                        "id": "report-1",
+                        "created_at": "2026-05-10T10:00:00Z",
+                        "pest_type": "Rhinoceros Beetle",
+                        "status": "Under Review",
+                        "barangay": "Barangay A",
+                    },
+                    {
+                        "id": "report-2",
+                        "created_at": "2026-08-20T11:00:00Z",
+                        "pest_type": "Brontispa",
+                        "status": "Resolved",
+                        "barangay": "Barangay B",
+                    },
+                ])
+
+        original_supabase = main.supabase
+        main.supabase = FakeSupabaseClient()
+        self.addCleanup(setattr, main, "supabase", original_supabase)
+
+        with self.client.session_transaction() as session:
+            session["user_id"] = "user-1"
+            session["user_role"] = "lgu"
+
+        response = self.client.get("/report_summary")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+
+        # Verify Period uses actual dates (May 10, 2026 to Aug 20, 2026)
+        self.assertIn("Period:", html)
+        self.assertIn("May 10, 2026 to Aug 20, 2026", html)
+        self.assertNotIn("Beginning to Present", html)
+
+        # Verify historical data banner is removed
+        self.assertNotIn("This report covers all historical data across all active regions.", html)
+
+    def test_report_summary_with_month_filter_uses_month_dates(self):
+        class FakeResponse:
+            def __init__(self, data):
+                self.data = data
+
+        class FakeQuery:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def select(self, *args, **kwargs):
+                return self
+
+            def order(self, *args, **kwargs):
+                return self
+
+            def execute(self):
+                return FakeResponse(self.rows)
+
+        class FakeSupabaseClient:
+            def table(self, _table_name):
+                return FakeQuery([
+                    {
+                        "id": "report-1",
+                        "created_at": "2026-07-05T10:00:00Z",
+                        "pest_type": "Rhinoceros Beetle",
+                        "status": "Under Review",
+                        "barangay": "Barangay A",
+                    },
+                ])
+
+        original_supabase = main.supabase
+        main.supabase = FakeSupabaseClient()
+        self.addCleanup(setattr, main, "supabase", original_supabase)
+
+        with self.client.session_transaction() as session:
+            session["user_id"] = "user-1"
+            session["user_role"] = "lgu"
+
+        response = self.client.get("/report_summary?month=2026-07")
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+
+        self.assertIn("Jul 01, 2026 to Jul 31, 2026", html)
+        self.assertNotIn("This report covers all historical data across all active regions.", html)
+
+

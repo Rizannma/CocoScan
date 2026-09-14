@@ -92,7 +92,7 @@ def report_summary():
         
         start_date_str = None
         end_date_str = None
-        explanation = "This report covers all historical data across all active regions."
+        explanation = ""
         
         if month_str:
             try:
@@ -141,12 +141,34 @@ def report_summary():
         from datetime import datetime
         generated_at = datetime.now().strftime("%B %d, %Y %I:%M %p")
         
+        if start_date_str and end_date_str:
+            try:
+                start_label = datetime.strptime(start_date_str, '%Y-%m-%d').strftime('%b %d, %Y')
+            except Exception:
+                start_label = start_date_str
+            try:
+                end_label = datetime.strptime(end_date_str.split('T')[0], '%Y-%m-%d').strftime('%b %d, %Y')
+            except Exception:
+                end_label = end_date_str
+        else:
+            dates_source = pest_reports if pest_reports else reports
+            report_dates = [_parse_report_timestamp(r.get('created_at') or r.get('submitted_at') or r.get('photo_taken_at')) for r in dates_source]
+            valid_dates = [d for d in report_dates if d is not None]
+            if valid_dates:
+                start_label = min(valid_dates).strftime('%b %d, %Y')
+                end_label = max(valid_dates).strftime('%b %d, %Y')
+            else:
+                start_label = datetime.now().strftime('%b %d, %Y')
+                end_label = datetime.now().strftime('%b %d, %Y')
+
         # Generate chart payload using existing dashboard logic
         dashboard_payload = build_dashboard_chart_payload(pest_reports, group_by_day=bool(month_str))
 
         data = {
             'explanation': explanation,
             'generated_at': generated_at,
+            'start_date': start_label,
+            'end_date': end_label,
             'total_reports': len(pest_reports),
             'rhino_count': rhino_count,
             'brontispa_count': brontispa_count,

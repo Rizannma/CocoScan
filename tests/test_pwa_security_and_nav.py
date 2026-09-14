@@ -239,7 +239,7 @@ def test_farmer_no_sidebar_or_hamburger(client):
 
 
 def test_non_farmer_retains_sidebar(client):
-    """Non-farmer views (such as Agriculturist) must retain their sidebar and hamburger navigation."""
+    """Non-farmer views (such as Agriculturist, LGU, Admin) must retain their sidebar/hamburger and NOT show language toggle."""
     with client.session_transaction() as sess:
         sess['user_id'] = 'a0000000-0000-0000-0000-000000000002'
         sess['user_role'] = 'agriculturist'
@@ -251,6 +251,18 @@ def test_non_farmer_retains_sidebar(client):
     assert '<button class="hamburger-btn"' in html
     assert '<aside class="sidebar-wrapper"' in html
     assert 'farmer-bottom-nav' not in html
+    assert 'class="lang-toggle-btn"' not in html
+
+    # Also test LGU and Admin roles
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'a0000000-0000-0000-0000-000000000003'
+        sess['user_role'] = 'lgu'
+        sess['user_name'] = 'LGU Officer'
+
+    resp_lgu = client.get('/lgu/dashboard')
+    if resp_lgu.status_code == 200:
+        html_lgu = resp_lgu.get_data(as_text=True)
+        assert 'class="lang-toggle-btn"' not in html_lgu
 
 
 

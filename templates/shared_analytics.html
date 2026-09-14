@@ -267,7 +267,7 @@
         <div class="month-chip-container" style="position: relative; display: inline-flex;">
             <button id="filter-month-btn" type="button" class="chip-filter-btn">
                 <i class="fa-solid fa-calendar-days" style="color: #1a4d32;"></i>
-                <span id="month-label">Month</span> ▾
+                <span id="month-label">All Months</span> ▾
             </button>
             <div id="month-dropdown-panel" class="filter-dropdown-panel" style="min-width: 280px;">
                 <!-- Will be populated by JavaScript -->
@@ -338,9 +338,8 @@
         const today = new Date();
         const currentYear = today.getFullYear();
         const defaultYear = currentYear;
-        const defaultMonth = `${defaultYear}-${String(today.getMonth() + 1).padStart(2, '0')}`;
         let selectedYear = defaultYear;
-        monthFilter.value = defaultMonth;
+        monthFilter.value = "";
 
         function createYearSelector() {
             const container = document.createElement('div');
@@ -379,11 +378,6 @@
 
             select.addEventListener('change', () => {
                 selectedYear = parseInt(select.value, 10);
-                const [selectedYearValue] = monthFilter.value.split('-');
-                if (parseInt(selectedYearValue, 10) !== selectedYear) {
-                    const newMonth = selectedYear === currentYear ? defaultMonth : `${selectedYear}-01`;
-                    monthFilter.value = newMonth;
-                }
                 populateMonthOptions(selectedYear);
                 updateMonthChip();
                 updateClearBtn();
@@ -399,6 +393,27 @@
             monthPanel.innerHTML = '';
             monthPanel.appendChild(createYearSelector());
 
+            const allBtn = document.createElement('button');
+            allBtn.type = 'button';
+            allBtn.className = 'dropdown-item' + (!monthFilter.value ? ' selected' : '');
+            allBtn.setAttribute('data-value', '');
+            allBtn.textContent = 'All Months (All Time)';
+            allBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                monthFilter.value = '';
+                weekFilter.value = '';
+                weekBtn.innerHTML = 'All Weeks ▾';
+                weekBtn.classList.remove('active-chip');
+                updateMonthChip();
+                monthPanel.querySelectorAll('.dropdown-item').forEach(item => {
+                    item.classList.toggle('selected', item.getAttribute('data-value') === '');
+                });
+                monthPanel.style.display = 'none';
+                updateClearBtn();
+                loadData();
+            });
+            monthPanel.appendChild(allBtn);
+
             for (let month = 0; month < 12; month++) {
                 const d = new Date(year, month, 1);
                 const monthVal = `${year}-${String(month + 1).padStart(2, '0')}`;
@@ -406,7 +421,7 @@
 
                 const btn = document.createElement('button');
                 btn.type = 'button';
-                btn.className = 'dropdown-item';
+                btn.className = 'dropdown-item' + (monthFilter.value === monthVal ? ' selected' : '');
                 btn.setAttribute('data-value', monthVal);
                 btn.textContent = monthText;
 
@@ -433,9 +448,9 @@
         populateMonthOptions(selectedYear);
 
         function formatMonthDisplay(val) {
-            if (!val) return "Select Month";
+            if (!val) return "All Months";
             try {
-                        const [y, m] = val.split('-');
+                const [y, m] = val.split('-');
                 const d = new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
                 return d.toLocaleString('default', { month: 'short', year: 'numeric' });
             } catch (e) {
@@ -447,7 +462,7 @@
             const label = document.getElementById('month-label');
             if (label) label.textContent = formatMonthDisplay(monthFilter.value);
             if (monthBtn) {
-                if (monthFilter.value && monthFilter.value !== defaultMonth) {
+                if (monthFilter.value) {
                     monthBtn.classList.add('active-chip');
                 } else {
                     monthBtn.classList.remove('active-chip');
@@ -489,7 +504,7 @@
         });
 
         function updateClearBtn() {
-            if (weekFilter.value || monthFilter.value !== defaultMonth) {
+            if (weekFilter.value || monthFilter.value) {
                 clearBtn.style.display = 'inline-flex';
             } else {
                 clearBtn.style.display = 'none';
@@ -498,10 +513,10 @@
 
         clearBtn.addEventListener('click', () => {
             selectedYear = defaultYear;
-            monthFilter.value = defaultMonth;
+            monthFilter.value = "";
+            weekFilter.value = "";
             populateMonthOptions(selectedYear);
             updateMonthChip();
-            weekFilter.value = "";
             weekBtn.innerHTML = "All Weeks ▾";
             weekBtn.classList.remove('active-chip');
             weekPanel.querySelectorAll('.dropdown-item').forEach(i => i.classList.toggle('selected', i.getAttribute('data-value') === ""));

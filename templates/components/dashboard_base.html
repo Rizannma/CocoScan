@@ -954,12 +954,14 @@
                 </div>
             </div>
             <div style="display: flex; align-items: center; gap: 8px;">
+                {% if is_farmer_role %}
                 <button type="button" class="lang-toggle-btn" onclick="toggleLanguagePreference()" title="{{ t('navigation.lang_preference', 'Language' if current_lang != 'tl' else 'Wika') }}" aria-label="Toggle Language">
                     <i class="fa-solid fa-globe" style="font-size: 0.78rem; color: var(--brand-accent);"></i>
                     <span class="lang-en {% if current_lang != 'tl' %}active-lang{% endif %}">EN</span>
                     <span style="opacity: 0.4;">|</span>
                     <span class="lang-tl {% if current_lang == 'tl' %}active-lang{% endif %}">TL</span>
                 </button>
+                {% endif %}
                 {% if not is_farmer_role %}
                 <button class="hamburger-btn" onclick="toggleSidebarMenu()" aria-label="Toggle Navigation Menu">
                     <i class="fa-solid fa-bars" id="toggleIcon"></i>
@@ -1396,7 +1398,13 @@
                 const ctxDist = distEl.getContext('2d');
                 const distributionLabels = Array.isArray(chartPayload?.distribution_labels) && chartPayload.distribution_labels.length ? chartPayload.distribution_labels : ['No reports yet'];
                 const distributionData = Array.isArray(chartPayload?.distribution_data) && chartPayload.distribution_data.length ? chartPayload.distribution_data : [0];
-                const distributionColors = distributionLabels.map((_, index) => ['#164630', '#d97706', '#0f766e', '#3b82f6', '#f59e0b'][index % 5]);
+                const distributionColors = distributionLabels.map((label) => {
+                    const l = String(label).toLowerCase();
+                    if (l.includes('brontispa') || l.includes('leaf beetle')) return '#164630';
+                    if (l.includes('rhino') || l.includes('beetle')) return '#d97706';
+                    if (l.includes('healthy')) return '#22c55e';
+                    return '#0f766e';
+                });
                 const distributionChart = new Chart(ctxDist, {
                     type: 'doughnut',
                     data: {
@@ -1471,115 +1479,114 @@
                     console.debug('No existing severity breakdown chart to destroy', e);
                 }
                 const ctx = el.getContext('2d');
-                const sevData = chartPayload?.severity_breakdown?.combined || {
-                    Mild: (Number(chartPayload?.severity_breakdown?.brontispa?.Mild) || 0) + (Number(chartPayload?.severity_breakdown?.rhinoceros_beetle?.Mild) || 0),
-                    Moderate: (Number(chartPayload?.severity_breakdown?.brontispa?.Moderate) || 0) + (Number(chartPayload?.severity_breakdown?.rhinoceros_beetle?.Moderate) || 0),
-                    Severe: (Number(chartPayload?.severity_breakdown?.brontispa?.Severe) || 0) + (Number(chartPayload?.severity_breakdown?.rhinoceros_beetle?.Severe) || 0)
-                };
-                const mildCount = Number(sevData?.Mild) || 0;
-                const modCount = Number(sevData?.Moderate) || 0;
-                const sevCount = Number(sevData?.Severe) || 0;
-                const total = mildCount + modCount + sevCount;
-                const hasData = total > 0;
+                const sevBreakdown = chartPayload?.severity_breakdown || {};
+                const categories = Array.isArray(sevBreakdown.categories) && sevBreakdown.categories.length
+                    ? sevBreakdown.categories
+                    : ['Mild', 'Moderate', 'Severe'];
 
-                const chart = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: hasData ? ['Mild', 'Moderate', 'Severe'] : ['No reports yet'],
-                        datasets: [{
-                            data: hasData ? [mildCount, modCount, sevCount] : [1],
-                            backgroundColor: hasData ? ['#22c55e', '#f59e0b', '#ef4444'] : ['#e2e8f0'],
-                            borderWidth: hasData ? 3 : 1,
-                            borderColor: '#ffffff'
-                        }]
+                const brontispaData = [
+                    Number(sevBreakdown?.brontispa?.Mild) || 0,
+                    Number(sevBreakdown?.brontispa?.Moderate) || 0,
+                    Number(sevBreakdown?.brontispa?.Severe) || 0
+                ];
+                const rhinoData = [
+                    Number(sevBreakdown?.rhinoceros_beetle?.Mild) || 0,
+                    Number(sevBreakdown?.rhinoceros_beetle?.Moderate) || 0,
+                    Number(sevBreakdown?.rhinoceros_beetle?.Severe) || 0
+                ];
+
+                const datasets = [
+                    {
+                        label: 'Brontispa',
+                        data: brontispaData,
+                        backgroundColor: '#164630',
+                        borderColor: '#164630',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        maxBarThickness: 36
                     },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: {
-                                    boxWidth: 10,
-                                    font: { size: 10, weight: '600' }
-                                }
-                            },
-                            tooltip: {
-                                enabled: hasData,
-                                callbacks: {
-                                    label: function (context) {
-                                        const val = context.parsed;
-                                        const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-                                        return ` ${context.label}: ${val} (${pct}%)`;
-                                    }
-                                }
-                            }
-                        },
-                        cutout: '65%'
+                    {
+                        label: 'Rhinoceros Beetle',
+                        data: rhinoData,
+                        backgroundColor: '#d97706',
+                        borderColor: '#d97706',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        maxBarThickness: 36
                     }
-                });
-                window.chartInstances.push(chart);
-            }
-
-            function initSeverityDoughnut(canvasId, pestKey) {
-                const el = document.getElementById(canvasId);
-                if (!el) return;
-                try {
-                    const existing = Chart.getChart(el);
-                    if (existing) existing.destroy();
-                } catch (e) {
-                    console.debug('No existing severity chart to destroy', e);
-                }
-                const ctx = el.getContext('2d');
-                const sevData = chartPayload?.severity_breakdown?.[pestKey];
-                const mildCount = Number(sevData?.Mild) || 0;
-                const modCount = Number(sevData?.Moderate) || 0;
-                const sevCount = Number(sevData?.Severe) || 0;
-                const total = mildCount + modCount + sevCount;
-                const hasData = total > 0;
+                ];
 
                 const chart = new Chart(ctx, {
-                    type: 'doughnut',
+                    type: 'bar',
                     data: {
-                        labels: hasData ? ['Mild', 'Moderate', 'Severe'] : ['No reports yet'],
-                        datasets: [{
-                            data: hasData ? [mildCount, modCount, sevCount] : [1],
-                            backgroundColor: hasData ? ['#22c55e', '#f59e0b', '#ef4444'] : ['#e2e8f0'],
-                            borderWidth: hasData ? 3 : 1,
-                            borderColor: '#ffffff'
-                        }]
+                        labels: categories,
+                        datasets: datasets
                     },
                     options: {
                         responsive: true,
                         maintainAspectRatio: false,
                         plugins: {
                             legend: {
-                                position: 'bottom',
+                                position: 'top',
+                                onClick: function (e, legendItem, legend) {
+                                    const index = legendItem.datasetIndex;
+                                    const ci = legend.chart;
+                                    if (ci.isDatasetVisible(index)) {
+                                        ci.hide(index);
+                                    } else {
+                                        ci.show(index);
+                                    }
+                                },
                                 labels: {
                                     boxWidth: 10,
-                                    font: { size: 10, weight: '600' }
+                                    font: { size: 10, weight: '600' },
+                                    generateLabels: function (chart) {
+                                        const dss = chart.data.datasets;
+                                        return dss.map((ds, i) => {
+                                            const isVisible = chart.isDatasetVisible(i);
+                                            return {
+                                                text: ds.label,
+                                                datasetIndex: i,
+                                                fillStyle: isVisible ? ds.backgroundColor : 'rgba(203, 213, 225, 0.4)',
+                                                strokeStyle: isVisible ? ds.borderColor : 'rgba(203, 213, 225, 0.4)',
+                                                fontColor: isVisible ? '#64748b' : 'rgba(100, 116, 139, 0.4)',
+                                                lineWidth: ds.borderWidth || 1,
+                                                hidden: false
+                                            };
+                                        });
+                                    }
                                 }
                             },
                             tooltip: {
-                                enabled: hasData,
                                 callbacks: {
                                     label: function (context) {
-                                        const val = context.parsed;
-                                        const pct = total > 0 ? Math.round((val / total) * 100) : 0;
-                                        return ` ${context.label}: ${val} (${pct}%)`;
+                                        const pestLabel = context.dataset.label || '';
+                                        const count = context.parsed.y;
+                                        const sev = context.label || '';
+                                        return ` ${pestLabel} (${sev}): ${count} case${count === 1 ? '' : 's'}`;
                                     }
                                 }
                             }
                         },
-                        cutout: '65%'
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: '#f1f5f9' },
+                                ticks: {
+                                    stepSize: 1,
+                                    precision: 0
+                                }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
                     }
                 });
                 window.chartInstances.push(chart);
             }
 
             initSeverityBreakdownChart();
-            initSeverityDoughnut('brontispaSeverityChart', 'brontispa');
-            initSeverityDoughnut('rhinoSeverityChart', 'rhinoceros_beetle');
         }
     </script>
     <script>
