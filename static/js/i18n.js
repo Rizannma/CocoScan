@@ -386,7 +386,10 @@
     "reschedule_btn_submitting": "Submitting...",
     "reschedule_success": "Reschedule request submitted.",
     "alert_select_reason": "Please select a reason before submitting the reschedule request.",
-    "alert_provide_details": "Please provide reason details for 'Other'."
+    "alert_provide_details": "Please provide reason details for 'Other'.",
+    "reschedule_offline_saved": "Offline Mode: Your reschedule request has been saved locally and will be automatically submitted once you regain connection.",
+    "feedback_offline_saved": "Offline Mode: Your response has been saved locally and will be automatically submitted once your connection is restored.",
+    "followup_offline_saved": "Offline Mode: Your follow-up notes have been saved locally and will be automatically submitted once you regain connection."
   },
   "pest_recommendations": {
     "tooltip_sanitation": "<strong>Step 1:</strong> Collect all dead leaves, rotting trunks, and fallen fruits.<br><strong>Step 2:</strong> Burn them or bury them deep away from healthy trees to destroy hidden pest breeding grounds.",
@@ -881,7 +884,10 @@
     "reschedule_btn_submitting": "Ipinapasa...",
     "reschedule_success": "Naipasa na ang kahilingan para sa bagong iskedyul.",
     "alert_select_reason": "Mangyaring pumili ng dahilan bago ipasa ang kahilingan.",
-    "alert_provide_details": "Mangyaring magbigay ng paliwanag para sa 'Iba pa'."
+    "alert_provide_details": "Mangyaring magbigay ng paliwanag para sa 'Iba pa'.",
+    "reschedule_offline_saved": "Offline Mode: Ang iyong kahilingan para sa bagong iskedyul ay na-save sa device at awtomatikong ipapadala kapag nagkaroon ng koneksyon.",
+    "feedback_offline_saved": "Offline Mode: Ang iyong tugon ay na-save sa device at awtomatikong ipapadala kapag nagkaroon ng koneksyon.",
+    "followup_offline_saved": "Offline Mode: Ang iyong follow-up ay na-save sa device at awtomatikong ipapadala kapag nagkaroon ng koneksyon."
   },
   "pest_recommendations": {
     "tooltip_sanitation": "<strong>Hakbang 1:</strong> Tipunin ang lahat ng tuyong dahon, nabubulok na puno, at laglag na bunga.<br><strong>Hakbang 2:</strong> Sunugin o ibaon nang malalim malayo sa malulusog na puno upang masira ang pinamumugaran ng peste.",

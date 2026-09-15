@@ -35,6 +35,7 @@
         document.head.appendChild(style);
     })();
 
+    const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
     let currentReportModalRecord = null;
     let currentReportModalMode = "farmer";
     let activeReportModalSubmissionController = null;
@@ -90,6 +91,129 @@
         }, VISIT_DISCUSSION_POLL_INTERVAL_MS);
     }
 
+    function queueOfflineAction(action) {
+        if (!action || !action.type || !action.report_id) return;
+        try {
+            const raw = localStorage.getItem('cocoscan_offline_actions_queue') || '[]';
+            const queue = JSON.parse(raw);
+            queue.push({
+                ...action,
+                id: 'offline_act_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+                created_at: new Date().toISOString()
+            });
+            localStorage.setItem('cocoscan_offline_actions_queue', JSON.stringify(queue));
+            console.info('[OfflineSync] Action queued for offline sync:', action);
+        } catch (e) {
+            console.warn('[OfflineSync] Could not queue offline action:', e);
+        }
+    }
+
+    function updateLocalReportState(reportId, updaterFn) {
+        if (!reportId || typeof updaterFn !== 'function') return;
+        try {
+            const raw = localStorage.getItem('cocoscan_cached_farmer_reports');
+            if (raw) {
+                let reports = JSON.parse(raw);
+                if (Array.isArray(reports)) {
+                    reports = reports.map(r => {
+                        if (String(r.id) === String(reportId)) {
+                            return updaterFn({ ...r });
+                        }
+                        return r;
+                    });
+                    if (window.CocoScanAuth && typeof window.CocoScanAuth.cacheFarmerReports === 'function') {
+                        window.CocoScanAuth.cacheFarmerReports(reports);
+                    } else {
+                        localStorage.setItem('cocoscan_cached_farmer_reports', JSON.stringify(reports));
+                    }
+                }
+            }
+        } catch (e) {
+            console.debug('updateLocalReportState note:', e);
+        }
+    }
+
+    async function syncOfflineReportActions() {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+        try {
+            const queueRaw = localStorage.getItem('cocoscan_offline_actions_queue');
+            if (!queueRaw) return;
+            const queue = JSON.parse(queueRaw);
+            if (!Array.isArray(queue) || queue.length === 0) return;
+
+            const remaining = [];
+            for (const action of queue) {
+                try {
+                    let res = null;
+                    if (action.type === 'reschedule') {
+                        res = await fetch(`/reports/${action.report_id}/request-reschedule`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(action.payload || {})
+                        });
+                    } else if (action.type === 'farmer-feedback') {
+                        const fd = new FormData();
+                        fd.append('report_id', action.report_id);
+                        fd.append('confirmation', action.payload?.confirmation || 'resolved');
+                        fd.append('reason', action.payload?.reason || '');
+                        res = await fetch('/farmer/submit-assessment-feedback', {
+                            method: 'POST',
+                            body: fd
+                        });
+                    } else if (action.type === 'follow_up') {
+                        res = await fetch('/farmer/follow-up-report', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                report_id: action.report_id,
+                                notes: action.payload?.notes || ''
+                            })
+                        });
+                    } else if (action.type === 'visit_chat') {
+                        res = await fetch(`/reports/${action.report_id}/visit-chat`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: action.payload?.message || ''
+                            })
+                        });
+                    }
+
+                    if (!res || !res.ok) {
+                        if (res && res.status >= 400 && res.status < 500) {
+                            console.warn('[OfflineSync] Discarding invalid queued action (status ' + res.status + '):', action);
+                        } else {
+                            remaining.push(action);
+                        }
+                    }
+                } catch (err) {
+                    console.warn('[OfflineSync] Network error while syncing action:', action, err);
+                    remaining.push(action);
+                    break;
+                }
+            }
+
+            if (remaining.length > 0) {
+                localStorage.setItem('cocoscan_offline_actions_queue', JSON.stringify(remaining));
+            } else {
+                localStorage.removeItem('cocoscan_offline_actions_queue');
+                console.info('[OfflineSync] All offline report actions synchronized successfully.');
+            }
+        } catch (e) {
+            console.warn('[OfflineSync] Error during sync loop:', e);
+        }
+    }
+
+    if (typeof window !== 'undefined') {
+        window.addEventListener('online', () => {
+            syncOfflineReportActions();
+        });
+        window.queueOfflineReportAction = queueOfflineAction;
+        window.syncOfflineReportActions = syncOfflineReportActions;
+        window.updateLocalReportState = updateLocalReportState;
+        setTimeout(syncOfflineReportActions, 2000);
+    }
+
     function escapeHtml(text) {
         return String(text ?? "")
             .replace(/&/g, "&amp;")
@@ -98,6 +222,7 @@
             .replace(/\"/g, "&quot;")
             .replace(/'/g, "&#39;");
     }
+    const escapeHTML = escapeHtml;
 
     function normalizeList(value) {
         if (Array.isArray(value)) {
@@ -444,9 +569,10 @@
 
     function setButtonLoading(button, isLoading, loadingText = "Saving...") {
         if (!button) return;
+        const dataset = button.dataset || {};
         if (isLoading) {
-            if (!button.dataset.defaultHtml) {
-                button.dataset.defaultHtml = button.innerHTML;
+            if (!dataset.defaultHtml) {
+                try { button.dataset.defaultHtml = button.innerHTML; } catch (e) { button._defaultHtml = button.innerHTML; }
             }
             button.disabled = true;
             button.classList.add("btn-loading", "is-disabled");
@@ -459,8 +585,9 @@
         } else {
             button.disabled = false;
             button.classList.remove("btn-loading", "is-disabled");
-            if (button.dataset.defaultHtml) {
-                button.innerHTML = button.dataset.defaultHtml;
+            const defaultHtml = dataset.defaultHtml || button._defaultHtml;
+            if (defaultHtml) {
+                button.innerHTML = defaultHtml;
             }
         }
     }
@@ -473,6 +600,7 @@
 
         actionButtons.forEach((button) => {
             if (!button) return;
+            const dataset = button.dataset || {};
             const shouldDisable = isSubmitting;
             button.disabled = shouldDisable;
             button.classList.toggle("is-disabled", shouldDisable);
@@ -480,8 +608,8 @@
             button.setAttribute("aria-busy", isSubmitting ? "true" : "false");
 
             if (isSubmitting) {
-                if (!button.dataset.defaultHtml) {
-                    button.dataset.defaultHtml = button.innerHTML;
+                if (!dataset.defaultHtml) {
+                    try { button.dataset.defaultHtml = button.innerHTML; } catch (e) { button._defaultHtml = button.innerHTML; }
                 }
                 const icon = "fa-solid fa-circle-notch fa-spin";
                 button.innerHTML = `
@@ -490,8 +618,11 @@
                     </span>
                     <span class="btn-loading-bar"></span>
                 `;
-            } else if (button.dataset.defaultHtml) {
-                button.innerHTML = button.dataset.defaultHtml;
+            } else {
+                const defaultHtml = dataset.defaultHtml || button._defaultHtml;
+                if (defaultHtml) {
+                    button.innerHTML = defaultHtml;
+                }
             }
         });
 
@@ -842,8 +973,9 @@
                 agriButton.style.color = "#475569";
                 agriButton.innerHTML = '<i class="fa-solid fa-lock"></i> Assessment Issued';
             } else {
-                if (agriButton.dataset.defaultHtml) {
-                    agriButton.innerHTML = agriButton.dataset.defaultHtml;
+                const defaultHtml = agriButton.dataset?.defaultHtml || agriButton._defaultHtml;
+                if (defaultHtml) {
+                    agriButton.innerHTML = defaultHtml;
                 } else {
                     agriButton.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Assessment';
                 }
@@ -978,7 +1110,7 @@
         }
     }
 
-    function renderVisitDiscussionCard(mode, report) {
+    function renderVisitDiscussionCard(mode, report = currentReportModalRecord) {
         const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
         const workflowCard = document.getElementById("workflow-actions-card");
         const workflowInput = document.getElementById("workflow-detail-input");
@@ -992,6 +1124,7 @@
         const isArchived = Boolean(report?.visitArchived);
         const isAgriculturist = mode === "agriculturist";
         const chats = Array.isArray(report?.visitChats) ? report.visitChats : [];
+        const normalizedStatus = getStatusKey(report?.status || "");
         const statusLabel = getWorkflowStatusDisplayLabel(report?.status || "");
         const rawScheduleTitle = report?.visitScheduleTitle || (report?.visitRescheduleReason ? "Reschedule Requested" : "Visit Scheduled");
         let localizedScheduleTitle = rawScheduleTitle;
@@ -1007,7 +1140,10 @@
         const messagePlaceholder = isAgriculturist ? "Type a message..." : t("modal.discussion_placeholder", "Discuss visit details...");
         const messageCount = chats.length;
         const messageLabel = `${messageCount} ${messageCount === 1 ? "message" : "messages"}`;
-        const isExpanded = Boolean(report?.visitDiscussionExpanded);
+        if (report && report.visitDiscussionExpanded === undefined) {
+            report.visitDiscussionExpanded = true;
+        }
+        const isExpanded = report?.visitDiscussionExpanded !== false;
 
         const hasPendingReschedule = Boolean(report?.visitRescheduleReason);
         const bannerStyle = hasPendingReschedule
@@ -1018,6 +1154,7 @@
             <div style="display:grid; gap:16px; padding:16px 0;">
                 ${(mode !== "lgu" && mode !== "admin") ? `
                <button id="visit-discussion-toggle" type="button"
+                onclick="window.toggleVisitDiscussion ? window.toggleVisitDiscussion(event) : null"
                 aria-expanded="${isExpanded ? "true" : "false"}"
                 style="
                     display:flex;
@@ -1128,9 +1265,9 @@
                         <strong>${escapeHtml(t('modal.tip_label', 'Tip:'))}</strong> ${escapeHtml(t('modal.discussion_tip_reschedule', 'Click the "Visit Request Discussion" button to chat and finalize a new date and time.'))}
                     </div>
                 ` : ""}
-                ${(!isArchived && isAgriculturist && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="visit-discussion-finalize-btn" class="btn-control submit-primary" style="justify-self:start; margin-top:4px;">Finalize Schedule</button>` : ""}
+                ${(!isArchived && isAgriculturist && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="visit-discussion-finalize-btn" class="btn-control submit-primary" style="justify-self:start; margin-top:4px;" onclick="window.openFinalizeVisitScheduleModal ? window.openFinalizeVisitScheduleModal() : null">Finalize Schedule</button>` : ""}
                 ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<div style="font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(t('modal.discussion_closed', 'The scheduling discussion has been closed.'))}</div>` : ""}
-                ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="request-reschedule-btn" class="btn-control submit-primary" style="justify-self:start;">${escapeHtml(t('modal.btn_request_reschedule', 'Request Reschedule'))}</button>` : ""}
+                ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="request-reschedule-btn" class="btn-control submit-primary" style="justify-self:start;" onclick="window.openRequestRescheduleModal ? window.openRequestRescheduleModal() : null">${escapeHtml(t('modal.btn_request_reschedule', 'Request Reschedule'))}</button>` : ""}
                 ${(report?.visit_summary && (mode === "lgu" || mode === "admin")) ? `<div style="font-size:0.95rem; color:#334155; line-height:1.6; background:#f8fafc; padding:14px; border-radius:12px; border:1px solid #e2e8f0; margin-top:10px;"><strong>${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}:</strong><br>${escapeHtml(report.visit_summary)}</div>` : ""}
             </div>`;
 
@@ -1145,10 +1282,11 @@
 
         const toggleButton = feedbackContainer.querySelector('#visit-discussion-toggle');
         if (toggleButton) {
-            toggleButton.addEventListener('click', () => {
-                report.visitDiscussionExpanded = !Boolean(report.visitDiscussionExpanded);
-                renderVisitDiscussionCard(mode, report);
-            });
+            toggleButton.onclick = (e) => {
+                if (window.toggleVisitDiscussion) {
+                    window.toggleVisitDiscussion(e);
+                }
+            };
         }
 
         const finalizeBtn = feedbackContainer.querySelector('#visit-discussion-finalize-btn');
@@ -1250,7 +1388,15 @@
         setDisplay(feedbackCard, true, "block");
     }
 
-    function openRequestRescheduleModal(report) {
+    function openRequestRescheduleModal(report = currentReportModalRecord) {
+        if (!report || !report.id) {
+            report = currentReportModalRecord;
+        }
+        if (!report || !report.id) {
+            alert("Report details not found. Please refresh and try again.");
+            return;
+        }
+
         const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
         const existingModal = document.getElementById("visit-reschedule-mini-modal");
         if (existingModal) {
@@ -1261,14 +1407,16 @@
         modal.id = "visit-reschedule-mini-modal";
         modal.style.position = "fixed";
         modal.style.inset = "0";
-        modal.style.background = "rgba(15, 23, 42, 0.48)";
+        modal.style.background = "rgba(15, 23, 42, 0.65)";
+        modal.style.backdropFilter = "blur(4px)";
+        modal.style.webkitBackdropFilter = "blur(4px)";
         modal.style.display = "flex";
         modal.style.alignItems = "center";
         modal.style.justifyContent = "center";
         modal.style.padding = "20px";
-        modal.style.zIndex = "4000";
+        modal.style.zIndex = "200000";
         modal.innerHTML = `
-            <div style="width:min(100%, 430px); background:#fff; border-radius:20px; box-shadow:0 20px 50px rgba(15,23,42,0.22); padding:28px; display:grid; gap:20px;">
+            <div style="width:min(100%, 430px); background:#fff; border-radius:20px; box-shadow:0 20px 50px rgba(15,23,42,0.25); padding:28px; display:grid; gap:20px;" onclick="event.stopPropagation()">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:14px;">
                     <div style="font-size:1.05rem; font-weight:700; color:#102a43;">${escapeHtml(t('modal.reschedule_modal_title', 'Request Reschedule'))}</div>
                     <button type="button" id="visit-reschedule-modal-close" class="btn-control cancel-secondary" style="width: auto; min-height: 34px; padding: 8px 12px; border-radius: 999px; background: #dc2626; color: #ffffff; border: 1px solid #dc2626; box-shadow: none;">${escapeHtml(t('modal.btn_close', 'Close'))}</button>
@@ -1294,6 +1442,10 @@
             </div>`;
         document.body.appendChild(modal);
 
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
         const reasonSelect = modal.querySelector('#visit-reschedule-reason');
         const otherWrapper = modal.querySelector('#visit-reschedule-other-wrapper');
         const toggleOtherInput = () => {
@@ -1318,7 +1470,40 @@
                 alert(t('modal.alert_select_reason', "Please select a reason before submitting the reschedule request."));
                 return;
             }
-            setButtonLoading(saveBtn, true, t('modal.reschedule_btn_submitting', "Submitting..."));
+            const isOffline = typeof navigator !== 'undefined' && (!navigator.onLine || (typeof localStorage !== 'undefined' && localStorage.getItem('cocoscan_offline_active') === 'true'));
+            if (isOffline) {
+                queueOfflineAction({
+                    type: 'reschedule',
+                    report_id: report.id,
+                    payload: { reason: finalReason }
+                });
+                report.visitArchived = false;
+                report.visitDiscussionExpanded = true;
+                report.visit_reschedule_reason = finalReason;
+                report.status = "Awaiting Confirmed Schedule";
+                report.visitScheduleTitle = "Reschedule Requested";
+                if (!Array.isArray(report.visitChats)) report.visitChats = [];
+                report.visitChats.push({
+                    message: `Reschedule requested: ${finalReason}`,
+                    created_at: new Date().toISOString(),
+                    is_farmer: true
+                });
+                updateLocalReportState(report.id, (r) => ({
+                    ...r,
+                    status: 'Awaiting Confirmed Schedule',
+                    visit_reschedule_reason: finalReason
+                }));
+                applyStatusStyle(report);
+                renderWorkflowActions(currentReportModalMode, report);
+                if (typeof window.renderReportsGrid === "function") {
+                    try { window.renderReportsGrid(); } catch (gridErr) { console.debug(gridErr); }
+                }
+                modal.remove();
+                alert(t('modal.reschedule_offline_saved', "Offline Mode: Your reschedule request has been saved locally and will be automatically submitted once you regain connection."));
+                return;
+            }
+
+            setButtonLoading(saveBtn, true, "Submitting Request...");
             try {
                 const response = await fetch(`/reports/${report.id}/request-reschedule`, {
                     method: "POST",
@@ -1333,36 +1518,79 @@
                 }
                 report.visitArchived = false;
                 report.visitDiscussionExpanded = true;
-                report.visitScheduleTitle = "Visit Scheduled";
+                report.visit_reschedule_reason = finalReason;
+                report.status = "Awaiting Confirmed Schedule";
+                report.visitScheduleTitle = "Reschedule Requested";
                 await loadVisitDiscussion(report);
+                applyStatusStyle(report);
                 renderWorkflowActions(currentReportModalMode, report);
+                if (typeof window.renderReportsGrid === "function") {
+                    try { window.renderReportsGrid(); } catch (gridErr) { console.debug(gridErr); }
+                }
                 modal.remove();
                 alert(data.message || t('modal.reschedule_success', "Reschedule request submitted."));
             } catch (error) {
-                alert("The reschedule request could not be submitted right now.");
-                setButtonLoading(saveBtn, false);
+                queueOfflineAction({
+                    type: 'reschedule',
+                    report_id: report.id,
+                    payload: { reason: finalReason }
+                });
+                report.visitArchived = false;
+                report.visitDiscussionExpanded = true;
+                report.visit_reschedule_reason = finalReason;
+                report.status = "Awaiting Confirmed Schedule";
+                report.visitScheduleTitle = "Reschedule Requested";
+                if (!Array.isArray(report.visitChats)) report.visitChats = [];
+                report.visitChats.push({
+                    message: `Reschedule requested: ${finalReason}`,
+                    created_at: new Date().toISOString(),
+                    is_farmer: true
+                });
+                updateLocalReportState(report.id, (r) => ({
+                    ...r,
+                    status: 'Awaiting Confirmed Schedule',
+                    visit_reschedule_reason: finalReason
+                }));
+                applyStatusStyle(report);
+                renderWorkflowActions(currentReportModalMode, report);
+                if (typeof window.renderReportsGrid === "function") {
+                    try { window.renderReportsGrid(); } catch (gridErr) { console.debug(gridErr); }
+                }
+                modal.remove();
+                alert(t('modal.reschedule_offline_saved', "Offline Mode: Your reschedule request has been saved locally and will be automatically submitted once you regain connection."));
             }
         });
     }
 
-    function openFinalizeVisitScheduleModal(report) {
+    function openFinalizeVisitScheduleModal(report = currentReportModalRecord) {
+        if (!report || !report.id) {
+            report = currentReportModalRecord;
+        }
+        if (!report || !report.id) {
+            alert("Report details not found. Please refresh and try again.");
+            return;
+        }
+
         const existingModal = document.getElementById("visit-schedule-mini-modal");
         if (existingModal) {
             existingModal.remove();
         }
 
+        const todayStr = new Date().toISOString().split("T")[0];
         const modal = document.createElement("div");
         modal.id = "visit-schedule-mini-modal";
         modal.style.position = "fixed";
         modal.style.inset = "0";
-        modal.style.background = "rgba(15, 23, 42, 0.48)";
+        modal.style.background = "rgba(15, 23, 42, 0.65)";
+        modal.style.backdropFilter = "blur(4px)";
+        modal.style.webkitBackdropFilter = "blur(4px)";
         modal.style.display = "flex";
         modal.style.alignItems = "center";
         modal.style.justifyContent = "center";
         modal.style.padding = "20px";
-        modal.style.zIndex = "4000";
+        modal.style.zIndex = "200000";
         modal.innerHTML = `
-            <div style="width:min(100%, 430px); background:#fff; border-radius:18px; box-shadow:0 20px 50px rgba(15,23,42,0.22); padding:28px; display:grid; gap:20px;">
+            <div style="width:min(100%, 430px); background:#fff; border-radius:18px; box-shadow:0 20px 50px rgba(15,23,42,0.25); padding:28px; display:grid; gap:20px;" onclick="event.stopPropagation()">
                 <div style="display:flex; justify-content:space-between; align-items:center; gap:14px;">
                     <div style="font-size:1.05rem; font-weight:700; color:#102a43;">Finalize Visit Schedule</div>
                     <button type="button" id="visit-schedule-modal-close" class="btn-control cancel-secondary" style="width: auto; min-height: 34px; padding: 8px 12px; border-radius: 999px; background: #dc2626; color: #ffffff; border: 1px solid #dc2626; box-shadow: none;">Close</button>
@@ -1370,7 +1598,7 @@
                 <div style="display:grid; gap:14px;">
                     <label style="display:grid; gap:8px; font-size:0.96rem; color:#334155;">
                         <span style="font-weight:700;">Select the agreed date</span>
-                        <input id="visit-confirmed-date" type="date" class="schedule-input" style="padding:0 14px; border-radius:12px; border:1px solid #e6e6e6; height:48px; box-sizing:border-box;">
+                        <input id="visit-confirmed-date" type="date" min="${todayStr}" value="${todayStr}" class="schedule-input" style="padding:0 14px; border-radius:12px; border:1px solid #e6e6e6; height:48px; box-sizing:border-box;">
                     </label>
                     <label style="display:grid; gap:8px; font-size:0.96rem; color:#334155;">
                         <span style="font-weight:700;">Start Time</span>
@@ -1409,6 +1637,26 @@
             </div>`;
         document.body.appendChild(modal);
 
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        const startTimeSelect = modal.querySelector('#visit-start-time');
+        const endTimeSelect = modal.querySelector('#visit-end-time');
+        if (startTimeSelect && endTimeSelect) {
+            startTimeSelect.addEventListener('change', () => {
+                const val = startTimeSelect.value;
+                if (!val) return;
+                const [h, m] = val.split(':').map(Number);
+                const endH = String(Math.min(17, h + 1)).padStart(2, '0');
+                const endM = String(m).padStart(2, '0');
+                const candidate = `${endH}:${endM}`;
+                if (Array.from(endTimeSelect.options).some(o => o.value === candidate)) {
+                    endTimeSelect.value = candidate;
+                }
+            });
+        }
+
         modal.querySelector('#visit-schedule-modal-close')?.addEventListener('click', () => modal.remove());
         modal.querySelector('#visit-schedule-save-btn')?.addEventListener('click', async (e) => {
             const saveBtn = e.target.closest('button');
@@ -1441,7 +1689,7 @@
                 applyStatusStyle(report);
                 renderWorkflowActions(currentReportModalMode, report);
                 if (typeof window.renderReportsGrid === "function") {
-                    try { window.renderReportsGrid(); } catch (e) { console.debug(e); }
+                    try { window.renderReportsGrid(); } catch (gridErr) { console.debug(gridErr); }
                 }
                 modal.remove();
                 alert(data.message || "The visit schedule has been finalized.");
@@ -1660,7 +1908,7 @@
                     const visitSummaryHtml = `
                         <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:16px;">
                             <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">Visit Summary</h5>
-                            <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHTML(report.visit_summary)}</p>
+                            <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(report.visit_summary)}</p>
                             ${(report.visitImages && report.visitImages.length > 0) ? `
                                 <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
                                     ${report.visitImages.map(url => `<img src="${url}" style="height:80px; width:120px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open('${url}', '_blank')">`).join('')}
@@ -1752,7 +2000,7 @@
                         visitSummaryBlock = `
                             <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-top:12px;">
                                 <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}</h5>
-                                <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHTML(report.visit_summary)}</p>
+                                <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(report.visit_summary)}</p>
                                 ${(report.visitImages && report.visitImages.length > 0) ? `
                                     <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
                                         ${report.visitImages.map(url => `<img src="${url}" style="height:80px; width:120px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open('${url}', '_blank')">`).join('')}
@@ -2004,25 +2252,75 @@
         if (actionName === "farmer-feedback") {
             const feedbackChoice = document.querySelector("input[name='farmer-feedback-choice']:checked")?.value || "resolved";
             formData.append("confirmation", feedbackChoice);
+            let feedbackReason = "";
             if (feedbackChoice === "resolved") {
                 formData.append("reason", "");
                 report.farmerFeedbackConfirmation = "resolved";
             } else {
-                const reason = document.getElementById("farmer-visit-reason")?.value?.trim() || "";
-                if (!reason) {
+                feedbackReason = document.getElementById("farmer-visit-reason")?.value?.trim() || "";
+                if (!feedbackReason) {
                     setButtonLoading(activeBtn, false);
                     alert("Please provide a reason before submitting the visit request.");
                     return;
                 }
-                formData.append("reason", reason);
-                report.farmerFeedbackReason = reason;
+                formData.append("reason", feedbackReason);
+                report.farmerFeedbackReason = feedbackReason;
                 report.farmerFeedbackConfirmation = "needs-assistance";
             }
+
+            const isOffline = typeof navigator !== 'undefined' && (!navigator.onLine || (typeof localStorage !== 'undefined' && localStorage.getItem('cocoscan_offline_active') === 'true'));
+            if (isOffline) {
+                queueOfflineAction({
+                    type: 'farmer-feedback',
+                    report_id: report.id,
+                    payload: { confirmation: feedbackChoice, reason: feedbackReason }
+                });
+                report.status = feedbackChoice === "resolved" ? "resolved" : "Awaiting Confirmed Schedule";
+                if (feedbackChoice !== "resolved") {
+                    report.visitArchived = false;
+                    report.visitScheduleStamp = "";
+                }
+                updateLocalReportState(report.id, (r) => ({
+                    ...r,
+                    status: report.status,
+                    visit_request_reason: feedbackReason
+                }));
+                applyStatusStyle(report);
+                renderWorkflowActions(currentReportModalMode, report);
+                const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+                alert(t('modal.feedback_offline_saved', "Offline Mode: Your response has been saved locally and will be automatically submitted once your connection is restored."));
+                closeReportModal();
+                return;
+            }
+
             try {
                 const response = await fetch("/farmer/submit-assessment-feedback", { method: "POST", body: formData });
                 const data = await response.json().catch(() => ({}));
                 if (!response.ok || !data.success) {
-                    alert(data.message || "The feedback could not be saved.");
+                    if (!navigator.onLine || response.status === 0 || response.status >= 500) {
+                        queueOfflineAction({
+                            type: 'farmer-feedback',
+                            report_id: report.id,
+                            payload: { confirmation: feedbackChoice, reason: feedbackReason }
+                        });
+                        report.status = feedbackChoice === "resolved" ? "resolved" : "Awaiting Confirmed Schedule";
+                        if (feedbackChoice !== "resolved") {
+                            report.visitArchived = false;
+                            report.visitScheduleStamp = "";
+                        }
+                        updateLocalReportState(report.id, (r) => ({
+                            ...r,
+                            status: report.status,
+                            visit_request_reason: feedbackReason
+                        }));
+                        applyStatusStyle(report);
+                        renderWorkflowActions(currentReportModalMode, report);
+                        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+                        alert(t('modal.feedback_offline_saved', "Offline Mode: Your response has been saved locally and will be automatically submitted once your connection is restored."));
+                        closeReportModal();
+                        return;
+                    }
+                    alert(data.message || data.error || "The feedback could not be saved.");
                     setButtonLoading(activeBtn, false);
                     return;
                 }
@@ -2031,6 +2329,11 @@
                     report.visitArchived = false;
                     report.visitScheduleStamp = "";
                 }
+                updateLocalReportState(report.id, (r) => ({
+                    ...r,
+                    status: report.status,
+                    visit_request_reason: feedbackReason
+                }));
                 applyStatusStyle(report);
                 if (typeof window.renderReportsGrid === "function") {
                     try { window.renderReportsGrid(); } catch (e) { console.debug(e); }
@@ -2043,8 +2346,26 @@
                 closeReportModal();
                 window.location.reload();
             } catch (error) {
-                alert("The feedback could not be saved right now.");
-                setButtonLoading(activeBtn, false);
+                queueOfflineAction({
+                    type: 'farmer-feedback',
+                    report_id: report.id,
+                    payload: { confirmation: feedbackChoice, reason: feedbackReason }
+                });
+                report.status = feedbackChoice === "resolved" ? "resolved" : "Awaiting Confirmed Schedule";
+                if (feedbackChoice !== "resolved") {
+                    report.visitArchived = false;
+                    report.visitScheduleStamp = "";
+                }
+                updateLocalReportState(report.id, (r) => ({
+                    ...r,
+                    status: report.status,
+                    visit_request_reason: feedbackReason
+                }));
+                applyStatusStyle(report);
+                renderWorkflowActions(currentReportModalMode, report);
+                const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+                alert(t('modal.feedback_offline_saved', "Offline Mode: Your response has been saved locally and will be automatically submitted once your connection is restored."));
+                closeReportModal();
             }
             return;
         }
@@ -2339,6 +2660,9 @@
             modalRoot.setAttribute("aria-hidden", "true");
         }
 
+        document.getElementById("visit-schedule-mini-modal")?.remove();
+        document.getElementById("visit-reschedule-mini-modal")?.remove();
+
         currentReportModalRecord = null;
         currentReportModalMode = "farmer";
 
@@ -2570,8 +2894,47 @@
         startVisitDiscussionPoll(report);
     }
 
+    window.toggleVisitDiscussion = function (event) {
+        if (event) {
+            if (typeof event.stopPropagation === 'function') event.stopPropagation();
+            if (typeof event.preventDefault === 'function') event.preventDefault();
+        }
+        const report = currentReportModalRecord;
+        const body = document.getElementById("visit-discussion-body");
+        const toggleBtn = document.getElementById("visit-discussion-toggle");
+        
+        let isNowExpanded = true;
+        if (body) {
+            const isCurrentlyHidden = body.style.display === "none";
+            isNowExpanded = isCurrentlyHidden;
+            body.style.display = isNowExpanded ? "grid" : "none";
+        } else if (report) {
+            isNowExpanded = !Boolean(report.visitDiscussionExpanded);
+        }
+
+        if (toggleBtn) {
+            toggleBtn.setAttribute("aria-expanded", isNowExpanded ? "true" : "false");
+            const chevron = toggleBtn.querySelector("span:last-child");
+            if (chevron) {
+                chevron.style.transform = `rotate(${isNowExpanded ? 90 : 0}deg)`;
+            }
+        }
+        if (report) {
+            report.visitDiscussionExpanded = isNowExpanded;
+        }
+        if (!body || !toggleBtn) {
+            try {
+                renderVisitDiscussionCard(currentReportModalMode, report);
+            } catch (renderErr) {
+                console.warn("Failed to render visit discussion card on toggle:", renderErr);
+            }
+        }
+    };
+
     window.openReportModal = openReportModal;
     window.closeReportModal = closeReportModal;
+    window.openRequestRescheduleModal = openRequestRescheduleModal;
+    window.openFinalizeVisitScheduleModal = openFinalizeVisitScheduleModal;
     window.resolveReportImageUrl = resolveReportImageUrl;
     window.setReportModalSubmissionState = setReportModalSubmissionState;
     window.abortReportSubmission = abortActiveReportModalSubmission;

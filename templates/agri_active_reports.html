@@ -1255,37 +1255,6 @@
             selectedReportRecord = null;
         }
 
-        function submitExpertValidation() {
-            const advice = document.getElementById("expert-notes-input").value.trim();
-            if(!advice) {
-                alert("Please write treatment recommendations before submitting.");
-                return;
-            }
-
-            fetch('/agriculturist/approve-report', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    report_id: selectedReportRecord.id,
-                    recommendation: advice
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if(data.success) {
-                        alert(data.message);
-                        closeReviewModal();
-                        location.reload(); 
-                    } else {
-                    alert("Pipeline error: " + data.message);
-                }
-            })
-            .catch(err => {
-                alert(`Offline Environment Mock Success:\nRecommendation advice applied successfully to Report #${selectedReportRecord.id}.`);
-                closeReviewModal();
-            });
-        }
-
         function toggleSidebarMenu() {
             const sidebar = document.getElementById('sidebar');
             const backdrop = document.getElementById('backdrop');

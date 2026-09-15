@@ -1169,10 +1169,6 @@
 
             <div class="pagination-meta" id="pagination-summary"></div>
             <div class="pagination-container" id="pagination-wrapper" style="display: none;"></div>
-{% endblock %}
-
-{% block extra_scripts %}
-</div>
 
     <!-- Shared report summary modal reused across the app -->
     {% include 'components/report_modal.html' %}
@@ -1235,7 +1231,9 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
+{% block extra_scripts %}
     <script type="application/json" id="farmer-reports-data">
         {{ reports_data | tojson | safe }}
     </script>
@@ -1954,6 +1952,76 @@
             selectedReportRecord = null;
         }
 
+        function handleOfflineFollowUp(reportId, extraNotes) {
+            if (typeof window.queueOfflineReportAction === 'function') {
+                window.queueOfflineReportAction({
+                    type: 'follow_up',
+                    report_id: reportId,
+                    payload: { notes: extraNotes }
+                });
+            } else {
+                try {
+                    const raw = localStorage.getItem('cocoscan_offline_actions_queue') || '[]';
+                    const queue = JSON.parse(raw);
+                    queue.push({
+                        type: 'follow_up',
+                        report_id: reportId,
+                        payload: { notes: extraNotes },
+                        id: 'offline_act_' + Date.now(),
+                        created_at: new Date().toISOString()
+                    });
+                    localStorage.setItem('cocoscan_offline_actions_queue', JSON.stringify(queue));
+                } catch (e) {
+                    console.warn(e);
+                }
+            }
+
+            if (selectedReportRecord) {
+                selectedReportRecord.status = 'Under Review';
+                selectedReportRecord.farmer_notes = (selectedReportRecord.farmer_notes || '') + '\n\nFollow-up update: ' + extraNotes;
+            }
+
+            try {
+                const rawReports = localStorage.getItem('cocoscan_cached_farmer_reports');
+                if (rawReports) {
+                    let reports = JSON.parse(rawReports);
+                    if (Array.isArray(reports)) {
+                        reports = reports.map(r => {
+                            if (String(r.id) === String(reportId)) {
+                                return {
+                                    ...r,
+                                    status: 'Under Review',
+                                    farmer_notes: (r.farmer_notes || '') + '\n\nFollow-up update: ' + extraNotes
+                                };
+                            }
+                            return r;
+                        });
+                        if (window.CocoScanAuth && typeof window.CocoScanAuth.cacheFarmerReports === 'function') {
+                            window.CocoScanAuth.cacheFarmerReports(reports);
+                        } else {
+                            localStorage.setItem('cocoscan_cached_farmer_reports', JSON.stringify(reports));
+                        }
+                    }
+                }
+            } catch (e) {
+                console.debug(e);
+            }
+
+            document.getElementById('followup-modal').classList.remove('open-modal');
+            const submitBtn = document.querySelector('#followup-modal .submit-primary');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('btn-loading');
+                submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Follow Up';
+            }
+
+            const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+            alert(t('modal.followup_offline_saved', 'Offline Mode: Your follow-up notes have been saved locally and will be automatically submitted once you regain connection.'));
+            if (typeof renderReports === 'function') {
+                renderReports();
+            }
+        }
+
         function submitFollowUpData() {
             if (!selectedReportRecord) {
                 alert('Please open a report before submitting a follow-up.');
@@ -1963,6 +2031,12 @@
             const extraNotes = document.getElementById('fup-input-text').value.trim();
             if (!extraNotes) {
                 alert('Please describe the follow-up update before submitting.');
+                return;
+            }
+
+            const isOffline = !navigator.onLine || (typeof localStorage !== 'undefined' && localStorage.getItem('cocoscan_offline_active') === 'true');
+            if (isOffline) {
+                handleOfflineFollowUp(selectedReportRecord.id, extraNotes);
                 return;
             }
 
@@ -2001,13 +2075,8 @@
                     alert(data.message || 'Unable to submit the follow-up right now.');
                 })
                 .catch(error => {
-                    console.error('Follow-up submission error:', error);
-                    if (submitBtn) {
-                        submitBtn.disabled = false;
-                        submitBtn.classList.remove('btn-loading');
-                        submitBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Follow Up';
-                    }
-                    alert('Unable to submit the follow-up right now.');
+                    console.warn('Network error, saving follow-up offline:', error);
+                    handleOfflineFollowUp(selectedReportRecord.id, extraNotes);
                 });
         }
 

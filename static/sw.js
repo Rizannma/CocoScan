@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cocoscan-app-shell-v18';
-const RUNTIME_CACHE = 'cocoscan-pages-runtime-v18';
-const IMAGE_CACHE = 'cocoscan-report-images-v18';
+const CACHE_NAME = 'cocoscan-app-shell-v21';
+const RUNTIME_CACHE = 'cocoscan-pages-runtime-v21';
+const IMAGE_CACHE = 'cocoscan-report-images-v21';
 
 // Only precache truly public, unauthenticated assets to prevent login redirect caching corruption
 const PRECACHE_ASSETS = [
@@ -33,15 +33,15 @@ const PRECACHE_ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[SW v18] Precaching Public App Shell & Webfonts');
+            console.log('[SW v21] Precaching Public App Shell & Webfonts');
             return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-                console.warn('[SW v18] Precache assets load warning:', err);
+                console.warn('[SW v21] Precache assets load warning:', err);
             });
         }).then(() => self.skipWaiting())
     );
 });
 
-// Activate event: Clean up legacy caches (v1-v17)
+// Activate event: Clean up legacy caches (v1-v20)
 self.addEventListener('activate', (event) => {
     const currentCaches = [CACHE_NAME, RUNTIME_CACHE, IMAGE_CACHE];
     event.waitUntil(
@@ -49,7 +49,7 @@ self.addEventListener('activate', (event) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
                     if (!currentCaches.includes(cacheName)) {
-                        console.log('[SW v18] Deleting legacy cache:', cacheName);
+                        console.log('[SW v21] Deleting legacy cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })

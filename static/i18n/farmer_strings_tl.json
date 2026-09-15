@@ -379,7 +379,10 @@
     "reschedule_btn_submitting": "Ipinapasa...",
     "reschedule_success": "Naipasa na ang kahilingan para sa bagong iskedyul.",
     "alert_select_reason": "Mangyaring pumili ng dahilan bago ipasa ang kahilingan.",
-    "alert_provide_details": "Mangyaring magbigay ng paliwanag para sa 'Iba pa'."
+    "alert_provide_details": "Mangyaring magbigay ng paliwanag para sa 'Iba pa'.",
+    "reschedule_offline_saved": "Offline Mode: Ang iyong kahilingan para sa bagong iskedyul ay na-save sa device at awtomatikong ipapadala kapag nagkaroon ng koneksyon.",
+    "feedback_offline_saved": "Offline Mode: Ang iyong tugon ay na-save sa device at awtomatikong ipapadala kapag nagkaroon ng koneksyon.",
+    "followup_offline_saved": "Offline Mode: Ang iyong follow-up ay na-save sa device at awtomatikong ipapadala kapag nagkaroon ng koneksyon."
   },
   "pest_recommendations": {
     "tooltip_sanitation": "<strong>Hakbang 1:</strong> Tipunin ang lahat ng tuyong dahon, nabubulok na puno, at laglag na bunga.<br><strong>Hakbang 2:</strong> Sunugin o ibaon nang malalim malayo sa malulusog na puno upang masira ang pinamumugaran ng peste.",

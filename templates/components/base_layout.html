@@ -1004,7 +1004,7 @@
         {% block content %}{% endblock %}
     </main>
     </div>
-    <script src="{{ url_for('static', filename='js/report_modal.js') }}?v=16"></script>
+    <script src="{{ url_for('static', filename='js/report_modal.js') }}?v=21"></script>
 
     <script id="chart-data" type="application/json">
         {{ (chart_data if chart_data is defined and chart_data else {}) | tojson }}

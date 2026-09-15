@@ -298,8 +298,13 @@ def _resolve_app_user_id(session_data=None, *, lookup_user_id=None, lookup_email
 
     candidate_id = active_session.get("user_id")
     email = str(active_session.get("user_email") or active_session.get("email") or "").strip()
+    if not email:
+        try:
+            email = str(request.cookies.get('cocoscan_user_email') or '').strip()
+        except Exception:
+            pass
 
-    if candidate_id:
+    if candidate_id and candidate_id != 'offline_farmer':
         if lookup_user_id is not None:
             if lookup_user_id(candidate_id):
                 return candidate_id
@@ -543,16 +548,26 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
             extra_updates = {k: v for k, v in extra_updates.items() if k != "farmer_notes"}
         update_data.update(extra_updates)
 
-    update_response = supabase.table("reports").update(update_data).eq("id", report_id).execute()
+    try:
+        update_response = supabase.table("reports").update(update_data).eq("id", report_id).execute()
+    except Exception as upd_err:
+        logger.warning(f"Error updating report workflow with full payload: {upd_err}, attempting fallback...")
+        minimal_update = {
+            "status": norm_status,
+            "updated_at": now_iso,
+        }
+        if "farmer_notes" in update_data:
+            minimal_update["farmer_notes"] = update_data["farmer_notes"]
+        update_response = supabase.table("reports").update(minimal_update).eq("id", report_id).execute()
 
     try:
         from app.push_service import send_push_notification
-        report_data = supabase.table("reports").select("user_id, user_email, pest_detected, pest").eq("id", report_id).execute()
+        report_data = supabase.table("reports").select("user_id, pest_type").eq("id", report_id).execute()
         rows = getattr(report_data, "data", None) or []
         if rows:
             r_row = rows[0]
-            target_user = r_row.get("user_id") or r_row.get("user_email")
-            pest = r_row.get("pest_detected") or r_row.get("pest") or "Coconut Report"
+            target_user = r_row.get("user_id")
+            pest = r_row.get("pest_type") or "Coconut Report"
             send_push_notification(
                 user_id=target_user,
                 title="CocoScan Status Update",
@@ -3040,6 +3055,7 @@ def farmer_follow_up_report():
         return jsonify({'success': False, 'message': 'The follow-up could not be saved.'}), 500
     
 @app.route('/agriculturist/submit-assessment', methods=['POST'])
+@app.route('/agriculturist/approve-report', methods=['POST'])
 @require_role('agri_expert')
 def agriculturist_submit_assessment():
     """Save the agriculturist assessment notes and advance the report to assessment issued."""
@@ -3106,7 +3122,7 @@ def agriculturist_submit_assessment():
 
 
 @app.route('/farmer/submit-assessment-feedback', methods=['POST'])
-@require_role('farmer')
+@require_role('farmer', 'agri_expert', 'lgu', 'admin')
 def farmer_submit_assessment_feedback():
     """Let the farmer confirm whether the assessment resolved the issue or request a visit."""
     user_id = _get_current_app_user_id()
@@ -3119,6 +3135,19 @@ def farmer_submit_assessment_feedback():
 
         if not report_id:
             return jsonify({'success': False, 'message': 'Missing report reference'}), 400
+
+        try:
+            report_id = int(report_id)
+        except (ValueError, TypeError):
+            pass
+
+        if not user_id or user_id == 'offline_farmer':
+            try:
+                r_check = supabase.table('reports').select('user_id').eq('id', report_id).execute()
+                if r_check and getattr(r_check, 'data', None) and len(r_check.data) > 0:
+                    user_id = r_check.data[0].get('user_id')
+            except Exception as e:
+                logger.debug(f"Could not fallback user_id from report: {e}")
 
         if confirmation == 'resolved' or confirmation == 'yes':
             note = "Farmer confirmed the assessment resolved the issue."
@@ -3136,17 +3165,22 @@ def farmer_submit_assessment_feedback():
                     'visit_requested_at': datetime.now(UTC).isoformat(),
                 },
             )
+
             if getattr(update_response, 'error', None):
                 logger.error(f"Assessment feedback update failed: {update_response.error}")
                 return jsonify({'success': False, 'message': 'The feedback could not be saved.'}), 500
 
-            chat_insert_response = supabase.table('visit_chats').insert({
-                'report_id': report_id,
-                'sender_id': user_id,
-                'message': reason,
-            }).execute()
-            if getattr(chat_insert_response, 'error', None):
-                logger.warning(f"Visit chat insert failed: {chat_insert_response.error}")
+            if user_id and user_id != 'offline_farmer':
+                try:
+                    chat_insert_response = supabase.table('visit_chats').insert({
+                        'report_id': report_id,
+                        'sender_id': user_id,
+                        'message': reason,
+                    }).execute()
+                    if getattr(chat_insert_response, 'error', None):
+                        logger.warning(f"Visit chat insert failed: {chat_insert_response.error}")
+                except Exception as c_err:
+                    logger.warning(f"Visit chat insert exception: {c_err}")
 
         if getattr(update_response, 'error', None):
             logger.error(f"Assessment feedback update failed: {update_response.error}")
@@ -3159,11 +3193,10 @@ def farmer_submit_assessment_feedback():
 
 
 @app.route('/reports/<int:report_id>/visit-discussion', methods=['GET'])
+@require_role('farmer', 'agri_expert', 'lgu', 'admin')
 def get_visit_discussion(report_id):
     user_id = _get_current_app_user_id()
     user_role = normalize_role(session.get('user_role'))
-    if not user_id or user_role not in {'farmer', 'agri_expert', 'lgu', 'admin'}:
-        return jsonify({'success': False, 'message': 'Unauthorized user session'}), 403
 
     payload = _fetch_visit_workflow_payload(report_id)
     report_row = payload.get('report') or {}
@@ -3183,11 +3216,18 @@ def get_visit_discussion(report_id):
 
 
 @app.route('/reports/<int:report_id>/visit-chat', methods=['POST'])
+@require_role('farmer', 'agri_expert', 'lgu', 'admin')
 def save_visit_chat(report_id):
     user_id = _get_current_app_user_id()
     user_role = normalize_role(session.get('user_role'))
-    if not user_id or user_role not in {'farmer', 'agri_expert'}:
-        return jsonify({'success': False, 'message': 'Unauthorized user session'}), 403
+
+    if not user_id or user_id == 'offline_farmer':
+        try:
+            r_check = supabase.table('reports').select('user_id').eq('id', report_id).execute()
+            if r_check and getattr(r_check, 'data', None) and len(r_check.data) > 0:
+                user_id = r_check.data[0].get('user_id')
+        except Exception as e:
+            logger.debug(f"Could not fallback user_id from report: {e}")
 
     try:
         payload = request.get_json(silent=True) or {}
@@ -3201,14 +3241,17 @@ def save_visit_chat(report_id):
         if _should_archive_visit_discussion(current_status, report_row.get('visit_reschedule_reason')):
             return jsonify({'success': False, 'message': 'The visit discussion is archived.'}), 400
 
-        insert_response = supabase.table('visit_chats').insert({
-            'report_id': report_id,
-            'sender_id': user_id,
-            'message': message,
-        }).execute()
-        if getattr(insert_response, 'error', None):
-            logger.error(f"Visit chat insert failed: {insert_response.error}")
-            return jsonify({'success': False, 'message': 'The message could not be saved.'}), 500
+        if user_id and user_id != 'offline_farmer':
+            try:
+                insert_response = supabase.table('visit_chats').insert({
+                    'report_id': report_id,
+                    'sender_id': user_id,
+                    'message': message,
+                }).execute()
+                if getattr(insert_response, 'error', None):
+                    logger.error(f"Visit chat insert failed: {insert_response.error}")
+            except Exception as c_err:
+                logger.warning(f"Visit chat insert exception: {c_err}")
 
         _update_report_workflow(report_id, 'Awaiting Confirmed Schedule')
 
@@ -3279,12 +3322,27 @@ def api_push_subscribe():
 
 
 @app.route('/reports/<int:report_id>/request-reschedule', methods=['POST'])
+@require_role('farmer', 'agri_expert', 'lgu', 'admin')
 def request_visit_reschedule(report_id):
     user_id = _get_current_app_user_id()
     user_role = normalize_role(session.get('user_role'))
 
-    if not user_id or user_role not in {'farmer', 'agri_expert'}:
-        return jsonify({'success': False, 'message': 'Unauthorized user session'}), 403
+    if not user_id or user_id == 'offline_farmer':
+        try:
+            r_check = supabase.table('reports').select('user_id').eq('id', report_id).execute()
+            if r_check and getattr(r_check, 'data', None) and len(r_check.data) > 0:
+                user_id = r_check.data[0].get('user_id')
+        except Exception as e:
+            logger.debug(f"Could not fallback user_id from report: {e}")
+
+    rescheduled_by_uuid = None
+    if user_id and user_id != 'offline_farmer':
+        try:
+            import uuid
+            uuid.UUID(str(user_id))
+            rescheduled_by_uuid = str(user_id)
+        except (ValueError, TypeError):
+            rescheduled_by_uuid = None
 
     try:
         payload = request.get_json(silent=True) or {}
@@ -3299,22 +3357,40 @@ def request_visit_reschedule(report_id):
             extra_updates={
                 'visit_reschedule_reason': reason,
                 'visit_rescheduled_at': datetime.now(UTC).isoformat(),
+                'visit_rescheduled_by': rescheduled_by_uuid,
             },
         )
         if getattr(update_response, 'error', None):
-            logger.error(f"Reschedule request update failed: {update_response.error}")
-            return jsonify({'success': False, 'message': 'The reschedule request could not be saved.'}), 500
+            logger.warning(f"Reschedule request update with extra_updates failed: {update_response.error}, falling back")
+            update_response = _update_report_workflow(
+                report_id,
+                'Awaiting Confirmed Schedule',
+                note=f"Reschedule requested: {reason}"
+            )
+            if getattr(update_response, 'error', None):
+                logger.error(f"Reschedule request fallback update failed: {update_response.error}")
+                return jsonify({'success': False, 'message': 'The reschedule request could not be saved.'}), 500
 
         message = f"Reschedule requested: {reason}"
-        chat_insert_response = supabase.table('visit_chats').insert({
-            'report_id': report_id,
-            'sender_id': user_id,
-            'message': message,
-        }).execute()
-        if getattr(chat_insert_response, 'error', None):
-            logger.warning(f"Reschedule chat insert failed: {chat_insert_response.error}")
+        if rescheduled_by_uuid:
+            try:
+                chat_insert_response = supabase.table('visit_chats').insert({
+                    'report_id': report_id,
+                    'sender_id': rescheduled_by_uuid,
+                    'message': message,
+                }).execute()
+                if getattr(chat_insert_response, 'error', None):
+                    logger.warning(f"Reschedule chat insert failed: {chat_insert_response.error}")
+            except Exception as c_err:
+                logger.warning(f"Reschedule chat insert exception: {c_err}")
 
-        return jsonify({'success': True, 'message': 'Reschedule request submitted.'})
+        return jsonify({
+            'success': True,
+            'message': 'Reschedule request submitted.',
+            'status': 'Awaiting Confirmed Schedule',
+            'schedule_title': 'Reschedule Requested',
+            'visit_reschedule_reason': reason,
+        })
     except Exception as e:
         logger.error(f"Error requesting visit reschedule: {str(e)}")
         return jsonify({'success': False, 'message': 'The reschedule request could not be submitted.'}), 500
