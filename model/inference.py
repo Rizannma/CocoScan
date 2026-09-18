@@ -16,7 +16,7 @@ os.environ.setdefault("KERAS_BACKEND", "torch")
 logger = logging.getLogger(__name__)
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "model"
-PEST_MODEL_FILE_NAME = "pest_classifier_moderate.h5"
+PEST_MODEL_FILE_NAME = "pest_classifier.h5"
 
 # The trained 4-class pest model output order:
 # [Brontispa, Healthy Coconut Leaf, Rhinoceros Beetle, Not a Coconut Leaf Image]
@@ -287,7 +287,7 @@ def _get_labels(num_classes: int, base_labels: List[str] = PEST_LABELS) -> List[
 
 def predict_pest(image: Image.Image, model_path: Optional[str] = None) -> Dict:
     """
-    Run single-model pest classification on a PIL Image using pest_classifier_moderate.h5.
+    Run single-model pest classification on a PIL Image using pest_classifier.h5.
     Returns predicted_pest label, confidence_score, and class probabilities.
     """
     try:

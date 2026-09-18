@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-DEFAULT_PEST_MODEL = "pest_classifier_moderate.h5"
+DEFAULT_PEST_MODEL = "pest_classifier.h5"
 
 
 def resolve_model_path(

@@ -101,7 +101,7 @@ app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Preload H5 AI pest classification model once globally at startup
 try:
     from model.inference import preload_models
-    _startup_pest_path = resolve_model_path('PEST_MODEL_PATH', 'pest_classifier_moderate.h5')
+    _startup_pest_path = resolve_model_path('PEST_MODEL_PATH', 'pest_classifier.h5')
     preload_models(pest_model_path=_startup_pest_path)
 except Exception as _startup_exc:
     logger.warning(f"Startup global AI model preloading notice: {_startup_exc}")
@@ -2295,7 +2295,7 @@ def farmer_predict():
         
         pest_model_path = resolve_model_path(
             'PEST_MODEL_PATH',
-            'pest_classifier_moderate.h5'
+            'pest_classifier.h5'
         )
 
         if not os.path.exists(pest_model_path):

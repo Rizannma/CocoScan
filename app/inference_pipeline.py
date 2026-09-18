@@ -1,6 +1,6 @@
 """
 Integrated inference pipeline for CocoScan using the Keras H5 pest classification model:
-- pest_classifier_moderate.h5
+- pest_classifier.h5
 
 Handles: image preparation -> pest model inference -> safe initial recommendations -> aggressive memory cleanup.
 """
@@ -67,7 +67,7 @@ def run_full_inference_pipeline(
     """
     Execute the single-model pest inference pipeline:
     1. Prepare and downscale the input image safely.
-    2. Run pest classification using pest_classifier_moderate.h5.
+    2. Run pest classification using pest_classifier.h5.
     3. Generate safe, non-invasive initial recommendations tailored to the detected pest.
     4. Aggressively clear memory and GPU caches.
     """
