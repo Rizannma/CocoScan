@@ -307,7 +307,6 @@
             <button id="filter-all-btn" class="chip-filter-btn active-chip">All</button>
             <button id="filter-barangay-btn" class="chip-filter-btn">Barangay ▾</button>
             <button id="filter-status-btn" class="chip-filter-btn">Status ▾</button>
-            <button id="filter-severity-btn" class="chip-filter-btn">Severity ▾</button>
             <div style="position: relative; display: inline-flex;">
                 <button type="button" id="filter-calendar-btn" class="chip-filter-btn" title="Filter by date"><i
                         class="fa-solid fa-calendar-days"></i></button>
@@ -330,12 +329,6 @@
             style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:220px; max-height:240px; overflow:auto; pointer-events:auto;">
         </div>
     </div>
-    <div id="severity-dropdown" class="filter-dropdown"
-        style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
-        <div class="filter-dropdown-panel"
-            style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:200px; max-height:240px; overflow:auto; pointer-events:auto;">
-        </div>
-    </div>
 </div>
 
 <div
@@ -346,7 +339,6 @@
                 <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Date</th>
                 <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Location</th>
                 <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Pest Type</th>
-                <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Severity</th>
                 <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Status</th>
                 <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; text-align: center;">Action</th>
             </tr>
@@ -373,26 +365,23 @@
         let activeSearchQuery = "";
         let activeBarangayFilter = "all";
         let activeStatusFilter = "all";
-        let activeSeverityFilter = "all";
         let activeDateFilter = "";
         let currentPage = 1;
         const recordsPerPage = 10;
 
         function getFilteredReports() {
             return allReportsData.filter(item => {
-                const searchStr = `${item.formatted_date || ""} ${item.formatted_location || ""} ${item.pest_type || ""} ${item.normalized_status || ""} ${item.barangay || ""} ${item.municipality || ""} ${item.severity || item.damage_severity || ""}`.toLowerCase();
+                const searchStr = `${item.formatted_date || ""} ${item.formatted_location || ""} ${item.pest_type || ""} ${item.normalized_status || ""} ${item.barangay || ""} ${item.municipality || ""}`.toLowerCase();
                 const matchesSearch = !activeSearchQuery || searchStr.includes(activeSearchQuery);
                 const matchesBarangay = activeBarangayFilter === "all" || String(item.barangay || "").toLowerCase() === activeBarangayFilter.toLowerCase();
                 const matchesStatus = activeStatusFilter === "all" || String(item.status || "").toLowerCase() === activeStatusFilter.toLowerCase() || String(item.normalized_status || "").toLowerCase() === activeStatusFilter.toLowerCase();
-                const itemSev = String(item.severity || item.damage_severity || "").toLowerCase();
-                const matchesSeverity = activeSeverityFilter === "all" || itemSev === activeSeverityFilter.toLowerCase();
                 const matchesDate = !activeDateFilter || String(item.formatted_date || item.created_at || "").includes(activeDateFilter) || String(item.date || "").includes(activeDateFilter);
-                return matchesSearch && matchesBarangay && matchesStatus && matchesSeverity && matchesDate;
+                return matchesSearch && matchesBarangay && matchesStatus && matchesDate;
             });
         }
 
         function updateFilterUI() {
-            const hasFilter = Boolean(activeSearchQuery || activeBarangayFilter !== "all" || activeStatusFilter !== "all" || activeSeverityFilter !== "all" || activeDateFilter);
+            const hasFilter = Boolean(activeSearchQuery || activeBarangayFilter !== "all" || activeStatusFilter !== "all" || activeDateFilter);
             const clearBtn = document.getElementById("clear-filters-btn");
             if (clearBtn) {
                 clearBtn.style.display = hasFilter ? "inline-flex" : "none";
@@ -410,11 +399,6 @@
             if (statusBtn) {
                 statusBtn.classList.toggle("active-chip", activeStatusFilter !== "all");
                 statusBtn.textContent = activeStatusFilter !== "all" ? `${activeStatusFilter} ▾` : "Status ▾";
-            }
-            const sevBtn = document.getElementById("filter-severity-btn");
-            if (sevBtn) {
-                sevBtn.classList.toggle("active-chip", activeSeverityFilter !== "all");
-                sevBtn.textContent = activeSeverityFilter !== "all" ? `${activeSeverityFilter} ▾` : "Severity ▾";
             }
             const calBtn = document.getElementById("filter-calendar-btn");
             if (calBtn) {
@@ -453,19 +437,11 @@
                 tr.style.cssText = "border-bottom: 1px solid var(--bg-base, #f1f5f9); transition: background-color 0.2s;";
                 const bg = report.badge_style?.backgroundColor || "#f1f5f9";
                 const col = report.badge_style?.color || "#334155";
-                
-                const sevVal = report.severity || report.damage_severity || 'Moderate';
-                const sevLower = String(sevVal).toLowerCase();
-                const sevClass = sevLower.includes('severe') ? 'severe' : (sevLower.includes('mild') ? 'mild' : 'moderate');
-                const sevLabel = sevLower.includes('severe') ? 'Severe' : (sevLower.includes('mild') ? 'Mild' : 'Moderate');
 
                 tr.innerHTML = `
                     <td style="padding: 16px 12px; font-size: 0.9rem;">${report.formatted_date || ""}</td>
                     <td style="padding: 16px 12px; font-size: 0.9rem; font-weight: 500;">${report.formatted_location || ""}</td>
                     <td style="padding: 16px 12px; font-size: 0.9rem;">${report.pest_type || ""}</td>
-                    <td style="padding: 16px 12px; font-size: 0.9rem;">
-                        <span class="sched-severity-pill ${sevClass}">${sevLabel}</span>
-                    </td>
                     <td style="padding: 16px 12px; font-size: 0.9rem;">
                         <span class="report-status-badge" style="background-color: ${bg}; color: ${col}; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">
                             ${report.normalized_status || report.status || ""}
@@ -498,12 +474,15 @@
             activeSearchQuery = "";
             activeBarangayFilter = "all";
             activeStatusFilter = "all";
-            activeSeverityFilter = "all";
             activeDateFilter = "";
+            currentPage = 1;
+
             const searchInput = document.getElementById("report-search");
             if (searchInput) searchInput.value = "";
+
             const dateInput = document.getElementById("report-date-filter");
             if (dateInput) dateInput.value = "";
+
             renderReportsTable();
         };
 
@@ -599,43 +578,6 @@
                 currentPage = 1;
                 statusPanel.style.display = "none";
                 statusPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activeStatusFilter));
-                renderReportsTable();
-            });
-        }
-
-        // Build Severity Dropdown
-        const sevBtn = document.getElementById("filter-severity-btn");
-        const sevPanel = document.querySelector("#severity-dropdown .filter-dropdown-panel");
-        const sevOptions = [
-            { value: "all", label: "All Severities" },
-            { value: "Mild", label: "Mild" },
-            { value: "Moderate", label: "Moderate" },
-            { value: "Severe", label: "Severe" }
-        ];
-        if (sevBtn && sevPanel) {
-            let sevHtml = "";
-            sevOptions.forEach(s => {
-                sevHtml += `<button type="button" class="dropdown-item ${activeSeverityFilter === s.value ? 'selected' : ''}" data-value="${s.value}">${s.label}</button>`;
-            });
-            sevPanel.innerHTML = sevHtml;
-
-            sevBtn.addEventListener("click", function (e) {
-                e.stopPropagation();
-                const rect = sevBtn.getBoundingClientRect();
-                sevPanel.style.top = `${rect.bottom + 6}px`;
-                sevPanel.style.left = `${rect.left}px`;
-                const isVisible = sevPanel.style.display === "block";
-                document.querySelectorAll(".filter-dropdown-panel").forEach(p => p.style.display = "none");
-                sevPanel.style.display = isVisible ? "none" : "block";
-            });
-
-            sevPanel.addEventListener("click", function (e) {
-                const item = e.target.closest(".dropdown-item");
-                if (!item) return;
-                activeSeverityFilter = item.getAttribute("data-value");
-                currentPage = 1;
-                sevPanel.style.display = "none";
-                sevPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activeSeverityFilter));
                 renderReportsTable();
             });
         }

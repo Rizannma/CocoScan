@@ -2037,8 +2037,6 @@
                 window.currentPrediction = {
                     ...data,
                     pest: data.pest,
-                    severity: data.severity || 'Moderate',
-                    damage_percentage: data.damage_percentage || 50,
                     confidence: `${data.pest_confidence}%`,
                     timestamp: formattedTimestamp,
                     location_text: locationStr,
@@ -2059,11 +2057,6 @@
                     initial_recommendations: Array.isArray(data.recommendations) ? data.recommendations : [],
                     status: 'Ready to Submit'
                 };
-
-                const sevNode = document.getElementById('report-severity-text');
-                if (sevNode) {
-                    sevNode.textContent = data.severity || 'Moderate';
-                }
 
                 renderSupportingPreviews();
                 if (typeof window.openReportModal === 'function') {
@@ -2130,9 +2123,6 @@
 
             const formData = new FormData();
             formData.append('pest_type', compiledPest);
-            formData.append('severity', predictionData.severity || 'Moderate');
-            formData.append('damage_severity', predictionData.severity || 'Moderate');
-            formData.append('damage_percentage', predictionData.damage_percentage || 50);
             formData.append('farmer_notes', additionalNotes);
             formData.append('location_notes', globalPrimaryGPS?.displayName || additionalNotes);
             formData.append('confidence', predictionData.pest_confidence || 0);
@@ -2232,9 +2222,6 @@
                 saved_at: new Date().toISOString(),
                 status: isOfflineSubmit ? 'offline_draft' : 'draft',
                 pest: compiledPest,
-                severity: window.currentPrediction?.severity || 'Moderate',
-                damage_severity: window.currentPrediction?.severity || 'Moderate',
-                damage_percentage: window.currentPrediction?.damage_percentage || 50,
                 confidence: compiledConfidence,
                 farmer_notes: additionalNotes,
                 recommendations: Array.isArray(window.currentPrediction?.recommendations) ? window.currentPrediction.recommendations : [],
@@ -2476,7 +2463,6 @@
             window.currentPrediction = {
                 pest: draft.pest || 'Offline Scan',
                 pest_confidence: draft.confidence_value || parseFloat((draft.confidence || '').replace('%', '')) || 0,
-                severity: 'Moderate',
                 recommendations: draft.recommendations || [],
                 confidence: draft.confidence || (draft.confidence_value ? `${draft.confidence_value}%` : '0%'),
                 timestamp: formatTimestampInManila(draft.photo_taken_at || new Date()),

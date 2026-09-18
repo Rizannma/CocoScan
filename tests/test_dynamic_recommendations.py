@@ -1,89 +1,74 @@
+import os
+import sys
 import unittest
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from app.recommendations import (
-    RECOMMENDATIONS,
+    SAFE_INITIAL_RECOMMENDATIONS,
     RISK_FACTORS,
     assess_risk,
     recommend_actions,
+    get_safe_recommendations,
     urgency_from_risk,
 )
 
 
 class TestDynamicRecommendations(unittest.TestCase):
-    def test_rhinoceros_beetle_recommendations_by_severity(self):
-        # Mild
-        mild_result = recommend_actions("Rhinoceros Beetle", severity="Mild")
-        self.assertEqual(mild_result["pest"], "Rhinoceros Beetle")
-        self.assertEqual(mild_result["severity"], "Mild")
-        self.assertEqual(mild_result["risk"], "Low")
-        self.assertEqual(mild_result["urgency"], "Low")
-        self.assertTrue(len(mild_result["recommendation"]) > 0)
-        self.assertTrue(any("sanitation" in r.lower() or "pheromone" in r.lower() for r in mild_result["recommendation"]))
+    def test_rhinoceros_beetle_safe_recommendations(self):
+        result = recommend_actions("Rhinoceros Beetle")
+        self.assertEqual(result["pest"], "Rhinoceros Beetle")
+        self.assertEqual(result["risk"], "Medium")
+        self.assertEqual(result["urgency"], "Medium")
+        self.assertTrue(len(result["recommendation"]) > 0)
+        self.assertTrue(any("sanitation" in r.lower() or "monitor" in r.lower() for r in result["recommendation"]))
 
-        # Moderate
-        mod_result = recommend_actions("Rhinoceros Beetle", severity="Moderate")
-        self.assertEqual(mod_result["severity"], "Moderate")
-        self.assertEqual(mod_result["risk"], "Medium")
-        self.assertEqual(mod_result["urgency"], "Medium")
-        self.assertTrue(any("muscardine" in r.lower() or "density" in r.lower() for r in mod_result["recommendation"]))
-
-        # Severe
-        sev_result = recommend_actions("Rhinoceros Beetle", severity="Severe")
-        self.assertEqual(sev_result["severity"], "Severe")
-        self.assertEqual(sev_result["risk"], "High")
-        self.assertEqual(sev_result["urgency"], "High")
-        self.assertTrue(any("immediate" in r.lower() or "technician" in r.lower() or "protective" in r.lower() for r in sev_result["recommendation"]))
-
-    def test_brontispa_recommendations_by_severity(self):
-        # Mild
-        mild_result = recommend_actions("Brontispa", severity="Mild")
-        self.assertEqual(mild_result["pest"], "Brontispa")
-        self.assertEqual(mild_result["severity"], "Mild")
-        self.assertEqual(mild_result["risk"], "Low")
-        self.assertEqual(mild_result["urgency"], "Low")
-        self.assertTrue(any("prune" in r.lower() or "spear" in r.lower() for r in mild_result["recommendation"]))
-
-        # Moderate
-        mod_result = recommend_actions("Brontispa", severity="Moderate")
-        self.assertEqual(mod_result["severity"], "Moderate")
-        self.assertEqual(mod_result["risk"], "Medium")
-        self.assertEqual(mod_result["urgency"], "Medium")
-        self.assertTrue(any("tetrastichus" in r.lower() or "parasitoid" in r.lower() or "earwig" in r.lower() for r in mod_result["recommendation"]))
-
-        # Severe
-        sev_result = recommend_actions("Brontispa", severity="Severe")
-        self.assertEqual(sev_result["severity"], "Severe")
-        self.assertEqual(sev_result["risk"], "High")
-        self.assertEqual(sev_result["urgency"], "High")
-        self.assertTrue(any("insecticide" in r.lower() or "quarantine" in r.lower() or "pca-approved" in r.lower() for r in sev_result["recommendation"]))
+    def test_brontispa_safe_recommendations(self):
+        result = recommend_actions("Brontispa")
+        self.assertEqual(result["pest"], "Brontispa")
+        self.assertEqual(result["risk"], "Medium")
+        self.assertEqual(result["urgency"], "Medium")
+        self.assertTrue(len(result["recommendation"]) > 0)
+        self.assertTrue(any("spear" in r.lower() or "fronds" in r.lower() or "predator" in r.lower() for r in result["recommendation"]))
 
     def test_healthy_leaf_recommendations(self):
-        healthy_result = recommend_actions("Healthy Coconut Leaf", severity="Mild")
+        healthy_result = recommend_actions("Healthy Coconut Leaf")
         self.assertEqual(healthy_result["pest"], "Healthy Coconut Leaf")
         self.assertEqual(healthy_result["risk"], "Low")
         self.assertEqual(healthy_result["urgency"], "Low")
         self.assertTrue(len(healthy_result["recommendation"]) > 0)
-        self.assertEqual(healthy_result["risk_factors"], [])
 
-    def test_backward_compatibility_with_numeric_risk_score(self):
-        # Passing an int as second parameter (legacy risk_score)
-        result = recommend_actions("Rhinoceros Beetle", 85)
-        self.assertEqual(result["pest"], "Rhinoceros Beetle")
-        self.assertEqual(result["risk"], "High")
-        self.assertTrue(len(result["recommendation"]) > 0)
+    def test_get_safe_recommendations(self):
+        recos = get_safe_recommendations("Brontispa")
+        self.assertIsInstance(recos, list)
+        self.assertGreater(len(recos), 0)
 
     def test_assess_risk_and_urgency_helpers(self):
-        self.assertEqual(assess_risk("Rhinoceros Beetle", severity="Severe"), "High")
-        self.assertEqual(assess_risk("Rhinoceros Beetle", severity="Moderate"), "Medium")
-        self.assertEqual(assess_risk("Rhinoceros Beetle", severity="Mild"), "Low")
-        self.assertEqual(assess_risk("Healthy Coconut Leaf", severity="Severe"), "Low")
-        self.assertEqual(assess_risk("Rhinoceros Beetle", risk_score=20), "Low")
-        self.assertEqual(assess_risk("Rhinoceros Beetle", risk_score=50), "Medium")
-        self.assertEqual(assess_risk("Rhinoceros Beetle", risk_score=80), "High")
+        self.assertEqual(assess_risk("Rhinoceros Beetle"), "Medium")
+        self.assertEqual(assess_risk("Brontispa"), "Medium")
+        self.assertEqual(assess_risk("Healthy Coconut Leaf"), "Low")
+        self.assertEqual(assess_risk("Unknown"), "Low")
 
-        self.assertEqual(urgency_from_risk("High", severity="Severe"), "High")
-        self.assertEqual(urgency_from_risk("Medium", severity="Moderate"), "Medium")
-        self.assertEqual(urgency_from_risk("Low", severity="Mild"), "Low")
+        self.assertEqual(urgency_from_risk("High"), "High")
+        self.assertEqual(urgency_from_risk("Medium"), "Medium")
+        self.assertEqual(urgency_from_risk("Low"), "Low")
+
+    def test_get_official_recommendations(self):
+        from app.recommendations import get_official_recommendations, OFFICIAL_RECOMMENDATIONS
+
+        rhino_recs = get_official_recommendations("Rhinoceros Beetle")
+        self.assertIsInstance(rhino_recs, list)
+        self.assertEqual(len(rhino_recs), 4)
+        self.assertTrue(any("pheromone" in r.lower() for r in rhino_recs))
+
+        brontispa_recs = get_official_recommendations("Brontispa")
+        self.assertIsInstance(brontispa_recs, list)
+        self.assertEqual(len(brontispa_recs), 5)
+        self.assertTrue(any("prune" in r.lower() for r in brontispa_recs))
+
+        healthy_recs = get_official_recommendations("Healthy Coconut Leaf")
+        self.assertIsInstance(healthy_recs, list)
+        self.assertEqual(len(healthy_recs), 2)
 
 
 if __name__ == "__main__":

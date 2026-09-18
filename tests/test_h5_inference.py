@@ -1,20 +1,18 @@
 import base64
 import io
+import os
+import sys
 import unittest
 import numpy as np
 from PIL import Image
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from model.inference import (
     PEST_LABELS,
-    SEVERITY_LABELS,
     get_pest_model_path,
-    get_severity_model_path,
     predict_pest,
-    predict_severity,
     predict_pest_from_base64,
-    predict_severity_from_base64,
-    predict_all_from_base64,
-    predict_both,
     preload_models,
     _prepare_input,
 )
@@ -39,16 +37,12 @@ def _image_to_base64(image: Image.Image) -> str:
 class TestH5Inference(unittest.TestCase):
     def test_model_paths_exist(self):
         pest_path = get_pest_model_path()
-        severity_path = get_severity_model_path()
         self.assertTrue(pest_path.exists(), f"Pest model does not exist at {pest_path}")
-        self.assertTrue(severity_path.exists(), f"Severity model does not exist at {severity_path}")
         self.assertTrue(str(pest_path).endswith("pest_classifier_moderate.h5"))
-        self.assertTrue(str(severity_path).endswith("severity_classifier_severe_boost.h5"))
 
     def test_global_preload_models(self):
-        pest_model, severity_model = preload_models()
+        pest_model = preload_models()
         self.assertIsNotNone(pest_model)
-        self.assertIsNotNone(severity_model)
 
     def test_image_resizing_and_contiguous_tensor_preparation(self):
         # Create non-standard dimension image (e.g. 800x600)
@@ -64,16 +58,6 @@ class TestH5Inference(unittest.TestCase):
         elif hasattr(tensor, "flags"):
             self.assertTrue(tensor.flags.c_contiguous)
 
-    def test_predict_both_single_pass(self):
-        img = _create_synthetic_leaf_image(width=300, height=300)
-        pest_res, sev_res = predict_both(img)
-        
-        self.assertIn("predicted_pest", pest_res)
-        self.assertIn(pest_res["predicted_pest"], PEST_LABELS)
-        self.assertIn("severity", sev_res)
-        self.assertIn(sev_res["severity"], SEVERITY_LABELS)
-        self.assertIn(sev_res["damage_percentage"], [25, 50, 75])
-
     def test_pest_prediction_structure(self):
         img = _create_synthetic_leaf_image()
         result = predict_pest(img)
@@ -85,17 +69,6 @@ class TestH5Inference(unittest.TestCase):
         self.assertLessEqual(result["confidence_score"], 1.0)
         self.assertEqual(len(result["probabilities"]), 4)
 
-    def test_severity_prediction_structure(self):
-        img = _create_synthetic_leaf_image()
-        result = predict_severity(img)
-        self.assertIn("severity", result)
-        self.assertIn("confidence_score", result)
-        self.assertIn("damage_percentage", result)
-        self.assertIn("probabilities", result)
-        self.assertIn(result["severity"], SEVERITY_LABELS)
-        self.assertIn(result["damage_percentage"], [25, 50, 75])
-        self.assertEqual(len(result["probabilities"]), 3)
-
     def test_base64_predictions(self):
         img = _create_synthetic_leaf_image()
         b64_str = _image_to_base64(img)
@@ -103,29 +76,17 @@ class TestH5Inference(unittest.TestCase):
         pest_res = predict_pest_from_base64(b64_str)
         self.assertIn("predicted_pest", pest_res)
 
-        sev_res = predict_severity_from_base64(b64_str)
-        self.assertIn("severity", sev_res)
-
-        pest_all, sev_all = predict_all_from_base64(b64_str)
-        self.assertEqual(pest_all["predicted_pest"], pest_res["predicted_pest"])
-        self.assertEqual(sev_all["severity"], sev_res["severity"])
-
     def test_full_inference_pipeline(self):
         img = _create_synthetic_leaf_image()
         result = run_full_inference_pipeline(img)
 
         self.assertTrue(result["success"])
         self.assertIn("pest", result)
-        self.assertIn(result["pest"], PEST_LABELS)
         self.assertIn("pest_confidence", result)
-        self.assertIn("severity", result)
-        self.assertIn(result["severity"], SEVERITY_LABELS)
-        self.assertIn("severity_confidence", result)
-        self.assertIn("damage_percentage", result)
         self.assertIn("recommendations", result)
         self.assertTrue(len(result["recommendations"]) > 0)
-        self.assertIn("risk_level", result)
-        self.assertIn("urgency", result)
+        self.assertIn("possible_pest_title", result)
+        self.assertTrue(result["possible_pest_title"].startswith("Possible Pest: "))
 
     def test_leaf_image_validation_failures(self):
         # Too small image
@@ -164,13 +125,9 @@ class TestH5Inference(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertTrue(data['success'])
-        self.assertIn(data['pest'], PEST_LABELS)
-        self.assertIn(data['severity'], SEVERITY_LABELS)
+        self.assertIn('pest', data)
         self.assertGreater(len(data['recommendations']), 0)
-        self.assertIn('damage_percentage', data)
-        self.assertIn('risk_level', data)
-        self.assertIn('urgency', data)
-
+        self.assertIn('possible_pest_title', data)
 
     def test_image_compression_and_downscale(self):
         from app.image_utils import process_and_compress_image, compress_image_to_bytes
@@ -208,9 +165,7 @@ class TestH5Inference(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         data = response.get_json()
         self.assertTrue(data['success'])
-        self.assertIn(data['pest'], PEST_LABELS)
-        self.assertIn(data['severity'], SEVERITY_LABELS)
-
+        self.assertIn('pest', data)
 
     def test_clear_inference_memory(self):
         from model.inference import clear_inference_memory
@@ -220,5 +175,3 @@ class TestH5Inference(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-

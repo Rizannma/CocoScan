@@ -350,7 +350,7 @@
             additionalImages,
             initialRecommendations: normalizeList(reportData.initial_recommendations || reportData.recommendations),
             expertRecommendations: normalizeList(reportData.expert_recommendations || reportData.expert_recommendation),
-            reviewer_name: reportData.reviewer_name || reportData.reviewerName || "PCA Agriculturist",
+            reviewer_name: reportData.reviewer_name || reportData.reviewerName || "",
             reviewer_position: reportData.reviewer_position || reportData.position_title || "Agriculturist",
             reviewer_office: reportData.reviewer_office || reportData.agency_office || "",
             farmerFeedbackReason: feedbackData.reason,
@@ -359,9 +359,6 @@
             availabilitySlots: normalizeAvailabilitySlots(reportData.availability_slots || reportData.availability || reportData.availabilitySlots || reportData.farmer_availability || feedbackData.schedules?.map((item) => item.date ? `${item.date} ${item.time || "Morning"}`.trim() : "") || []),
             agriBookedSchedules: normalizeAvailabilitySlots(reportData.agri_booked_schedules || reportData.agri_booked_slots || reportData.booked_schedules || []),
             weather: reportData.weather || {},
-            severity: reportData.severity || reportData.damage_severity || reportData.damage || (reportData.pest === "Healthy Coconut Leaf" ? "Mild" : "Moderate"),
-            severityConfidence: reportData.severity_confidence ? normalizeConfidence(reportData.severity_confidence) : null,
-            damagePercentage: reportData.damage_percentage ?? null,
         };
     }
 
@@ -890,29 +887,10 @@
         }
     }
 
-    const SEVERITY_THEMES = {
-        "mild": {
-            backgroundColor: "#1E4620",
-            textColor: "#E6F4EA"
-        },
-        "moderate": {
-            backgroundColor: "#B06000",
-            textColor: "#FFF3E0"
-        },
-        "severe": {
-            backgroundColor: "#9C1C1C",
-            textColor: "#FCE8E6"
-        }
-    };
-
     function applyStatusStyle(report) {
         const severityBanner = document.getElementById("report-severity-banner");
         const statusNode = document.getElementById("report-status-text");
         const pestTitle = document.getElementById("report-pest-title");
-        const severityNode = document.getElementById("report-severity-text");
-
-        const sevKey = String(report.severity || "").trim().toLowerCase();
-        const theme = SEVERITY_THEMES[sevKey] || (report.pest === "Healthy Coconut Leaf" ? SEVERITY_THEMES["mild"] : SEVERITY_THEMES["moderate"]);
 
         if (statusNode) {
             const statusStyle = getWorkflowStatusBadgeStyle(report.status || "--");
@@ -921,17 +899,12 @@
         }
 
         if (severityBanner) {
-            severityBanner.style.backgroundColor = theme.backgroundColor;
-            severityBanner.style.color = theme.textColor;
+            severityBanner.style.backgroundColor = "#1E4620";
+            severityBanner.style.color = "#E6F4EA";
         }
 
         if (pestTitle) {
-            pestTitle.style.color = theme.textColor;
-        }
-
-        if (severityNode) {
-            severityNode.textContent = report.severity || "--";
-            severityNode.style.color = theme.textColor;
+            pestTitle.style.color = "#E6F4EA";
         }
     }
 
@@ -943,24 +916,24 @@
         const notesDisplay = document.getElementById("report-notes-display");
         const expertInput = document.getElementById("expert-notes-input");
         const expertHelp = document.getElementById("expert-notes-help");
+        const agriVerificationGroup = document.getElementById("agri-verification-group");
         const scanOnlyNodes = document.querySelectorAll("[data-scan-only]");
         const readonlyOnlyNodes = document.querySelectorAll("[data-readonly-only]");
         const isReviewed = isRecommendationIssuedStatus(report?.status || "");
 
+        const normalizedMode = String(mode || "").toLowerCase();
+        const isAgriMode = ["agriculturist", "agri", "agri_expert"].includes(normalizedMode);
+
         const statusKey = getStatusKey(report?.status || "");
         const assessmentAlreadyIssued = ["assessment_issued", "recommendation_issued", "waiting_for_agriculturist_confirmation", "waiting_agriculturist_confirmation", "awaiting_confirmed_schedule", "visit_requested", "visit_scheduled", "visit_completed", "final_remarks_issued", "resolved", "closed"].includes(statusKey) || (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0);
 
-        setDisplay(scanButton, mode === "scan", "flex");
-        // Hide follow-up/farmer button (removed from UI)
+        setDisplay(scanButton, normalizedMode === "scan", "flex");
         // Show agriculturist submit only when in agriculturist mode and no recommendation/assessment has been issued
-        setDisplay(agriButton, mode === "agriculturist" && !assessmentAlreadyIssued, "flex");
+        setDisplay(agriButton, isAgriMode && !assessmentAlreadyIssued, "flex");
         setDisplay(cancelButton, true, "inline-flex");
 
-        scanOnlyNodes.forEach((node) => setDisplay(node, mode === "scan", "block"));
-        readonlyOnlyNodes.forEach((node) => setDisplay(node, mode !== "scan", "block"));
-
-        // The follow-up control has been removed from the modal UI. Follow-up flows are handled
-        // via the feedback/workflow cards rendered by `renderWorkflowActions` when appropriate.
+        scanOnlyNodes.forEach((node) => setDisplay(node, normalizedMode === "scan", "block"));
+        readonlyOnlyNodes.forEach((node) => setDisplay(node, normalizedMode !== "scan", "block"));
 
         // Agriculturist submit button state: disable when assessment already issued or report reviewed
         if (agriButton) {
@@ -973,24 +946,29 @@
                 agriButton.style.color = "#475569";
                 agriButton.innerHTML = '<i class="fa-solid fa-lock"></i> Assessment Issued';
             } else {
-                const defaultHtml = agriButton.dataset?.defaultHtml || agriButton._defaultHtml;
-                if (defaultHtml) {
-                    agriButton.innerHTML = defaultHtml;
-                } else {
-                    agriButton.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Assessment';
-                }
+                agriButton.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Assessment &amp; Verification';
                 agriButton.style.backgroundColor = "";
                 agriButton.style.color = "";
             }
         }
 
         if (expertInput) {
-            const allowExpertInput = mode === "agriculturist" && !assessmentAlreadyIssued;
+            const allowExpertInput = isAgriMode && !assessmentAlreadyIssued;
             setDisplay(expertInput, allowExpertInput, "block");
         }
 
+        if (expertHelp) {
+            const allowExpertHelp = isAgriMode && !assessmentAlreadyIssued;
+            setDisplay(expertHelp, allowExpertHelp, "block");
+        }
+
+        if (agriVerificationGroup) {
+            const showVerification = isAgriMode && !assessmentAlreadyIssued;
+            setDisplay(agriVerificationGroup, showVerification, "block");
+        }
+
         if (notesInput && notesDisplay) {
-            if (mode === "scan") {
+            if (normalizedMode === "scan") {
                 setDisplay(notesInput, true, "block");
                 setDisplay(notesDisplay, false);
             } else {
@@ -999,6 +977,123 @@
             }
         }
     }
+
+    function getOfficialRecommendationsForPest(pestName) {
+        const pLower = String(pestName || "").toLowerCase();
+        if (window.CocoScanI18n && window.CocoScanI18n.currentStrings?.pest_knowledge_base?.recommendations) {
+            const baseRecs = window.CocoScanI18n.currentStrings.pest_knowledge_base.recommendations;
+            if (pLower.includes("brontispa") || pLower.includes("leaf beetle")) {
+                return baseRecs.brontispa || [];
+            }
+            if (pLower.includes("rhino") || pLower.includes("beetle")) {
+                return baseRecs.rhinoceros_beetle || [];
+            }
+            if (pLower.includes("healthy") || pLower.includes("malusog")) {
+                return baseRecs.healthy_leaf || [];
+            }
+        }
+        if (pLower.includes("brontispa") || pLower.includes("leaf beetle")) {
+            return [
+                "Prune and safely dispose of infested leaves",
+                "Maintain field sanitation and monitor infestation levels",
+                "Release earwigs and Tetrastichus parasitoids for natural control",
+                "Spray white Muscardine fungus",
+                "Use approved pesticide early morning for severe infestations"
+            ];
+        }
+        if (pLower.includes("rhino") || pLower.includes("beetle")) {
+            return [
+                "Improve farm sanitation and remove breeding sites",
+                "Install pheromone traps and green Muscardine fungus log traps",
+                "Apply biological treatment or use light traps at night",
+                "Monitor weekly and consult an agricultural technician for severe cases"
+            ];
+        }
+        if (pLower.includes("healthy") || pLower.includes("malusog")) {
+            return [
+                "Continue regular monitoring",
+                "Maintain current sanitation practices"
+            ];
+        }
+        return [
+            "Ensure the camera is focused directly on a coconut leaf, frond, or crown section under daylight.",
+            "Hold the device steady and re-scan from approximately 1 to 2 feet away."
+        ];
+    }
+
+    function formatCleanPestName(pest) {
+        if (!pest || pest === "--") return "--";
+        const pLower = String(pest).toLowerCase();
+        if (pLower.includes("healthy") || pLower.includes("malusog")) {
+            return window.CocoScanI18n ? window.CocoScanI18n.t("pest_knowledge_base.pests.healthy_leaf", "Healthy Coconut Leaf") : "Healthy Coconut Leaf";
+        }
+        if (pLower.includes("not a coconut") || pLower.includes("hindi larawan")) {
+            return "Not a Coconut Leaf Image";
+        }
+        if (pLower.includes("brontispa") || pLower.includes("leaf beetle")) {
+            return "Brontispa";
+        }
+        if (pLower.includes("rhino") || pLower.includes("beetle")) {
+            return "Rhinoceros Beetle";
+        }
+        return pest.replace(/^possible pest:\s*/i, '').replace(/^posibleng peste:\s*/i, '');
+    }
+
+    function getVerifiedFirstName(fullName) {
+        if (!fullName) return "";
+        const clean = String(fullName).trim();
+        if (/pca agriculturist/i.test(clean) || /^agriculturist$/i.test(clean)) {
+            return "";
+        }
+        return clean.split(/\s+/)[0];
+    }
+
+    let currentAgriValidationMode = "validate";
+
+    window.handleAgriPestSelectChange = function (val) {
+        const customWrap = document.getElementById("agri-custom-pest-wrap");
+        const customInput = document.getElementById("agri-custom-pest-input");
+        if (val === "custom") {
+            if (customWrap) customWrap.style.display = "block";
+            if (customInput) {
+                customInput.focus();
+            }
+        } else {
+            if (customWrap) customWrap.style.display = "none";
+            if (customInput) customInput.value = val;
+        }
+    };
+
+    window.setAgriValidationMode = function (mode) {
+        currentAgriValidationMode = mode === "correct" ? "correct" : "validate";
+        const btnValidate = document.getElementById("btn-tab-validate-correct");
+        const btnCorrect = document.getElementById("btn-tab-correct-result");
+        const select = document.getElementById("agri-verified-pest-select");
+        const customWrap = document.getElementById("agri-custom-pest-wrap");
+        const customInput = document.getElementById("agri-custom-pest-input");
+        const report = currentReportModalRecord;
+
+        if (btnValidate) btnValidate.classList.toggle("active", currentAgriValidationMode === "validate");
+        if (btnCorrect) btnCorrect.classList.toggle("active", currentAgriValidationMode === "correct");
+
+        if (currentAgriValidationMode === "validate") {
+            if (customWrap) customWrap.style.display = "none";
+            if (select && report?.pest) {
+                const pestName = String(report.pest || "").toLowerCase();
+                if (pestName.includes("brontispa")) select.value = "Brontispa";
+                else if (pestName.includes("rhino") || pestName.includes("beetle")) select.value = "Rhinoceros Beetle";
+                else if (pestName.includes("healthy") || pestName.includes("malusog")) select.value = "Healthy Coconut Leaf";
+                else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) select.value = "Not a Coconut Leaf Image";
+                else {
+                    select.value = "custom";
+                    if (customWrap) customWrap.style.display = "block";
+                    if (customInput) customInput.value = report.pest;
+                }
+            }
+        } else {
+            if (select) select.focus();
+        }
+    };
 
     async function submitExpertAssessment() {
         const expertInput = document.getElementById("expert-notes-input");
@@ -1017,12 +1112,25 @@
             return;
         }
 
-        setReportModalSubmissionState(true, "Submitting assessment…");
+        setReportModalSubmissionState(true, "Submitting assessment & verification…");
         try {
+            const verifiedSelect = document.getElementById("agri-verified-pest-select");
+            const customInput = document.getElementById("agri-custom-pest-input");
+            let verifiedPest = verifiedSelect ? verifiedSelect.value : "";
+            if (verifiedPest === "custom" && customInput && customInput.value.trim()) {
+                verifiedPest = customInput.value.trim();
+            }
+            const isCorrection = currentAgriValidationMode === "correct";
+
             const response = await fetch("/agriculturist/submit-assessment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ report_id: report.id, assessment_notes: assessment }),
+                body: JSON.stringify({
+                    report_id: report.id,
+                    assessment_notes: assessment,
+                    verified_pest: verifiedPest || report.pest,
+                    is_correction: isCorrection,
+                }),
             });
             const data = await response.json().catch(() => ({}));
             if (!response.ok || !data.success) {
@@ -1030,32 +1138,122 @@
                 return;
             }
             report.status = "assessment_issued";
+            if (data.verified_pest || verifiedPest) {
+                report.pest = data.verified_pest || verifiedPest;
+            }
+            if (data.reviewer_name) {
+                report.reviewer_name = data.reviewer_name;
+            }
+            if (data.reviewer_position) {
+                report.reviewer_position = data.reviewer_position;
+            }
+            if (data.reviewer_office) {
+                report.reviewer_office = data.reviewer_office;
+            }
+            if (Array.isArray(data.official_recommendations) && data.official_recommendations.length > 0) {
+                report.officialRecommendations = data.official_recommendations;
+                report.initialRecommendations = data.official_recommendations;
+            } else {
+                const recs = getOfficialRecommendationsForPest(report.pest);
+                report.officialRecommendations = recs;
+                report.initialRecommendations = recs;
+            }
             if (!Array.isArray(report.expertRecommendations)) {
                 report.expertRecommendations = [];
             }
             report.expertRecommendations.push(assessment);
+
+            const verifierName = data.reviewer_name || report.reviewer_name || "";
+            const verifierFirstName = data.reviewer_first_name || getVerifiedFirstName(verifierName);
+
+            // 1. Dynamic Result Card Header Update:
+            // Remove "POSSIBLE PEST" badge and warning notice banner; show "DETECTED PEST"
+            const eyebrowPending = document.getElementById("pest-eyebrow-pending");
+            if (eyebrowPending) setDisplay(eyebrowPending, false);
+
+            const eyebrowVerified = document.getElementById("pest-eyebrow-verified");
+            if (eyebrowVerified) {
+                setDisplay(eyebrowVerified, true, "inline-flex");
+                eyebrowVerified.innerHTML = `<span id="pest-verified-by-text" data-i18n="modal.detected_pest_eyebrow">DETECTED PEST</span>`;
+            }
+
+            const pendingNotice = document.getElementById("report-pending-validation-notice");
+            if (pendingNotice) setDisplay(pendingNotice, false);
+
+            // Dynamically switch main title to official verified pest name
+            const pestTitle = document.getElementById("report-pest-title");
+            if (pestTitle) {
+                pestTitle.textContent = formatCleanPestName(report.pest);
+            }
+
+            // Confidence row update: "Verified by Agriculturist (First Name)"
+            const confidenceRow = document.getElementById("report-confidence-row");
+            if (confidenceRow) {
+                const verifiedText = verifierFirstName ? `Verified by Agriculturist ${escapeHtml(verifierFirstName)}` : `Verified by Agriculturist`;
+                confidenceRow.innerHTML = `<span id="pest-verified-by-text">${verifiedText}</span>`;
+            }
+
+            // 2. Dynamic Recommendations Switch:
+            // Remove temporary "Safe Precautionary Actions" notice and general safe steps description
+            document.querySelectorAll(".safe-actions-notice-banner, #report-safe-actions-notice").forEach((el) => setDisplay(el, false));
+            document.querySelectorAll(".initial-reco-desc-text, #report-initial-reco-desc").forEach((el) => setDisplay(el, false));
+            
+            const recoHeading = document.getElementById("report-initial-reco-heading-text");
+            if (recoHeading) {
+                recoHeading.textContent = t("modal.verified_reco_title", "Recommendations");
+            }
+
+            // Automatically load and display official complete recommendations
+            renderList(document.getElementById("report-initial-list"), report.officialRecommendations, t("modal.initial_reco_empty", "No recommendations available."), true, true);
+
+            // 3. Update Expert Assessment List & hide input controls
             const expertEmptyText = window.CocoScanI18n ? window.CocoScanI18n.t("modal.expert_assessment_empty", "No expert assessment available yet.") : "No expert assessment available yet.";
             renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false);
+
+            const issuedNote = document.getElementById("expert-assessment-issued-note");
+            if (issuedNote) setDisplay(issuedNote, false);
+
             const issuerNote = document.getElementById("expert-assessment-issuer-note");
             if (issuerNote) {
-                const name = data.reviewer_name || report.reviewer_name || "PCA Agriculturist";
+                const displayName = verifierName || "PCA Agriculturist";
                 const pos = data.reviewer_position || report.reviewer_position || "Agriculturist";
                 const off = data.reviewer_office || report.reviewer_office || "";
-                let html = `Issued by ${escapeHtml(name)}<br>${escapeHtml(pos)}`;
+                let html = `Issued by ${escapeHtml(displayName)}<br>${escapeHtml(pos)}`;
                 if (off) html += `<br>${escapeHtml(off)}`;
                 issuerNote.innerHTML = html;
                 issuerNote.style.lineHeight = "1.4";
                 setDisplay(issuerNote, true, "block");
             }
+
+            const agriVerificationGroup = document.getElementById("agri-verification-group");
+            if (agriVerificationGroup) setDisplay(agriVerificationGroup, false);
+            if (expertInput) setDisplay(expertInput, false);
+            const expertHelp = document.getElementById("expert-notes-help");
+            if (expertHelp) setDisplay(expertHelp, false);
+            const agriSubmitBtn = document.getElementById("report-agri-submit-btn");
+            if (agriSubmitBtn) setDisplay(agriSubmitBtn, false);
+
+            // Update local report storage cache
+            updateLocalReportState(report.id, (r) => ({
+                ...r,
+                status: "assessment_issued",
+                pest: report.pest,
+                pest_type: report.pest,
+                reviewer_name: verifierName,
+                reviewer_position: report.reviewer_position,
+                reviewer_office: report.reviewer_office,
+                expert_recommendations: report.expertRecommendations,
+                official_recommendations: report.officialRecommendations,
+                initial_recommendations: report.officialRecommendations,
+            }));
+
             applyStatusStyle(report);
             renderWorkflowActions(currentReportModalMode, report);
-            // Refresh lists on the page if available and close modal for agriculturists
+
             if (typeof window.renderReportsGrid === "function") {
                 try { window.renderReportsGrid(); } catch (e) { console.debug(e); }
             }
-            if (currentReportModalMode === "agriculturist") {
-                closeReportModal();
-            }
+
             alert(data.message || "Assessment notes saved successfully.");
         } catch (error) {
             console.error("Assessment submission error:", error);
@@ -2586,70 +2784,6 @@
         alert("This workflow step is not available yet.");
     }
 
-    async function submitExpertAssessment() {
-        const expertInput = document.getElementById("expert-notes-input");
-        const report = currentReportModalRecord;
-        if (!report?.id) {
-            alert("This report does not have a valid identifier.");
-            return;
-        }
-        if (!expertInput) {
-            return submitWorkflowAction(currentWorkflowDefaultSubmitAction || "submit-assessment");
-        }
-
-        const assessment = String(expertInput.value || "").trim();
-        if (!assessment) {
-            alert("Please provide expert assessment notes before submitting.");
-            return;
-        }
-
-        setReportModalSubmissionState(true, "Submitting assessment…");
-        try {
-            const response = await fetch("/agriculturist/submit-assessment", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ report_id: report.id, assessment_notes: assessment }),
-            });
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || !data.success) {
-                alert(data.message || "The assessment could not be saved.");
-                return;
-            }
-            report.status = "assessment_issued";
-            if (!Array.isArray(report.expertRecommendations)) {
-                report.expertRecommendations = [];
-            }
-            report.expertRecommendations.push(assessment);
-            const expertEmptyText = window.CocoScanI18n ? window.CocoScanI18n.t("modal.expert_assessment_empty", "No expert assessment available yet.") : "No expert assessment available yet.";
-            renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false);
-            const issuerNote = document.getElementById("expert-assessment-issuer-note");
-            if (issuerNote) {
-                const name = data.reviewer_name || report.reviewer_name || "PCA Agriculturist";
-                const pos = data.reviewer_position || report.reviewer_position || "Agriculturist";
-                const off = data.reviewer_office || report.reviewer_office || "";
-                let html = `Issued by ${escapeHtml(name)}<br>${escapeHtml(pos)}`;
-                if (off) html += `<br>${escapeHtml(off)}`;
-                issuerNote.innerHTML = html;
-                issuerNote.style.lineHeight = "1.4";
-                setDisplay(issuerNote, true, "block");
-            }
-            applyStatusStyle(report);
-            renderWorkflowActions(currentReportModalMode, report);
-            alert(data.message || "Assessment notes saved successfully.");
-            closeReportModal();
-            window.location.reload();
-        } catch (error) {
-            console.error("Assessment submission error:", error);
-            alert("The assessment could not be submitted right now.");
-        } finally {
-            setReportModalSubmissionState(false);
-        }
-    }
-
-    window.submitExpertValidation = function () {
-        return submitExpertAssessment();
-    };
-
     function closeReportModal() {
         abortActiveReportModalSubmission();
         stopVisitDiscussionPoll();
@@ -2727,7 +2861,8 @@
             return;
         }
 
-        currentReportModalMode = String(mode || "farmer").toLowerCase();
+        const rawMode = String(mode || "farmer").toLowerCase();
+        currentReportModalMode = ["agriculturist", "agri", "agri_expert"].includes(rawMode) ? "agriculturist" : rawMode;
         currentReportModalRecord = normalizeReportData({ ...reportData, mode: currentReportModalMode });
 
         const report = currentReportModalRecord;
@@ -2751,10 +2886,64 @@
             const expertInput = document.getElementById("expert-notes-input");
             const expertCard = document.getElementById("report-expert-card");
 
-            if (pestTitle) pestTitle.textContent = report.pest;
-            if (confidenceNode) confidenceNode.textContent = report.confidence;
-            const severityNode = document.getElementById("report-severity-text");
-            if (severityNode) severityNode.textContent = report.severity || "--";
+            const statusKey = getStatusKey(report?.status || "");
+            const assessmentAlreadyIssued = ["assessment_issued", "recommendation_issued", "waiting_for_agriculturist_confirmation", "waiting_agriculturist_confirmation", "awaiting_confirmed_schedule", "visit_requested", "visit_scheduled", "visit_completed", "final_remarks_issued", "resolved", "closed"].includes(statusKey) || (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0);
+
+            const cleanPest = formatCleanPestName(report.pest);
+            if (pestTitle) pestTitle.textContent = cleanPest;
+
+            // Result Display & Verification Status Indicators
+            const eyebrowPending = document.getElementById("pest-eyebrow-pending");
+            const eyebrowVerified = document.getElementById("pest-eyebrow-verified");
+            const pendingNotice = document.getElementById("report-pending-validation-notice");
+            const confidenceRow = document.getElementById("report-confidence-row");
+
+            if (assessmentAlreadyIssued) {
+                // Verified Final Result State:
+                // Show DETECTED PEST badge and remove warning notice banner
+                if (eyebrowPending) setDisplay(eyebrowPending, false);
+                if (eyebrowVerified) {
+                    setDisplay(eyebrowVerified, true, "inline-flex");
+                    eyebrowVerified.innerHTML = `<span id="pest-verified-by-text" data-i18n="modal.detected_pest_eyebrow">${t('modal.detected_pest_eyebrow', 'DETECTED PEST')}</span>`;
+                }
+                if (pendingNotice) setDisplay(pendingNotice, false);
+
+                // Update confidence row into: "Verified by Agriculturist (First Name)"
+                if (confidenceRow) {
+                    const verifier = report.reviewer_name || "";
+                    const firstName = getVerifiedFirstName(verifier);
+                    const verifiedText = firstName ? `Verified by Agriculturist ${escapeHtml(firstName)}` : `Verified by Agriculturist`;
+                    confidenceRow.innerHTML = `<span id="pest-verified-by-text">${verifiedText}</span>`;
+                }
+            } else {
+                // Pending Validation State
+                if (eyebrowPending) {
+                    setDisplay(eyebrowPending, true, "inline-flex");
+                    eyebrowPending.innerHTML = `<span data-i18n="modal.possible_pest_eyebrow">${t('modal.possible_pest_eyebrow', 'POSSIBLE PEST')}</span>`;
+                }
+                if (eyebrowVerified) setDisplay(eyebrowVerified, false);
+                if (pendingNotice) setDisplay(pendingNotice, true, "flex");
+                if (confidenceRow) {
+                    confidenceRow.innerHTML = `<span data-i18n="modal.confidence_label">${t('modal.confidence_label', 'Confidence:')}</span> <span id="report-confidence">${escapeHtml(report.confidence || '--')}</span>`;
+                }
+            }
+            
+            const verifiedSelect = document.getElementById("agri-verified-pest-select");
+            if (verifiedSelect) {
+                const pestName = String(report.pest || "").toLowerCase();
+                if (pestName.includes("brontispa")) {
+                    verifiedSelect.value = "Brontispa";
+                } else if (pestName.includes("rhino") || pestName.includes("beetle")) {
+                    verifiedSelect.value = "Rhinoceros Beetle";
+                } else if (pestName.includes("healthy") || pestName.includes("malusog")) {
+                    verifiedSelect.value = "Healthy Coconut Leaf";
+                } else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) {
+                    verifiedSelect.value = "Not a Coconut Leaf Image";
+                } else {
+                    verifiedSelect.value = "Brontispa";
+                }
+            }
+
             if (farmerNameNode) farmerNameNode.textContent = report.farmer;
             if (locationNode) locationNode.textContent = report.locationText;
             if (timestampNode) timestampNode.textContent = formatTimestamp(report.timestamp);
@@ -2797,13 +2986,37 @@
             }
 
             const initialCard = document.getElementById("report-initial-card");
+            const safeActionsNotice = document.getElementById("report-safe-actions-notice") || document.querySelector(".safe-actions-notice-banner");
+            const recoDesc = document.getElementById("report-initial-reco-desc") || document.querySelector(".initial-reco-desc-text");
+            const recoHeading = document.getElementById("report-initial-reco-heading-text");
+
             if (currentReportModalMode === "lgu" || currentReportModalMode === "admin") {
                 if (initialCard) {
                     initialCard.style.setProperty("display", "none", "important");
                 }
             } else {
                 if (initialCard) setDisplay(initialCard, true, "flex");
-                renderList(document.getElementById("report-initial-list"), report.initialRecommendations, t("modal.initial_reco_empty", "No initial recommendations available."), true, true);
+                if (assessmentAlreadyIssued) {
+                    // Remove Safe Precautionary Actions notice and general safe steps description
+                    if (safeActionsNotice) setDisplay(safeActionsNotice, false);
+                    document.querySelectorAll(".safe-actions-notice-banner, #report-safe-actions-notice").forEach((el) => setDisplay(el, false));
+                    if (recoDesc) setDisplay(recoDesc, false);
+                    document.querySelectorAll(".initial-reco-desc-text, #report-initial-reco-desc").forEach((el) => setDisplay(el, false));
+                    if (recoHeading) recoHeading.textContent = t("modal.verified_reco_title", "Recommendations");
+
+                    // Load official complete recommendations specifically tailored to verified pest
+                    const officialRecos = (Array.isArray(report.officialRecommendations) && report.officialRecommendations.length > 0)
+                        ? report.officialRecommendations
+                        : getOfficialRecommendationsForPest(cleanPest);
+                    renderList(document.getElementById("report-initial-list"), officialRecos, t("modal.initial_reco_empty", "No recommendations available."), true, true);
+                } else {
+                    if (safeActionsNotice) setDisplay(safeActionsNotice, true, "flex");
+                    document.querySelectorAll(".safe-actions-notice-banner, #report-safe-actions-notice").forEach((el) => setDisplay(el, true, "flex"));
+                    if (recoDesc) setDisplay(recoDesc, true, "block");
+                    document.querySelectorAll(".initial-reco-desc-text, #report-initial-reco-desc").forEach((el) => setDisplay(el, true, "block"));
+                    if (recoHeading) recoHeading.textContent = t("modal.initial_reco_title", "Initial Recommendations");
+                    renderList(document.getElementById("report-initial-list"), report.initialRecommendations, t("modal.initial_reco_empty", "No initial recommendations available."), true, true);
+                }
             }
 
             let expertEmptyText = t("modal.expert_assessment_empty", "No expert assessment available yet.");
@@ -2817,19 +3030,22 @@
             renderWorkflowActions(currentReportModalMode, report);
 
             // Expert card visibility and input controls depend on existing assessment state
-            const statusKey = getStatusKey(report?.status || "");
-            const assessmentAlreadyIssued = ["assessment_issued", "recommendation_issued", "waiting_for_agriculturist_confirmation", "waiting_agriculturist_confirmation", "awaiting_confirmed_schedule", "visit_requested", "visit_scheduled", "visit_completed", "final_remarks_issued", "resolved", "closed"].includes(statusKey) || (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0);
+            const isAgriMode = ["agriculturist", "agri", "agri_expert"].includes(currentReportModalMode);
             if (expertCard) {
                 setDisplay(expertCard, true, "block");
                 const expertHelp = document.getElementById("expert-notes-help");
                 const agriSubmitBtn = document.getElementById("report-agri-submit-btn");
                 const issuerNote = document.getElementById("expert-assessment-issuer-note");
-                const showExpertControls = currentReportModalMode === "agriculturist" && !assessmentAlreadyIssued;
+                const agriVerificationGroup = document.getElementById("agri-verification-group");
+                const showExpertControls = isAgriMode && !assessmentAlreadyIssued;
+                if (agriVerificationGroup) {
+                    setDisplay(agriVerificationGroup, showExpertControls, "block");
+                }
                 setDisplay(expertInput, showExpertControls, "block");
                 setDisplay(expertHelp, showExpertControls, "block");
                 if (agriSubmitBtn) setDisplay(agriSubmitBtn, showExpertControls, "block");
                 if (issuerNote) {
-                    if (assessmentAlreadyIssued) {
+                    if (assessmentAlreadyIssued && (report.reviewer_name || (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0))) {
                         const name = report.reviewer_name || "PCA Agriculturist";
                         const pos = report.reviewer_position || "Agriculturist";
                         const off = report.reviewer_office || "";
@@ -2841,6 +3057,9 @@
                     } else {
                         setDisplay(issuerNote, false);
                     }
+                }
+                if (showExpertControls && typeof window.setAgriValidationMode === "function") {
+                    window.setAgriValidationMode("validate");
                 }
             }
 

@@ -517,6 +517,130 @@
         }
         .btn-control.cancel-secondary:hover { background-color: #fee2e2; }
 
+        /* --- PENDING VS VERIFIED RESULT ENHANCEMENTS --- */
+        .pest-eyebrow-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .pest-eyebrow-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            border-radius: 9999px;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .pest-eyebrow-badge.pending {
+            background: rgba(254, 243, 199, 0.22);
+            color: #fef08a;
+            border: 1px solid rgba(254, 240, 138, 0.4);
+            text-transform: uppercase;
+        }
+
+        .pest-eyebrow-badge.verified {
+            background: rgba(209, 250, 229, 0.25);
+            color: #a7f3d0;
+            border: 1px solid rgba(167, 243, 208, 0.5);
+            text-transform: uppercase;
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        .pending-validation-tag {
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: rgba(0, 0, 0, 0.22);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            color: #f1f5f9;
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+
+        .pending-validation-tag i {
+            color: #fbbf24;
+            margin-top: 2px;
+            flex-shrink: 0;
+            font-size: 0.88rem;
+        }
+
+        .safe-actions-notice-banner {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            background: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            border-radius: 12px;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+            color: #065f46;
+        }
+
+        .safe-actions-notice-banner i {
+            color: #059669;
+            font-size: 1.1rem;
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .safe-actions-notice-text {
+            font-size: 0.82rem;
+            line-height: 1.4;
+            color: #047857;
+        }
+
+        .safe-actions-notice-text strong {
+            display: block;
+            color: #065f46;
+            margin-bottom: 2px;
+            font-weight: 700;
+        }
+
+        .agri-action-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .agri-tab-btn {
+            flex: 1;
+            padding: 9px 12px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            border-radius: 8px;
+            border: 1.5px solid #bbf7d0;
+            background: #ffffff;
+            color: #166534;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .agri-tab-btn:hover {
+            background: #f0fdf4;
+        }
+
+        .agri-tab-btn.active {
+            background: #166534;
+            color: #ffffff;
+            border-color: #166534;
+            box-shadow: 0 2px 6px rgba(22, 101, 52, 0.2);
+        }
+
 </style>
 
         <div class="modal-header-inline" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px;">
@@ -536,14 +660,31 @@
             <div class="desktop-col-left">
 
         <div class="diagnostic-result-badge" id="report-severity-banner" style="display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 22px; border-radius: 20px; background-color: #1E4620; color: #E6F4EA;">
-            <div class="badge-main" style="display: flex; flex-direction: column; flex: 1; min-width: 0;">
-                <h3 id="report-pest-title" style="margin: 0; font-size: 1.35rem; font-weight: 800; line-height: 1.25; letter-spacing: -0.02em; color: inherit;">--</h3>
-                <p style="margin: 4px 0 0; font-size: 0.88rem; line-height: 1.25; font-weight: 500; opacity: 0.95; color: inherit;">
+            <div class="badge-main" style="display: flex; flex-direction: column; flex: 1; min-width: 0; width: 100%;">
+                <!-- Small Top Eyebrow Indicator -->
+                <div class="pest-eyebrow-container" id="report-pest-eyebrow">
+                    <span class="pest-eyebrow-badge pending" id="pest-eyebrow-pending">
+                        <span data-i18n="modal.possible_pest_eyebrow">{{ t('modal.possible_pest_eyebrow', 'POSSIBLE PEST') }}</span>
+                    </span>
+                    <span class="pest-eyebrow-badge verified" id="pest-eyebrow-verified" style="display: none;">
+                        <span id="pest-verified-by-text" data-i18n="modal.detected_pest_eyebrow">{{ t('modal.detected_pest_eyebrow', 'DETECTED PEST') }}</span>
+                    </span>
+                </div>
+
+                <!-- Main Prominent Pest Title -->
+                <h3 id="report-pest-title" style="margin: 0; font-size: 1.45rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; color: inherit;">--</h3>
+
+                <!-- Confidence Level / Verified By Row -->
+                <p id="report-confidence-row" style="margin: 4px 0 0; font-size: 0.88rem; line-height: 1.25; font-weight: 500; opacity: 0.95; color: inherit;">
                     <span data-i18n="modal.confidence_label">{{ t('modal.confidence_label', 'Confidence:') }}</span> <span id="report-confidence">--</span>
+                    <span id="report-verifier-name" style="display: none;"></span>
                 </p>
-            </div>
-            <div class="badge-side-meta" id="report-severity-container" style="display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0;">
-                <span id="report-severity-text" class="severity-pill-header" style="display: inline-flex; align-items: center; justify-content: center; padding: 6px 14px; border-radius: 999px; background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.35); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; color: inherit;">--</span>
+
+                <!-- Pending Notice Box -->
+                <div class="pending-validation-tag" id="report-pending-validation-notice">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span data-i18n="modal.pending_validation_notice">{{ t('modal.pending_validation_notice', 'This is not a final result and will be validated by the agriculturist.') }}</span>
+                </div>
             </div>
         </div>
 
@@ -567,25 +708,43 @@
             <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
         </div>
 
-            <div class="premium-reco-card" id="report-initial-card">
-            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.initial_reco_title">{{ t('modal.initial_reco_title', 'Initial Recommendations') }}</span></h4>
-           <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
-                {{ t('modal.initial_reco_desc', 'These are general recommendations for the detected pest to help your initial decision on what to do.') }}
+        <div class="premium-reco-card" id="report-initial-card">
+            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> <span id="report-initial-reco-heading-text" data-i18n="modal.initial_reco_title">{{ t('modal.initial_reco_title', 'Initial Recommendations') }}</span></h4>
+            
+            <div class="safe-actions-notice-banner" id="report-safe-actions-notice">
+                <i class="fa-solid fa-shield-halved"></i>
+                <div class="safe-actions-notice-text">
+                    <strong data-i18n="modal.safe_actions_title">Safe Precautionary Actions</strong>
+                    <p data-i18n="modal.safe_actions_notice">{{ t('modal.safe_actions_notice', 'You may proceed with these safe precautionary steps while waiting for final confirmation from the agriculturist.') }}</p>
+                </div>
+            </div>
+
+            <p id="report-initial-reco-desc" style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
+                {{ t('modal.initial_reco_desc', 'These are general precautionary recommendations for the detected pest to help your initial decision while awaiting agriculturist verification.') }}
             </p>
             <ul id="report-initial-list"></ul>
-            <p style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;" data-i18n="modal.initial_reco_subtext">
+            <p id="report-initial-reco-subtext" style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;" data-i18n="modal.initial_reco_subtext">
                 {{ t('modal.initial_reco_subtext', 'Tap the question mark icon for more details.') }}
             </p>
         </div>
 
         {% else %}
-            <div class="premium-reco-card" id="report-initial-card">
-            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> <span data-i18n="modal.initial_reco_title">{{ t('modal.initial_reco_title', 'Initial Recommendations') }}</span></h4>
-           <p style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
-                {{ t('modal.initial_reco_desc', 'These are general recommendations for the detected pest to help your initial decision on what to do.') }}
+        <div class="premium-reco-card" id="report-initial-card">
+            <h4><i class="fa-solid fa-wand-magic-sparkles"></i> <span id="report-initial-reco-heading-text" data-i18n="modal.initial_reco_title">{{ t('modal.initial_reco_title', 'Initial Recommendations') }}</span></h4>
+            
+            <div class="safe-actions-notice-banner" id="report-safe-actions-notice">
+                <i class="fa-solid fa-shield-halved"></i>
+                <div class="safe-actions-notice-text">
+                    <strong data-i18n="modal.safe_actions_title">Safe Precautionary Actions</strong>
+                    <p data-i18n="modal.safe_actions_notice">{{ t('modal.safe_actions_notice', 'You may proceed with these safe precautionary steps while waiting for final confirmation from the agriculturist.') }}</p>
+                </div>
+            </div>
+
+            <p id="report-initial-reco-desc" style="font-size: 0.82rem; color: #64748b; margin-top: 4px; margin-bottom: 8px; line-height: 1.4;" data-i18n="modal.initial_reco_desc">
+                {{ t('modal.initial_reco_desc', 'These are general precautionary recommendations for the detected pest to help your initial decision while awaiting agriculturist verification.') }}
             </p>
             <ul id="report-initial-list"></ul>
-            <p style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;" data-i18n="modal.initial_reco_subtext">
+            <p id="report-initial-reco-subtext" style="font-size: 0.78rem; color: #64748b; margin-top: 2px; margin-bottom: 0; font-style: italic;" data-i18n="modal.initial_reco_subtext">
                 {{ t('modal.initial_reco_subtext', 'Tap the question mark icon for more details.') }}
             </p>
         </div>
@@ -617,14 +776,51 @@
         </div>
 
         <div class="premium-reco-card" id="report-expert-card" style="display:block;">
-            <h4 data-i18n="modal.expert_assessment_title"><i class="fa-solid fa-user-shield"></i> {{ t('modal.expert_assessment_title', 'Expert Assessment') }}</h4>
+            <h4 data-i18n="modal.expert_assessment_title"><i class="fa-solid fa-user-shield"></i> {{ t('modal.expert_assessment_title', 'Expert Assessment & Verification') }}</h4>
             <ul id="report-expert-list" class="expert-reco-clean-list" style="margin-top: 12px;"></ul>
             <p id="expert-assessment-issued-note" style="font-size:0.88rem; color:#475569; font-style:italic; margin:8px 0 0; display:none;" data-i18n="modal.expert_assessment_issued">{{ t('modal.expert_assessment_issued', 'Expert assessment issued.') }}</p>
             
+            <div id="agri-verification-group" style="display:none; margin-top: 14px; padding: 16px; background: #f0fdf4; border: 1.5px solid #bbf7d0; border-radius: 14px;">
+                <label style="display:flex; align-items:center; gap:6px; font-size: 0.86rem; font-weight: 700; color: #166534; margin-bottom: 10px;">
+                    <i class="fa-solid fa-microscope" style="color:#059669;"></i> <span data-i18n="modal.agri_verification_title">{{ t('modal.agri_verification_title', 'Expert Assessment & AI Verification') }}</span>
+                </label>
+
+                <!-- Validation Action Mode Tabs -->
+                <div class="agri-action-tabs">
+                    <button type="button" id="btn-tab-validate-correct" class="agri-tab-btn active" onclick="setAgriValidationMode('validate')">
+                        <i class="fa-solid fa-check"></i> <span id="label-validate-correct" data-i18n="modal.btn_validate_correct">{{ t('modal.btn_validate_correct', 'Validate as Correct') }}</span>
+                    </button>
+                    <button type="button" id="btn-tab-correct-result" class="agri-tab-btn" onclick="setAgriValidationMode('correct')">
+                        <i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.btn_correct_result">{{ t('modal.btn_correct_result', 'Correct / Change Result') }}</span>
+                    </button>
+                </div>
+
+                <div id="agri-correction-select-wrap" style="margin-bottom: 10px;">
+                    <label style="display:block; font-size: 0.78rem; font-weight: 700; color: #166534; margin-bottom: 4px;">
+                        Verified Classification / Diagnosis:
+                    </label>
+                    <select id="agri-verified-pest-select" onchange="handleAgriPestSelectChange(this.value)" style="width: 100%; height: 40px; border-radius: 10px; border: 1.5px solid #86efac; background: white; padding: 0 12px; font-size: 0.88rem; color: #14532d; outline: none; font-weight: 600;">
+                        <option value="Brontispa">Brontispa (Coconut Leaf Beetle)</option>
+                        <option value="Rhinoceros Beetle">Rhinoceros Beetle (Coconut Rhino Beetle)</option>
+                        <option value="Healthy Coconut Leaf">Healthy Coconut Leaf</option>
+                        <option value="Not a Coconut Leaf Image">Not a Coconut Leaf Image (Unidentified)</option>
+                        <option value="custom">Other / Custom Diagnosis (Type below)</option>
+                    </select>
+                    <div id="agri-custom-pest-wrap" style="display:none; margin-top: 8px;">
+                        <input type="text" id="agri-custom-pest-input" placeholder="Type the corrected pest or diagnosis..." style="width: 100%; height: 38px; border-radius: 8px; border: 1.5px solid #86efac; background: white; padding: 0 12px; font-size: 0.86rem; color: #14532d; outline: none; font-weight: 600;" />
+                    </div>
+                </div>
+
+                <p style="font-size: 0.75rem; color: #15803d; margin: 0; line-height: 1.35; display: flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-cloud-arrow-up"></i>
+                    <span>Verified sample will be automatically synced to Dataset Hub in Supabase Cloud Storage.</span>
+                </p>
+            </div>
+
             <textarea id="expert-notes-input" class="notes-input-box" placeholder="Provide additional observations, clarifications, or recommendations based on your assessment of this report." style="display:none; margin-top: 12px;"></textarea>
             <p id="expert-notes-help" class="expert-notes-help-text" style="font-size:0.88rem; display:none;">Share assessment notes for the farmer using the Submit button.</p>
             <button class="btn-control submit-primary" id="report-agri-submit-btn" type="button" onclick="window.submitExpertValidation()" style="display:none; width:100%; margin-top:12px;">
-                <i class="fa-solid fa-paper-plane"></i> Submit Assessment
+                <i class="fa-solid fa-paper-plane"></i> Submit Assessment &amp; Verification
             </button>
             <p id="expert-assessment-issuer-note" style="font-size:0.78rem; color:#64748b; font-style:italic; margin:14px 0 0; padding-top:10px; display:none; text-align:right;"></p>
         </div>

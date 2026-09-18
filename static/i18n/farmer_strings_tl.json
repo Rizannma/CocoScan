@@ -211,7 +211,8 @@
     "alert_notes_required": "Mangyaring maglagay ng iyong tala bago ipasa ang ulat.",
     "alert_no_network_save_draft": "Walang koneksyon sa internet. I-save na lamang ba bilang draft?",
     "alert_submit_success": "TAGUMPAY: Matagumpay na naipasa ang ulat para sa {pest}.",
-    "alert_submit_failed_save_draft": "Hindi ma-sync ang ulat ngayon. I-save na lamang ba bilang draft?"
+    "alert_submit_failed_save_draft": "Hindi ma-sync ang ulat ngayon. I-save na lamang ba bilang draft?",
+    "possible_pest_prefix": "Posibleng Peste: "
   },
   "drafts_page": {
     "page_title": "Mga Naka-save na Draft",
@@ -314,6 +315,14 @@
     "notes_card_placeholder": "Ilarawan ang iyong napansin sa puno ng niyog (hal., paninilaw ng dahon, sirang bunga, di-karaniwang insekto, o iba pang palatandaan).",
     "farmer_notes_placeholder": "Ilarawan ang iyong napansin sa puno ng niyog (hal., paninilaw ng dahon, sirang bunga, di-karaniwang insekto, o iba pang palatandaan).",
     "notes_empty": "Walang inilagay na tala.",
+    "possible_pest_eyebrow": "Posibleng Peste",
+    "detected_pest_eyebrow": "NATUKOY NA PESTE",
+    "pending_validation_notice": "Ito ay hindi pa pinal na resulta at susuriin pa ng agriculturist.",
+    "final_result_verified_by": "Pinal na Resulta Na-verify ni: {name}",
+    "safe_actions_notice": "Maaari nang gawin ang mga ligtas na paunang hakbang na ito habang naghihintay ng pinal na kumpirmasyon mula sa agriculturist.",
+    "btn_validate_correct": "Kumpirmahing Tama",
+    "btn_correct_result": "Itama / Palitan ang Resulta",
+    "agri_verification_title": "Pagsusuri ng Eksperto at Beripikasyon",
     "initial_reco_title": "Paunang mga Rekomendasyon",
     "initial_reco_desc": "Pangkalahatang gabay para sa natukoy na peste upang matulungan ka sa agarang aksyon.",
     "initial_reco_subtext": "Pindutin ang question mark icon para sa karagdagang detalye.",

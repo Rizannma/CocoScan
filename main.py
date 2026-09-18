@@ -7,7 +7,7 @@ import traceback
 import logging
 import json
 from datetime import datetime, UTC
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, make_response
 from app.route_utils import require_role, fetch_user_reports, resolve_user_fullname
 import base64
 from io import BytesIO
@@ -51,7 +51,7 @@ from app.report_storage import (
     resolve_field_notes,
     resolve_report_image_url,
 )
-from app.dashboard_data import build_dashboard_chart_payload, normalize_severity, normalize_pest_type, _parse_datetime
+from app.dashboard_data import build_dashboard_chart_payload, normalize_pest_type, _parse_datetime
 from app.model_paths import resolve_model_path
 from app.map_utils import filter_map_reports, limit_recent_records
 from app.recommendations import recommend_actions
@@ -98,12 +98,11 @@ app = Flask(__name__)
 app.session_interface = RoleBasedSessionInterface()
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Preload H5 AI models once globally at startup to prevent request-time memory spikes & OOM crashes
+# Preload H5 AI pest classification model once globally at startup
 try:
     from model.inference import preload_models
     _startup_pest_path = resolve_model_path('PEST_MODEL_PATH', 'pest_classifier_moderate.h5')
-    _startup_severity_path = resolve_model_path('SEVERITY_MODEL_PATH', 'severity_classifier_severe_boost.h5')
-    preload_models(pest_model_path=_startup_pest_path, severity_model_path=_startup_severity_path)
+    preload_models(pest_model_path=_startup_pest_path)
 except Exception as _startup_exc:
     logger.warning(f"Startup global AI model preloading notice: {_startup_exc}")
 
@@ -2019,12 +2018,12 @@ def _enrich_reports_with_reviewer_info(reports):
     for r in reports:
         rev_id = str(r.get('reviewed_by_id')) if r.get('reviewed_by_id') else None
         if rev_id:
-            r['reviewer_name'] = users_map.get(rev_id) or r.get('reviewer_name') or 'PCA Agriculturist'
+            r['reviewer_name'] = users_map.get(rev_id) or r.get('reviewer_name') or ''
             r['reviewer_position'] = (profiles_map.get(rev_id, {}).get('position') or r.get('reviewer_position') or 'Agriculturist').strip()
             r['reviewer_office'] = (profiles_map.get(rev_id, {}).get('office') or r.get('reviewer_office') or '').strip()
         else:
-            r['reviewer_name'] = r.get('reviewer_name') or 'PCA Agriculturist'
-            r['reviewer_position'] = r.get('reviewer_position') or 'Agriculturist'
+            r['reviewer_name'] = r.get('reviewer_name') or ''
+            r['reviewer_position'] = r.get('reviewer_position') or ''
             r['reviewer_office'] = r.get('reviewer_office') or ''
     return reports
 
@@ -2061,17 +2060,11 @@ def _build_report_modal_payload(item, *, supporting_images=None, weather=None, d
         notes = "No notes logged."
 
     pest_name = item.get("pest_type") or item.get("pest") or "Unknown Pest"
-    severity_val = item.get("severity") or item.get("damage_severity") or ("Mild" if pest_name == "Healthy Coconut Leaf" else "Moderate")
-    damage_pct = item.get("damage_percentage")
-    if damage_pct is None:
-        damage_pct = 25 if severity_val == "Mild" or pest_name == "Healthy Coconut Leaf" else (75 if severity_val == "Severe" else 50)
 
     return {
         "id": report_id,
         "chat_count": chat_count,
         "pest": pest_name,
-        "severity": severity_val,
-        "damage_percentage": damage_pct,
         "confidence": _format_report_confidence(item.get("confidence")),
         "status": normalize_report_status(item.get("status"), default=default_status),
         "timestamp": format_report_timestamp(item.get("created_at") or item.get("submitted_at") or item.get("photo_taken_at")),
@@ -2089,8 +2082,8 @@ def _build_report_modal_payload(item, *, supporting_images=None, weather=None, d
         "additional_images": [img for img in supporting_images if img],
         "initial_recommendations": _normalize_string_list(raw_initial_recommendations),
         "expert_recommendations": _normalize_string_list(raw_expert_recommendations),
-        "reviewer_name": item.get("reviewer_name") or "PCA Agriculturist",
-        "reviewer_position": item.get("reviewer_position") or "Agriculturist",
+        "reviewer_name": item.get("reviewer_name") or "",
+        "reviewer_position": item.get("reviewer_position") or "",
         "reviewer_office": item.get("reviewer_office") or "",
         "weather": weather,
         "weather_status": "down" if weather.get("is_down") else "ready",
@@ -2203,12 +2196,10 @@ def farmer_scan():
                     created_raw = item.get('submitted_at') or item.get('created_at') or ''
                     created_label = format_report_timestamp(created_raw)
                     pest_val = item.get('pest_type') or 'Unknown Pest'
-                    sev_val = item.get('severity') or item.get('damage_severity') or ('Mild' if pest_val == 'Healthy Coconut Leaf' else 'Moderate')
 
                     recent_reports.append({
                         'id': item.get('id'),
                         'pest': pest_val,
-                        'severity': sev_val,
                         'confidence': f"{int(float(item.get('confidence', 0)))}%" if item.get('confidence') else '90%',
                         'raw_timestamp': created_label,
                         'time_string': created_label,
@@ -2227,7 +2218,7 @@ def farmer_scan():
 @app.route('/farmer/predict', methods=['POST'])
 @require_role('farmer')
 def farmer_predict():
-    """Process image prediction using the full inference pipeline"""
+    """Process image prediction using the single pest classifier pipeline"""
     import base64
     from io import BytesIO
     from app.inference_pipeline import run_full_inference_pipeline
@@ -2236,13 +2227,6 @@ def farmer_predict():
     user_role = normalize_role(session.get('user_role'))
     
     try:
-        # Debug: log incoming files/form keys
-        try:
-            logger.info(f"Files: {list(request.files.keys())}")
-            logger.info(f"Form fields: {list(request.form.keys())}")
-        except Exception:
-            logger.warning('Failed to log incoming request file/form keys')
-
         # Require multipart file upload only for prediction
         image_file = request.files.get('image_file')
         if not image_file:
@@ -2262,23 +2246,14 @@ def farmer_predict():
             'PEST_MODEL_PATH',
             'pest_classifier_moderate.h5'
         )
-        severity_model_path = resolve_model_path(
-            'SEVERITY_MODEL_PATH',
-            'severity_classifier_severe_boost.h5'
-        )
 
         if not os.path.exists(pest_model_path):
             logger.error(f"Pest model not found: {pest_model_path}")
             return jsonify({'success': False, 'error': f'Pest model not found: {pest_model_path}'}), 500
 
-        if not os.path.exists(severity_model_path):
-            logger.error(f"Severity model not found: {severity_model_path}")
-            return jsonify({'success': False, 'error': f'Severity model not found: {severity_model_path}'}), 500
-
         result = run_full_inference_pipeline(
             image,
             pest_model_path=pest_model_path,
-            severity_model_path=severity_model_path,
             use_lite_size=False
         )
 
@@ -2291,27 +2266,21 @@ def farmer_predict():
                 'success': False,
                 'error': err_msg,
                 'pest': 'Unknown',
-                'severity': 'Not available'
             }), 400
-
-        severity_confidence = result.get('severity_confidence')
-        if severity_confidence is not None:
-            severity_confidence = round(severity_confidence * 100, 1)
 
         response = {
             'success': True,
             'pest': result['pest'],
-            'severity': result.get('severity', 'Not available'),
+            'possible_pest_title': result.get('possible_pest_title', f"Possible Pest: {result['pest']}"),
             'pest_confidence': round(result['pest_confidence'] * 100, 1),
-            'severity_confidence': severity_confidence,
-            'damage_percentage': result.get('damage_percentage'),
             'recommendations': result['recommendations'],
+            'precautionary_note': result.get('precautionary_note', ''),
             'risk_level': result['risk_level'],
             'urgency': result['urgency'],
             'risk_factors': result['risk_factors']
         }
         
-        logger.info(f"Prediction successful: {result['pest']} - {result['severity']}")
+        logger.info(f"Prediction successful: Possible Pest='{result['pest']}' ({response['pest_confidence']}%)")
         return jsonify(response), 200
         
     except StorageLimitExceededError as e:
@@ -2735,27 +2704,21 @@ def report_summary():
 
         dashboard_payload = build_dashboard_chart_payload(reports, group_by_day=bool(month_str))
 
-        # Compute dynamic PCA recommendations for detected pests based on period severity
+        # Compute dynamic PCA recommendations for detected pests
         period_recommendations = []
         if rhino_count > 0:
-            rhino_sevs = [normalize_severity(r.get('damage_severity') or r.get('severity'), r.get('pest_type')) for r in pest_reports if 'rhino' in str(r.get('pest_type') or '').lower() or 'beetle' in str(r.get('pest_type') or '').lower()]
-            rhino_top_sev = 'Severe' if 'Severe' in rhino_sevs else ('Moderate' if 'Moderate' in rhino_sevs else 'Mild')
-            rhino_reco = recommend_actions(pest='Rhinoceros Beetle', severity=rhino_top_sev)
+            rhino_reco = recommend_actions(pest='Rhinoceros Beetle')
             period_recommendations.append({
                 'pest': 'Rhinoceros Beetle',
-                'severity': rhino_top_sev,
                 'risk_level': rhino_reco.get('risk', 'Medium'),
                 'urgency': rhino_reco.get('urgency', 'Medium'),
                 'actions': rhino_reco.get('recommendation', []) or rhino_reco.get('recommendations', [])
             })
 
         if brontispa_count > 0:
-            brontispa_sevs = [normalize_severity(r.get('damage_severity') or r.get('severity'), r.get('pest_type')) for r in pest_reports if 'brontispa' in str(r.get('pest_type') or '').lower()]
-            brontispa_top_sev = 'Severe' if 'Severe' in brontispa_sevs else ('Moderate' if 'Moderate' in brontispa_sevs else 'Mild')
-            brontispa_reco = recommend_actions(pest='Brontispa', severity=brontispa_top_sev)
+            brontispa_reco = recommend_actions(pest='Brontispa')
             period_recommendations.append({
                 'pest': 'Brontispa',
-                'severity': brontispa_top_sev,
                 'risk_level': brontispa_reco.get('risk', 'Medium'),
                 'urgency': brontispa_reco.get('urgency', 'Medium'),
                 'actions': brontispa_reco.get('recommendation', []) or brontispa_reco.get('recommendations', [])
@@ -2958,8 +2921,6 @@ def render_map_view(required_role):
             record["latitude"] = lat
             record["longitude"] = lng
             record["pest_type"] = item.get("pest_type") or "Unknown Pest"
-            record["severity"] = normalize_severity(item.get("damage_severity") or item.get("severity"), item.get("pest_type"))
-            record["damage_severity"] = record["severity"]
             record["status"] = normalize_report_status(item.get("status"), default="Under Review")
             record["supporting_images"] = supporting_map.get(str(item.get("id")), [])
             record["additional_images"] = supporting_map.get(str(item.get("id")), [])
@@ -3050,7 +3011,6 @@ def agri_schedules():
             raw_status = rep_info.get('status') or s.get('status') or 'visit_scheduled'
             normalized_status = normalize_report_status(raw_status, default="Visit Scheduled")
             badge_style = _get_status_badge_style(raw_status)
-            severity = normalize_severity(rep_info.get('damage_severity') or rep_info.get('severity'), rep_info.get('pest_type'))
                 
             enriched_schedules.append({
                 "id": s.get('id'),
@@ -3060,7 +3020,6 @@ def agri_schedules():
                 "end_time": s.get('end_time'),
                 "formatted_time": formatted_time,
                 "pest_type": rep_info.get('pest_type') or 'Pest Scan',
-                "severity": severity,
                 "barangay": rep_info.get('barangay') or '',
                 "municipality": rep_info.get('municipality') or '',
                 "location": _format_report_location(rep_info) if rep_info else "Unknown Location",
@@ -3152,31 +3111,65 @@ def agriculturist_submit_assessment():
             or request.form.get('assessment_notes')
             or request.form.get('recommendation', '')
         ).strip()
+        verified_pest = payload.get('verified_pest') or payload.get('verified_label') or request.form.get('verified_pest') or request.form.get('verified_label')
 
         if not report_id or not assessment_notes:
             return jsonify({'success': False, 'message': 'Assessment notes are required.'}), 400
 
+        extra = {
+            'expert_recommendations': [assessment_notes],
+            'reviewed_by_id': user_id,
+        }
+        if verified_pest:
+            from app.dataset_hub import normalize_class_label
+            canonical_verified = normalize_class_label(verified_pest)
+            extra['pest_type'] = canonical_verified
+
         update_response = _update_report_workflow(
             report_id,
             'assessment_issued',
-            extra_updates={
-                'expert_recommendations': [assessment_notes],
-                'reviewed_by_id': user_id,
-            },
+            extra_updates=extra,
         )
 
         if getattr(update_response, 'error', None):
             logger.error(f"Assessment update failed: {update_response.error}")
             return jsonify({'success': False, 'message': 'The assessment could not be saved.'}), 500
 
+        # Auto-upload sample into Dataset Hub (Supabase Storage)
+        target_label = verified_pest
+        try:
+            from app.dataset_hub import save_verified_sample, normalize_class_label
+            rep_check = supabase.table('reports').select('image_url, pest_type').eq('id', report_id).execute()
+            if rep_check and getattr(rep_check, 'data', None) and len(rep_check.data) > 0:
+                rep_item = rep_check.data[0]
+                img_url = rep_item.get('image_url')
+                orig_pest = rep_item.get('pest_type') or 'Unknown'
+                target_label = normalize_class_label(verified_pest or orig_pest)
+                if img_url:
+                    save_verified_sample(
+                        report_id=report_id,
+                        image_data=img_url,
+                        verified_label=target_label,
+                        original_prediction=orig_pest,
+                        agriculturist_id=user_id,
+                        notes=assessment_notes,
+                        supabase_client=supabase,
+                    )
+        except Exception as arc_err:
+            logger.warning(f"Failed to auto-archive verified sample: {arc_err}")
+
         reviewer_name = session.get('user_name', '')
+        reviewer_first_name = ""
         if not reviewer_name:
             try:
                 u_res = supabase.table('users').select('first_name, last_name').eq('id', user_id).execute()
                 if u_res and getattr(u_res, 'data', None) and len(u_res.data) > 0:
-                    reviewer_name = f"{u_res.data[0].get('first_name', '')} {u_res.data[0].get('last_name', '')}".strip()
+                    reviewer_first_name = (u_res.data[0].get('first_name') or '').strip()
+                    reviewer_name = f"{reviewer_first_name} {u_res.data[0].get('last_name', '')}".strip()
             except Exception as e:
                 logger.warning(f"Error fetching reviewer name: {e}")
+        if not reviewer_first_name and reviewer_name:
+            reviewer_first_name = reviewer_name.split()[0] if reviewer_name else ""
         if not reviewer_name:
             reviewer_name = "PCA Agriculturist"
 
@@ -3190,17 +3183,74 @@ def agriculturist_submit_assessment():
         except Exception as e:
             logger.warning(f"Error fetching reviewer profile: {e}")
 
+        from app.recommendations import get_official_recommendations
+        official_recos = get_official_recommendations(target_label)
+
         logger.info(f"Report ID #{report_id} assessment logged by expert #{user_id}.")
         return jsonify({
             'success': True,
             'message': 'Assessment notes saved successfully.',
             'reviewer_name': reviewer_name,
+            'reviewer_first_name': reviewer_first_name,
             'reviewer_position': position,
             'reviewer_office': office,
+            'verified_pest': target_label,
+            'pest_type': target_label,
+            'official_recommendations': official_recos,
         })
     except Exception as e:
         logger.error(f"Error saving assessment: {str(e)}")
         return jsonify({'success': False, 'message': 'The assessment could not be saved.'}), 500
+
+
+@app.route('/agriculturist/verify-classification', methods=['POST'])
+@require_role('agri_expert', 'admin')
+def agriculturist_verify_classification():
+    """Verify or correct AI pest classification and archive sample to Dataset Hub in Supabase Storage."""
+    user_id = _get_current_app_user_id()
+    try:
+        payload = request.get_json(silent=True) or {}
+        report_id = payload.get('report_id') or request.form.get('report_id')
+        verified_label = (payload.get('verified_label') or payload.get('verified_pest') or request.form.get('verified_label') or request.form.get('verified_pest') or '').strip()
+        notes = (payload.get('notes') or request.form.get('notes') or '').strip()
+
+        if not report_id or not verified_label:
+            return jsonify({'success': False, 'message': 'Report reference and verified label are required.'}), 400
+
+        from app.dataset_hub import save_verified_sample, normalize_class_label
+        canonical_label = normalize_class_label(verified_label)
+
+        rep_check = supabase.table('reports').select('image_url, pest_type').eq('id', report_id).execute()
+        if not rep_check or not getattr(rep_check, 'data', None) or len(rep_check.data) == 0:
+            return jsonify({'success': False, 'message': 'Report not found.'}), 404
+
+        rep_item = rep_check.data[0]
+        img_url = rep_item.get('image_url')
+        orig_pest = rep_item.get('pest_type') or 'Unknown'
+
+        saved_sample = None
+        if img_url:
+            saved_sample = save_verified_sample(
+                report_id=report_id,
+                image_data=img_url,
+                verified_label=canonical_label,
+                original_prediction=orig_pest,
+                agriculturist_id=user_id,
+                notes=notes,
+                supabase_client=supabase,
+            )
+
+        return jsonify({
+            'success': True,
+            'message': f'Classification verified as {canonical_label} and synced to Cloud Dataset Hub.',
+            'verified_label': canonical_label,
+            'verified_pest': canonical_label,
+            'sample': saved_sample,
+        })
+    except Exception as e:
+        logger.error(f"Error in agriculturist_verify_classification: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 
 @app.route('/farmer/submit-assessment-feedback', methods=['POST'])
@@ -4695,6 +4745,53 @@ def admin_audit_log():
                            total_pages=data['total_pages'],
                            search=search,
                            current_action=action_filter)
+
+@app.route('/admin/dataset-hub')
+@require_role('admin')
+def admin_dataset_hub():
+    """Dedicated Dataset Hub Page for Admin Tools."""
+    from app.dataset_hub import get_dataset_summary, get_recent_dataset_samples
+    summary = get_dataset_summary(supabase)
+    recent_samples = get_recent_dataset_samples(limit=50, supabase_client=supabase)
+    return render_template(
+        'admin_dataset_hub.html',
+        user_name=session.get('user_name', 'Administrator'),
+        user_role=normalize_role(session.get('user_role')),
+        summary=summary,
+        samples=recent_samples,
+    )
+
+
+@app.route('/api/admin/dataset-hub/stats')
+@require_role('admin')
+def api_admin_dataset_hub_stats():
+    """Return JSON dataset collection summary and samples for gallery filtering."""
+    from app.dataset_hub import get_dataset_summary, get_recent_dataset_samples
+    category = request.args.get('category', '').strip()
+    return jsonify({
+        'success': True,
+        'summary': get_dataset_summary(supabase),
+        'samples': get_recent_dataset_samples(limit=100, category=category or None, supabase_client=supabase),
+    })
+
+
+@app.route('/admin/dataset-hub/export-zip')
+@require_role('admin')
+def admin_export_dataset_zip():
+    """Export the collected dataset images & metadata as a structured ZIP archive."""
+    try:
+        from app.dataset_hub import generate_dataset_zip
+        zip_stream, zip_filename = generate_dataset_zip(supabase)
+        return send_file(
+            zip_stream,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=zip_filename,
+        )
+    except Exception as e:
+        logger.error(f"Error exporting dataset ZIP: {e}")
+        flash(f"Failed to export dataset ZIP: {str(e)}", "error")
+        return redirect(url_for('admin_dataset_hub'))
 
 
 @app.route('/logout')

@@ -174,33 +174,7 @@
             transform: translateY(-2px);
         }
 
-        .severity-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 4px 10px;
-            border-radius: 999px;
-            font-size: 0.78rem;
-            font-weight: 700;
-        }
 
-        .severity-badge.mild {
-            background: #ecfdf5;
-            color: #15803d;
-            border: 1px solid #86efac;
-        }
-
-        .severity-badge.moderate {
-            background: #fffbeb;
-            color: #d97706;
-            border: 1px solid #fde68a;
-        }
-
-        .severity-badge.severe {
-            background: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fca5a5;
-        }
 
         .reco-card-item {
             background: #f8fafc;
@@ -235,50 +209,7 @@
             margin-bottom: 24px;
         }
 
-        .severity-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }
 
-        .severity-stat-box {
-            padding: 16px 18px;
-            overflow: hidden;
-        }
-
-        .stat-box h3.severity-card-title,
-        .severity-stat-box .severity-card-title,
-        .severity-card-title {
-            font-size: 0.85rem !important;
-            font-weight: 700 !important;
-            color: #1e293b !important;
-            margin: 0 0 10px 0 !important;
-            display: flex !important;
-            align-items: center !important;
-            gap: 6px !important;
-            white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
-            letter-spacing: -0.25px;
-            line-height: 1.3 !important;
-        }
-
-        .severity-card-title i {
-            font-size: 0.82rem;
-            flex-shrink: 0;
-        }
-
-        .severity-stat-box table {
-            margin-top: 4px;
-            width: 100%;
-        }
-
-        .severity-stat-box th,
-        .severity-stat-box td {
-            padding: 8px 10px;
-            font-size: 0.88rem;
-        }
 
         .affected-locations-block {
             margin-bottom: 20px;
@@ -403,48 +334,7 @@
                 white-space: nowrap !important;
             }
 
-            .severity-grid {
-                display: grid !important;
-                grid-template-columns: 1fr 1fr !important;
-                gap: 10px !important;
-                margin-bottom: 12px !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-            }
 
-            .severity-stat-box {
-                padding: 8px 10px !important;
-                margin-bottom: 0 !important;
-                overflow: hidden !important;
-            }
-
-            .stat-box h3.severity-card-title,
-            .severity-stat-box .severity-card-title,
-            .severity-card-title {
-                font-size: 0.76rem !important;
-                font-weight: 700 !important;
-                margin-bottom: 4px !important;
-                white-space: nowrap !important;
-                overflow: hidden !important;
-                text-overflow: ellipsis !important;
-                letter-spacing: -0.3px !important;
-                line-height: 1.2 !important;
-            }
-
-            .severity-card-title i {
-                font-size: 0.72rem !important;
-                flex-shrink: 0 !important;
-            }
-
-            .severity-stat-box table {
-                margin-top: 2px !important;
-            }
-
-            .severity-stat-box th,
-            .severity-stat-box td {
-                padding: 3px 6px !important;
-                font-size: 0.78rem !important;
-            }
 
             .operational-status-block {
                 page-break-inside: avoid !important;
@@ -652,56 +542,7 @@
             </div>
         </div>
 
-        <!-- Severity Breakdown Section -->
-        {% set sev_breakdown = data.dashboard_payload.get('severity_breakdown', {}) if data.dashboard_payload is defined else {} %}
-        {% set brontispa_sev = sev_breakdown.get('brontispa', {}) %}
-        {% set rhino_sev = sev_breakdown.get('rhinoceros_beetle', {}) %}
-        <div class="section-title">Severity Breakdown</div>
-        <div class="summary-grid severity-grid">
-            <div class="stat-box severity-stat-box">
-                <h3 class="severity-card-title">
-                    <i class="fa-solid fa-shield-halved" style="color: #164630;"></i> Brontispa Severity
-                </h3>
-                <table>
-                    <tbody>
-                        <tr>
-                            <td><span class="severity-badge mild">Mild</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ brontispa_sev.get('Mild', 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td><span class="severity-badge moderate">Moderate</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ brontispa_sev.get('Moderate', 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td><span class="severity-badge severe">Severe</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ brontispa_sev.get('Severe', 0) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
 
-            <div class="stat-box severity-stat-box">
-                <h3 class="severity-card-title">
-                    <i class="fa-solid fa-shield-halved" style="color: #d97706;"></i> Rhinoceros Beetle Severity
-                </h3>
-                <table>
-                    <tbody>
-                        <tr>
-                            <td><span class="severity-badge mild">Mild</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ rhino_sev.get('Mild', 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td><span class="severity-badge moderate">Moderate</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ rhino_sev.get('Moderate', 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td><span class="severity-badge severe">Severe</span></td>
-                            <td style="text-align: right; font-weight: 700;">{{ rhino_sev.get('Severe', 0) }}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
         <div class="report-section operational-status-block">
             <div class="section-title">Operational Status Breakdown</div>

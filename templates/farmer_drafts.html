@@ -699,7 +699,6 @@
                 pest: draft.pest,
                 pest_confidence: draft.confidence_value || parseFloat((draft.confidence || '').replace('%', '')) || 0,
                 confidence: draft.confidence || (draft.confidence_value ? `${draft.confidence_value}%` : '0%'),
-                severity: 'Moderate',
                 recommendations: draft.recommendations || [],
                 notes: draft.farmer_notes || draft.field_notes || '',
                 farmer_notes: draft.farmer_notes || draft.field_notes || '',

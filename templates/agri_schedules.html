@@ -709,7 +709,6 @@
                 <th>Date &amp; Time</th>
                 <th>Location</th>
                 <th>Pest Type</th>
-                <th>Severity</th>
                 <th>Farmer</th>
                 <th>Status</th>
                 <th style="text-align: center;">Action</th>
@@ -736,10 +735,6 @@
             <div class="detail-row">
                 <span class="detail-label"><i class="fa-solid fa-bug" style="margin-right:6px;"></i> Report / Pest:</span>
                 <span class="detail-value" id="modalReportPest">--</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i> Severity:</span>
-                <span class="detail-value" id="modalSeverity">--</span>
             </div>
             <div class="detail-row">
                 <span class="detail-label"><i class="fa-solid fa-user-tag" style="margin-right:6px;"></i> Farmer:</span>
@@ -1052,18 +1047,12 @@
                 const pestName = s.pest_type || 'Coconut Pest';
                 const farmerName = s.farmer_name || 'Farmer';
                 const locationText = s.location || 'Location';
-                
-                const sevVal = s.severity || s.damage_severity || 'Mild';
-                const sevLower = String(sevVal).toLowerCase();
-                const sevClass = sevLower.includes('severe') ? 'severe' : (sevLower.includes('mod') ? 'moderate' : 'mild');
-                const sevLabel = sevLower.includes('severe') ? 'Severe' : (sevLower.includes('mod') ? 'Moderate' : 'Mild');
 
-                card.className = `schedule-calendar-card sev-${sevClass}`;
-                card.title = `Report #${s.report_id}: ${pestName} - ${sevLabel} (${farmerName}, ${locationText} at ${timeText})`;
+                card.className = 'schedule-calendar-card';
+                card.title = `Report #${s.report_id}: ${pestName} (${farmerName}, ${locationText} at ${timeText})`;
                 card.innerHTML = `
                     <div class="sched-card-top">
                         <span class="sched-card-time"><i class="fa-regular fa-clock"></i> ${timeText}</span>
-                        <span class="sched-severity-pill ${sevClass}">${sevLabel}</span>
                     </div>
                     <div class="sched-card-pest" title="${pestName}">
                         <i class="fa-solid fa-bug" style="font-size: 0.65rem; color: #164630; margin-right: 2px;"></i>${pestName}
@@ -1091,7 +1080,7 @@
         tbody.innerHTML = "";
 
         if (allSchedules.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="padding: 0; border: none; background: white;">
+            tbody.innerHTML = `<tr><td colspan="6" style="padding: 0; border: none; background: white;">
                 <div style="text-align:center; padding: 60px 20px; background: white; border-radius: 16px; margin: 10px 0;">
                     <div style="width: 68px; height: 68px; background: #eef5f2; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;">
                         <i class="fa-solid fa-calendar-xmark" style="font-size: 28px; color: #1a4d32;"></i>
@@ -1110,11 +1099,6 @@
             const badge = s.badge_style || getStatusBadgeStyle(s.status);
             const statusLabel = s.normalized_status || badge.label || s.status || "Visit Scheduled";
 
-            const sevVal = s.severity || s.damage_severity || 'Moderate';
-            const sevLower = String(sevVal).toLowerCase();
-            const sevClass = sevLower.includes('severe') ? 'severe' : (sevLower.includes('mod') ? 'moderate' : 'mild');
-            const sevLabel = sevLower.includes('severe') ? 'Severe' : (sevLower.includes('mod') ? 'Moderate' : 'Mild');
-
             tr.innerHTML = `
                 <td style="padding: 16px 12px; font-size: 0.9rem;">
                     <div style="font-weight: 600; color: var(--text-dark, #0f172a);">${s.confirmed_date || ""}</div>
@@ -1126,11 +1110,6 @@
                 <td style="padding: 16px 12px; font-size: 0.9rem;">
                     <div style="font-weight: 600; color: var(--text-dark, #0f172a);">${s.pest_type || ""}</div>
                     <div style="font-size: 0.8rem; color: var(--text-muted, #64748b); margin-top: 2px;">Report #${s.report_id || ""}</div>
-                </td>
-                <td style="padding: 16px 12px; font-size: 0.9rem;">
-                    <span class="sched-severity-pill ${sevClass}">
-                        ${sevLabel}
-                    </span>
                 </td>
                 <td style="padding: 16px 12px; font-size: 0.9rem; font-weight: 500;">${s.farmer_name || "Farmer"}</td>
                 <td style="padding: 16px 12px; font-size: 0.9rem;">
@@ -1157,15 +1136,6 @@
         document.getElementById("modalTitle").textContent = `Visit Schedule - Report #${s.report_id || ''}`;
         document.getElementById("modalDateTime").textContent = `${s.confirmed_date || ''} (${s.formatted_time || ''})`;
         document.getElementById("modalReportPest").textContent = `Report #${s.report_id || ''} - ${s.pest_type || ''}`;
-        
-        const sevVal = s.severity || s.damage_severity || 'Mild';
-        const sevLower = String(sevVal).toLowerCase();
-        const sevClass = sevLower.includes('severe') ? 'severe' : (sevLower.includes('mod') ? 'moderate' : 'mild');
-        const sevLabel = sevLower.includes('severe') ? 'Severe' : (sevLower.includes('mod') ? 'Moderate' : 'Mild');
-        const sevEl = document.getElementById("modalSeverity");
-        if (sevEl) {
-            sevEl.innerHTML = `<span class="sched-severity-pill ${sevClass}">${sevLabel}</span>`;
-        }
 
         document.getElementById("modalFarmer").textContent = s.farmer_name || "Farmer";
         document.getElementById("modalLocation").textContent = s.location || "Unknown Location";

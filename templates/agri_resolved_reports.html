@@ -588,7 +588,6 @@
                             <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Date</th>
                             <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Farmer / Location</th>
                             <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Pest Type</th>
-                            <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Severity</th>
                             <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600;">Status</th>
                             <th style="padding: 12px; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; text-align: center;">Action</th>
                         </tr>
@@ -979,8 +978,7 @@
                 const farmerText = String(item.farmer || item.farmer_name || "").toLowerCase();
                 const pestText = String(item.pest || item.pest_type || "").toLowerCase();
                 const locText = String(item.location || item.full_location || item.barangay || "").toLowerCase();
-                const sevText = String(item.severity || item.damage_severity || "").toLowerCase();
-                const matchesSearch = !activeSearchQuery || farmerText.includes(activeSearchQuery) || pestText.includes(activeSearchQuery) || locText.includes(activeSearchQuery) || sevText.includes(activeSearchQuery);
+                const matchesSearch = !activeSearchQuery || farmerText.includes(activeSearchQuery) || pestText.includes(activeSearchQuery) || locText.includes(activeSearchQuery);
                 const matchesStatus = activeStatusFilter === 'all' || normalizeStatusKey(item.status) === normalizeStatusKey(activeStatusFilter);
                 const matchesDate = !activeDateFilter || String(item.date || "") === activeDateFilter || String(item.formatted_date || "").includes(activeDateFilter);
                 const itemBarangay = String(item.barangay || item.location || "").toLowerCase();
@@ -1022,11 +1020,6 @@
                 const statusBadge = { backgroundColor: "#ecfdf5", color: "#065f46" };
                 const dateFormatted = item.formatted_date || item.date || item.time_string || item.timestamp || "";
 
-                const sevVal = item.severity || item.damage_severity || 'Moderate';
-                const sevLower = String(sevVal).toLowerCase();
-                const sevClass = sevLower.includes('severe') ? 'severe' : (sevLower.includes('mild') ? 'mild' : 'moderate');
-                const sevLabel = sevLower.includes('severe') ? 'Severe' : (sevLower.includes('mild') ? 'Mild' : 'Moderate');
-
                 if (currentViewMode === 'cards') {
                     const card = document.createElement("div");
                     card.className = "report-row-node";
@@ -1034,7 +1027,6 @@
                         <div class="report-main-meta" style="width: 100%;">
                             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 4px;">
                                 <h4 style="margin: 0;">${highlightSearchText(item.pest || "", activeSearchQuery)}</h4>
-                                <span class="sched-severity-pill ${sevClass}">${sevLabel}</span>
                             </div>
                             <p>Farmer: <strong>${highlightSearchText(item.farmer || "", activeSearchQuery)}</strong></p>
                             <div class="meta-location"><i class="fa-solid fa-location-dot"></i> ${escapeHtml(item.location || "")}</div>
@@ -1062,9 +1054,6 @@
                             </div>
                         </td>
                         <td style="padding: 16px 12px; font-size: 0.9rem; font-weight: 600;">${highlightSearchText(item.pest || "", activeSearchQuery)}</td>
-                        <td style="padding: 16px 12px; font-size: 0.9rem;">
-                            <span class="sched-severity-pill ${sevClass}">${sevLabel}</span>
-                        </td>
                         <td style="padding: 16px 12px; font-size: 0.9rem;">
                             <span class="status-badge-pill" style="display:inline-flex; align-items:center; gap:6px; border-radius:999px; font-size:0.78rem; font-weight:700; background:${statusBadge.backgroundColor}; color:${statusBadge.color};">
                                 <i class="fa-solid fa-circle-check"></i> ${statusLabel}

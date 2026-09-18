@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional
 
 DEFAULT_PEST_MODEL = "pest_classifier_moderate.h5"
-DEFAULT_SEVERITY_MODEL = "severity_classifier_severe_boost.h5"
 
 
 def resolve_model_path(
@@ -21,7 +20,6 @@ def resolve_model_path(
         candidates.extend([
             str((resolved_model_dir / default_filename).resolve()),
             str((resolved_model_dir / DEFAULT_PEST_MODEL).resolve()),
-            str((resolved_model_dir / DEFAULT_SEVERITY_MODEL).resolve()),
         ])
 
     configured_value = env_value if env_value is not None else os.getenv(env_var_name, "")
@@ -41,7 +39,6 @@ def resolve_model_path(
         candidates.extend([
             str((resolved_model_dir / default_filename).resolve()),
             str((resolved_model_dir / DEFAULT_PEST_MODEL).resolve()),
-            str((resolved_model_dir / DEFAULT_SEVERITY_MODEL).resolve()),
         ])
 
     for candidate in candidates:
@@ -49,3 +46,4 @@ def resolve_model_path(
             return candidate
 
     return str((resolved_model_dir / default_filename).resolve())
+

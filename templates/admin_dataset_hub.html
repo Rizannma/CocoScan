@@ -1,0 +1,1064 @@
+{% extends 'components/base_layout.html' %}
+
+{% set active_page = 'dataset_hub' %}
+{% set sidebar_role = 'Admin' %}
+{% block title %}CocoScan - Dataset Hub & Cloud Export{% endblock %}
+
+{% block mobile_restriction_overlay %}
+<div class="desktop-restriction-overlay">
+    <div class="desktop-card-prompt">
+        <div class="glow-effect"></div>
+        <div class="icon-pulse-container">
+            <div class="ripple-ring ring-1"></div>
+            <div class="ripple-ring ring-2"></div>
+            <i class="fa-solid fa-desktop"></i>
+        </div>
+        <h2>Desktop Access Required</h2>
+        <p>This area is restricted on mobile devices. Please use a desktop or larger screen to explore the dataset hub and export archives.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .dataset-hub-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+        padding-bottom: 3rem;
+    }
+
+    /* Top Grid Header */
+    .page-header-block {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.25rem;
+        background: #ffffff;
+        padding: 1.5rem 1.75rem;
+        border-radius: 20px;
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+        border: 1px solid rgba(148, 163, 184, 0.15);
+    }
+
+    .page-title-main h1 {
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 800;
+        color: #0b1315;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        letter-spacing: -0.02em;
+    }
+
+    .page-title-main h1 i {
+        color: #164630;
+        font-size: 1.5rem;
+    }
+
+    .page-title-main p {
+        margin: 4px 0 0;
+        color: #64748b;
+        font-size: 0.92rem;
+    }
+
+    .header-actions-group {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .header-badge-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #ecfdf5;
+        color: #164630;
+        padding: 8px 16px;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        border: 1px solid rgba(22, 70, 48, 0.2);
+    }
+
+    .status-dot-pulse {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: #164630;
+        box-shadow: 0 0 0 0 rgba(22, 70, 48, 0.7);
+        animation: statusPulse 2s infinite;
+    }
+
+    @keyframes statusPulse {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 70, 48, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(22, 70, 48, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(22, 70, 48, 0); }
+    }
+
+    .btn-export-zip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #164630;
+        color: #ffffff !important;
+        padding: 9px 18px;
+        border-radius: 12px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        text-decoration: none;
+        box-shadow: 0 4px 12px rgba(22, 70, 48, 0.25);
+        transition: all 0.2s ease;
+        border: 1px solid #164630;
+        cursor: pointer;
+    }
+
+    .btn-export-zip:hover {
+        background: #0f3122;
+        transform: translateY(-2px);
+        box-shadow: 0 6px 18px rgba(22, 70, 48, 0.35);
+        color: #ffffff !important;
+    }
+
+    /* Metric Cards Grid */
+    .dataset-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-card-clean {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 1.15rem 1.3rem;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        box-shadow: 0 2px 8px rgba(15, 23, 42, 0.02);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card-clean:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .stat-card-clean::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: #cbd5e1;
+    }
+
+    .stat-card-clean.total::before { background: #164630; }
+    .stat-card-clean.validated::before { background: #059669; }
+    .stat-card-clean.corrected::before { background: #f59e0b; }
+    .stat-card-clean.brontispa::before { background: #10b981; }
+    .stat-card-clean.rhino::before { background: #d97706; }
+    .stat-card-clean.healthy::before { background: #2563eb; }
+    .stat-card-clean.not-leaf::before { background: #64748b; }
+
+    .stat-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.6rem;
+    }
+
+    .stat-card-title {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .stat-card-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.9rem;
+    }
+
+    .stat-card-clean.total .stat-card-icon { background: #ecfdf5; color: #164630; }
+    .stat-card-clean.validated .stat-card-icon { background: #d1fae5; color: #059669; }
+    .stat-card-clean.corrected .stat-card-icon { background: #fef3c7; color: #d97706; }
+    .stat-card-clean.brontispa .stat-card-icon { background: #d1fae5; color: #10b981; }
+    .stat-card-clean.rhino .stat-card-icon { background: #fef3c7; color: #d97706; }
+    .stat-card-clean.healthy .stat-card-icon { background: #dbeafe; color: #2563eb; }
+    .stat-card-clean.not-leaf .stat-card-icon { background: #f1f5f9; color: #64748b; }
+
+    .stat-card-value {
+        font-size: 1.7rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.1;
+    }
+
+    .stat-card-sub {
+        font-size: 0.76rem;
+        color: #94a3b8;
+        margin-top: 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    /* Metric Breakdown Table */
+    .metric-table-card {
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 1.5rem 1.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+    }
+
+    .metric-table-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .metric-table-header h3 {
+        margin: 0;
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #0f172a;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .metric-table-header h3 i {
+        color: #164630;
+    }
+
+    .table-responsive {
+        overflow-x: auto;
+    }
+
+    .dataset-metric-table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 0.88rem;
+    }
+
+    .dataset-metric-table th {
+        background: #f8fafc;
+        color: #475569;
+        font-weight: 700;
+        padding: 10px 14px;
+        border-bottom: 2px solid #e2e8f0;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+    }
+
+    .dataset-metric-table td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f1f5f9;
+        color: #1e293b;
+    }
+
+    .dataset-metric-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .dataset-metric-table tr:hover td {
+        background-color: #fafbfc;
+    }
+
+    .folder-path-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f1f5f9;
+        color: #475569;
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 0.82rem;
+    }
+
+    /* Main Content Section */
+    .dataset-main-card {
+        background: #ffffff;
+        border-radius: 20px;
+        padding: 1.75rem;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        box-shadow: 0 4px 16px rgba(15, 23, 42, 0.03);
+    }
+
+    .gallery-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .gallery-header-title {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .gallery-header-title h2 {
+        margin: 0;
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #0f172a;
+    }
+
+    .gallery-header-title .count-badge {
+        background: #f1f5f9;
+        color: #475569;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }
+
+    /* Filter Pills & Search */
+    .gallery-controls {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+    }
+
+    .filter-pills-group {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: #f8fafc;
+        padding: 4px;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .filter-pill {
+        border: none;
+        background: transparent;
+        color: #64748b;
+        font-size: 0.82rem;
+        font-weight: 600;
+        padding: 6px 14px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .filter-pill:hover {
+        color: #0f172a;
+        background: rgba(255, 255, 255, 0.6);
+    }
+
+    .filter-pill.active {
+        background: #164630;
+        color: #ffffff;
+        box-shadow: 0 2px 6px rgba(22, 70, 48, 0.2);
+    }
+
+    .search-input-box {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .search-input-box i {
+        position: absolute;
+        left: 12px;
+        color: #94a3b8;
+        font-size: 0.85rem;
+    }
+
+    .search-input-box input {
+        padding: 7px 12px 7px 32px;
+        font-size: 0.85rem;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #f8fafc;
+        color: #1e293b;
+        outline: none;
+        width: 220px;
+        transition: border-color 0.2s ease, width 0.2s ease;
+    }
+
+    .search-input-box input:focus {
+        border-color: #164630;
+        background: #ffffff;
+        width: 260px;
+    }
+
+    .btn-refresh-hub {
+        border: 1px solid #e2e8f0;
+        background: #ffffff;
+        color: #475569;
+        font-size: 0.85rem;
+        font-weight: 600;
+        padding: 7px 14px;
+        border-radius: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-refresh-hub:hover {
+        background: #f8fafc;
+        color: #0f172a;
+        border-color: #cbd5e1;
+    }
+
+    /* Samples Grid */
+    .samples-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1.25rem;
+    }
+
+    .sample-card {
+        background: #ffffff;
+        border-radius: 16px;
+        border: 1px solid #e2e8f0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        position: relative;
+    }
+
+    .sample-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 25px rgba(15, 23, 42, 0.07);
+        border-color: #cbd5e1;
+    }
+
+    .sample-thumb-container {
+        position: relative;
+        width: 100%;
+        height: 180px;
+        background: #f8fafc;
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .sample-thumb-img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        transition: transform 0.3s ease;
+    }
+
+    .sample-card:hover .sample-thumb-img {
+        transform: scale(1.04);
+    }
+
+    .sample-thumb-overlay {
+        position: absolute;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.3);
+        opacity: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.25rem;
+        transition: opacity 0.2s ease;
+    }
+
+    .sample-thumb-container:hover .sample-thumb-overlay {
+        opacity: 1;
+    }
+
+    .sample-category-badge {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 4px 10px;
+        border-radius: 9999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    }
+
+    .badge-brontispa { background: rgba(5, 150, 105, 0.9); color: #ffffff; }
+    .badge-rhinoceros_beetle { background: rgba(217, 119, 6, 0.9); color: #ffffff; }
+    .badge-healthy { background: rgba(37, 99, 235, 0.9); color: #ffffff; }
+    .badge-not_coconut_leaf { background: rgba(100, 116, 139, 0.9); color: #ffffff; }
+
+    .sample-report-tag {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: rgba(15, 23, 42, 0.75);
+        color: #ffffff;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .sample-card-body {
+        padding: 1rem 1.15rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        flex-grow: 1;
+    }
+
+    .sample-label-title {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin: 0;
+    }
+
+    .sample-comparison-box {
+        background: #f8fafc;
+        border: 1px solid #f1f5f9;
+        border-radius: 8px;
+        padding: 8px 10px;
+        font-size: 0.76rem;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .comp-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .comp-label { color: #64748b; font-weight: 600; }
+    .comp-val { font-weight: 700; }
+    .comp-val.original { color: #64748b; }
+    .comp-val.verified { color: #164630; }
+
+    .sample-notes-text {
+        font-size: 0.76rem;
+        color: #475569;
+        background: #fffbeb;
+        border-left: 3px solid #f59e0b;
+        padding: 6px 8px;
+        border-radius: 0 6px 6px 0;
+        line-height: 1.4;
+        margin-top: 2px;
+    }
+
+    .sample-card-footer {
+        padding: 0.75rem 1.15rem;
+        border-top: 1px solid #f1f5f9;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.74rem;
+        color: #94a3b8;
+        background: #ffffff;
+    }
+
+    /* Empty state */
+    .empty-samples-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #64748b;
+    }
+
+    .empty-samples-state i {
+        font-size: 3rem;
+        color: #cbd5e1;
+        margin-bottom: 1rem;
+    }
+
+    .empty-samples-state h3 {
+        margin: 0 0 6px 0;
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .empty-samples-state p {
+        margin: 0 auto;
+        max-width: 440px;
+        font-size: 0.88rem;
+        line-height: 1.5;
+    }
+
+    /* Modal for Image Zoom */
+    .img-preview-modal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.85);
+        backdrop-filter: blur(6px);
+        z-index: 99999;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+    }
+
+    .img-preview-modal.active {
+        display: flex;
+    }
+
+    .img-preview-card {
+        background: #ffffff;
+        border-radius: 20px;
+        max-width: 800px;
+        width: 100%;
+        overflow: hidden;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .img-preview-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .img-preview-header h3 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .img-preview-close {
+        background: #f1f5f9;
+        border: none;
+        color: #475569;
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 1rem;
+    }
+
+    .img-preview-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        max-height: 70vh;
+    }
+
+    @media (max-width: 768px) {
+        .img-preview-body {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .img-preview-view {
+        background: #0f172a;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .img-preview-view img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+
+    .img-preview-info {
+        padding: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        overflow-y: auto;
+    }
+
+    .info-item-label {
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        margin-bottom: 2px;
+    }
+
+    .info-item-val {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #0f172a;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dataset-hub-container">
+    <!-- Top Header -->
+    <div class="page-header-block">
+        <div class="page-title-main">
+            <h1><i class="fa-solid fa-database"></i> Dataset Hub &amp; Cloud Export</h1>
+            <p>Centralized collection of agriculturist-verified and corrected coconut leaf images stored in Supabase Storage.</p>
+        </div>
+        <div class="header-actions-group">
+            <div class="header-badge-status">
+                <span class="status-dot-pulse"></span>
+                <span>Cloud Storage (Supabase) Active</span>
+            </div>
+            <a href="/admin/dataset-hub/export-zip" class="btn-export-zip" title="Download categorized ZIP archive for offline training">
+                <i class="fa-solid fa-file-zipper"></i>
+                <span>Export as ZIP</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats Cards Grid -->
+    <div class="dataset-stats-grid">
+        <div class="stat-card-clean total">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Total Collected</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-layer-group"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-total">{{ summary.total_samples }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-cloud-arrow-up" style="color: #164630;"></i> Total cloud images</div>
+        </div>
+
+        <div class="stat-card-clean validated">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Validated / Confirmed</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-circle-check"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-validated">{{ summary.validated_count }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-thumbs-up" style="color: #059669;"></i> AI prediction confirmed</div>
+        </div>
+
+        <div class="stat-card-clean corrected">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Corrected by Expert</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-corrected">{{ summary.corrected_count }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-arrows-rotate" style="color: #d97706;"></i> Reclassified samples</div>
+        </div>
+
+        <div class="stat-card-clean brontispa">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Brontispa</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-bug"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-brontispa">{{ summary.counts.brontispa }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-folder" style="color: #10b981;"></i> brontispa/</div>
+        </div>
+
+        <div class="stat-card-clean rhino">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Rhino Beetle</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-rhino">{{ summary.counts.rhinoceros_beetle }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-folder" style="color: #d97706;"></i> rhinoceros_beetle/</div>
+        </div>
+
+        <div class="stat-card-clean healthy">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Healthy Leaf</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-leaf"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-healthy">{{ summary.counts.healthy }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-folder" style="color: #2563eb;"></i> healthy/</div>
+        </div>
+
+        <div class="stat-card-clean not-leaf">
+            <div class="stat-card-header">
+                <span class="stat-card-title">Unidentified</span>
+                <div class="stat-card-icon"><i class="fa-solid fa-circle-question"></i></div>
+            </div>
+            <div class="stat-card-value" id="stat-not-leaf">{{ summary.counts.not_coconut_leaf }}</div>
+            <div class="stat-card-sub"><i class="fa-solid fa-folder" style="color: #64748b;"></i> not_coconut_leaf/</div>
+        </div>
+    </div>
+
+    <!-- Metric Table Section -->
+    <div class="metric-table-card">
+        <div class="metric-table-header">
+            <h3><i class="fa-solid fa-table-list"></i> Dataset Export Folder Structure &amp; Distribution</h3>
+            <span style="font-size: 0.85rem; color: #64748b;">Ready for external PyTorch / YOLO training</span>
+        </div>
+        <div class="table-responsive">
+            <table class="dataset-metric-table">
+                <thead>
+                    <tr>
+                        <th>Category Label</th>
+                        <th>Target Folder in ZIP</th>
+                        <th>Class Index</th>
+                        <th>Collected Samples</th>
+                        <th>Storage Pipeline</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Coconut Leaf Beetle (Brontispa)</strong></td>
+                        <td><span class="folder-path-pill"><i class="fa-regular fa-folder-open"></i> brontispa/</span></td>
+                        <td><code>0</code></td>
+                        <td><strong style="color: #10b981;">{{ summary.counts.brontispa }}</strong></td>
+                        <td><span class="header-badge-status" style="padding: 3px 10px; font-size: 0.75rem;">Supabase Storage</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Coconut Rhinoceros Beetle</strong></td>
+                        <td><span class="folder-path-pill"><i class="fa-regular fa-folder-open"></i> rhinoceros_beetle/</span></td>
+                        <td><code>2</code></td>
+                        <td><strong style="color: #d97706;">{{ summary.counts.rhinoceros_beetle }}</strong></td>
+                        <td><span class="header-badge-status" style="padding: 3px 10px; font-size: 0.75rem;">Supabase Storage</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Healthy Coconut Leaf</strong></td>
+                        <td><span class="folder-path-pill"><i class="fa-regular fa-folder-open"></i> healthy/</span></td>
+                        <td><code>1</code></td>
+                        <td><strong style="color: #2563eb;">{{ summary.counts.healthy }}</strong></td>
+                        <td><span class="header-badge-status" style="padding: 3px 10px; font-size: 0.75rem;">Supabase Storage</span></td>
+                    </tr>
+                    <tr>
+                        <td><strong>Unidentified / Non-Leaf</strong></td>
+                        <td><span class="folder-path-pill"><i class="fa-regular fa-folder-open"></i> not_coconut_leaf/</span></td>
+                        <td><code>3</code></td>
+                        <td><strong style="color: #64748b;">{{ summary.counts.not_coconut_leaf }}</strong></td>
+                        <td><span class="header-badge-status" style="padding: 3px 10px; font-size: 0.75rem;">Supabase Storage</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Main Dataset Gallery Card -->
+    <div class="dataset-main-card">
+        <div class="gallery-header-row">
+            <div class="gallery-header-title">
+                <h2>Verified Image Repository</h2>
+                <span class="count-badge" id="displayed-count">{{ samples|length }} items</span>
+            </div>
+
+            <div class="gallery-controls">
+                <div class="filter-pills-group">
+                    <button class="filter-pill active" data-category="all" onclick="filterCategory('all', this)">All</button>
+                    <button class="filter-pill" data-category="brontispa" onclick="filterCategory('brontispa', this)">Brontispa</button>
+                    <button class="filter-pill" data-category="rhinoceros_beetle" onclick="filterCategory('rhinoceros_beetle', this)">Rhino Beetle</button>
+                    <button class="filter-pill" data-category="healthy" onclick="filterCategory('healthy', this)">Healthy</button>
+                    <button class="filter-pill" data-category="not_coconut_leaf" onclick="filterCategory('not_coconut_leaf', this)">Other</button>
+                </div>
+
+                <div class="search-input-box">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="sample-search" placeholder="Search by Report ID, notes..." oninput="filterSearch(this.value)">
+                </div>
+
+                <button class="btn-refresh-hub" onclick="refreshDatasetHub()"><i class="fa-solid fa-rotate"></i> Refresh</button>
+            </div>
+        </div>
+
+        <!-- Samples Grid -->
+        <div class="samples-grid" id="samples-grid">
+            {% if samples and samples|length > 0 %}
+                {% for item in samples %}
+                <div class="sample-card" data-category="{{ item.category_slug }}" data-report="{{ item.report_id }}" data-notes="{{ item.notes|lower }}" data-label="{{ item.verified_label|lower }}">
+                    <div class="sample-thumb-container" onclick="openImagePreview('{{ item.public_url or item.image_url }}', '{{ item.verified_label }}', '{{ item.original_prediction }}', '{{ item.report_id }}', '{{ item.notes }}', '{{ item.created_at }}')">
+                        <img src="{{ item.public_url or item.image_url }}" alt="{{ item.verified_label }}" class="sample-thumb-img" loading="lazy" onerror="this.onerror=null; this.src='/static/img/leaf-placeholder.png';">
+                        <div class="sample-thumb-overlay"><i class="fa-solid fa-expand"></i></div>
+                        <span class="sample-category-badge badge-{{ item.category_slug }}">{{ item.verified_label }}</span>
+                        <span class="sample-report-tag">#{{ item.report_id }}</span>
+                    </div>
+
+                    <div class="sample-card-body">
+                        <h4 class="sample-label-title">{{ item.verified_label }}</h4>
+                        
+                        <div class="sample-comparison-box">
+                            <div class="comp-row">
+                                <span class="comp-label">Original AI:</span>
+                                <span class="comp-val original">{{ item.original_prediction or 'Unknown' }}</span>
+                            </div>
+                            <div class="comp-row">
+                                <span class="comp-label">Verified Ground Truth:</span>
+                                <span class="comp-val verified">{{ item.verified_label }}</span>
+                            </div>
+                        </div>
+
+                        {% if item.notes %}
+                        <div class="sample-notes-text">
+                            <strong>Note:</strong> {{ item.notes }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="sample-card-footer">
+                        <span><i class="fa-regular fa-clock"></i> {{ item.created_at[:10] if item.created_at else 'Recent' }}</span>
+                        <span><i class="fa-solid fa-user-shield"></i> {{ item.agriculturist_id or 'Expert' }}</span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-samples-state" style="grid-column: 1 / -1;">
+                    <i class="fa-solid fa-images"></i>
+                    <h3>No Verified Samples Yet</h3>
+                    <p>When agriculturists verify or correct AI classifications in active reports, the images are automatically collected and indexed in Supabase Storage.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Image Preview Zoom Modal -->
+<div class="img-preview-modal" id="image-preview-modal" onclick="closeImagePreview(event)">
+    <div class="img-preview-card" onclick="event.stopPropagation()">
+        <div class="img-preview-header">
+            <h3 id="modal-title">Sample Image Preview</h3>
+            <button class="img-preview-close" onclick="closeImagePreview()"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="img-preview-body">
+            <div class="img-preview-view">
+                <img id="modal-img" src="" alt="Zoomed Sample">
+            </div>
+            <div class="img-preview-info">
+                <div>
+                    <div class="info-item-label">Verified Classification</div>
+                    <div class="info-item-val" id="modal-verified" style="color: #164630;">-</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Original AI Prediction</div>
+                    <div class="info-item-val" id="modal-original" style="color: #64748b;">-</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Report Reference</div>
+                    <div class="info-item-val" id="modal-report">-</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Archived Timestamp</div>
+                    <div class="info-item-val" id="modal-time" style="font-size: 0.85rem; color: #64748b;">-</div>
+                </div>
+                <div>
+                    <div class="info-item-label">Agriculturist Notes</div>
+                    <div class="info-item-val" id="modal-notes" style="font-size: 0.88rem; font-weight: normal; color: #334155; line-height: 1.5;">None provided.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentCategoryFilter = 'all';
+    let currentSearchTerm = '';
+
+    function filterCategory(category, buttonEl) {
+        currentCategoryFilter = category;
+        document.querySelectorAll('.filter-pill').forEach(btn => btn.classList.remove('active'));
+        if (buttonEl) buttonEl.classList.add('active');
+        applyFilters();
+    }
+
+    function filterSearch(term) {
+        currentSearchTerm = (term || '').trim().toLowerCase();
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const cards = document.querySelectorAll('.sample-card');
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+            const cat = card.getAttribute('data-category');
+            const report = (card.getAttribute('data-report') || '').toLowerCase();
+            const notes = (card.getAttribute('data-notes') || '').toLowerCase();
+            const label = (card.getAttribute('data-label') || '').toLowerCase();
+
+            const matchesCategory = currentCategoryFilter === 'all' || cat === currentCategoryFilter;
+            const matchesSearch = !currentSearchTerm || 
+                report.includes(currentSearchTerm) || 
+                notes.includes(currentSearchTerm) || 
+                label.includes(currentSearchTerm);
+
+            if (matchesCategory && matchesSearch) {
+                card.style.display = 'flex';
+                visibleCount++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        const countBadge = document.getElementById('displayed-count');
+        if (countBadge) {
+            countBadge.innerText = `${visibleCount} item${visibleCount === 1 ? '' : 's'}`;
+        }
+    }
+
+    async function refreshDatasetHub() {
+        try {
+            const btn = document.querySelector('.btn-refresh-hub');
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Refreshing...';
+
+            const resp = await fetch('/api/admin/dataset-hub/stats');
+            const data = await resp.json();
+            if (data.success && data.summary) {
+                const s = data.summary;
+                document.getElementById('stat-total').innerText = s.total_samples || 0;
+                if (document.getElementById('stat-validated')) document.getElementById('stat-validated').innerText = s.validated_count || 0;
+                if (document.getElementById('stat-corrected')) document.getElementById('stat-corrected').innerText = s.corrected_count || 0;
+                document.getElementById('stat-brontispa').innerText = s.counts?.brontispa || 0;
+                document.getElementById('stat-rhino').innerText = s.counts?.rhinoceros_beetle || 0;
+                document.getElementById('stat-healthy').innerText = s.counts?.healthy || 0;
+                document.getElementById('stat-not-leaf').innerText = s.counts?.not_coconut_leaf || 0;
+            }
+            if (btn) btn.innerHTML = '<i class="fa-solid fa-rotate"></i> Refresh';
+        } catch (e) {
+            console.error('Error refreshing dataset hub:', e);
+        }
+    }
+
+    function openImagePreview(url, verified, original, reportId, notes, createdAt) {
+        const modal = document.getElementById('image-preview-modal');
+        const img = document.getElementById('modal-img');
+        const title = document.getElementById('modal-title');
+        const verifiedEl = document.getElementById('modal-verified');
+        const originalEl = document.getElementById('modal-original');
+        const reportEl = document.getElementById('modal-report');
+        const timeEl = document.getElementById('modal-time');
+        const notesEl = document.getElementById('modal-notes');
+
+        img.src = url || '/static/img/leaf-placeholder.png';
+        title.innerText = `Report #${reportId} Sample`;
+        verifiedEl.innerText = verified || 'Unknown';
+        originalEl.innerText = original || 'Unknown';
+        reportEl.innerText = `Report ID #${reportId}`;
+        timeEl.innerText = createdAt || 'Timestamp unavailable';
+        notesEl.innerText = notes || 'No agriculturist notes provided.';
+
+        modal.classList.add('active');
+    }
+
+    function closeImagePreview(event) {
+        if (!event || event.target.id === 'image-preview-modal' || event.target.closest('.img-preview-close')) {
+            document.getElementById('image-preview-modal').classList.remove('active');
+        }
+    }
+</script>
+{% endblock %}

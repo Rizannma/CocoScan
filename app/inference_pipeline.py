@@ -1,9 +1,8 @@
 """
-Integrated inference pipeline for CocoScan using the two Keras H5 models:
+Integrated inference pipeline for CocoScan using the Keras H5 pest classification model:
 - pest_classifier_moderate.h5
-- severity_classifier_severe_boost.h5
 
-Handles: image preparation -> single-pass dual model inference -> dynamic recommendations -> aggressive memory cleanup.
+Handles: image preparation -> pest model inference -> safe initial recommendations -> aggressive memory cleanup.
 """
 
 import base64
@@ -16,17 +15,13 @@ from PIL import Image
 
 from model.inference import (
     clear_inference_memory,
-    predict_both,
     predict_pest,
     predict_pest_from_base64,
-    predict_severity,
-    predict_severity_from_base64,
 )
 
 logger = logging.getLogger(__name__)
 
 PEST_LABELS = ["Brontispa", "Healthy Coconut Leaf", "Rhinoceros Beetle", "Not a Coconut Leaf Image"]
-SEVERITY_LABELS = ["Mild", "Moderate", "Severe"]
 
 
 def _to_pil_image(image_source: Union[str, np.ndarray, Image.Image]) -> Image.Image:
@@ -70,52 +65,47 @@ def run_full_inference_pipeline(
     use_lite_size: bool = False,
 ) -> Dict:
     """
-    Execute the dual-model inference pipeline:
-    1. Prepare and downscale the input image once.
-    2. Run both pest and severity classification in a single optimized pass.
-    3. Generate recommendations dynamically tailored to the detected pest and severity.
+    Execute the single-model pest inference pipeline:
+    1. Prepare and downscale the input image safely.
+    2. Run pest classification using pest_classifier_moderate.h5.
+    3. Generate safe, non-invasive initial recommendations tailored to the detected pest.
     4. Aggressively clear memory and GPU caches.
     """
     try:
-        logger.info("Starting dual H5 model inference pipeline (pest + severity)")
+        logger.info("Starting pest classifier H5 inference pipeline")
 
         image = _to_pil_image(image_source)
 
-        # Single-pass dual model inference (preprocessed & validated once)
-        pest_result, severity_result = predict_both(
+        # Single pest model inference
+        pest_result = predict_pest(
             image,
-            pest_model_path=pest_model_path,
-            severity_model_path=severity_model_path,
+            model_path=pest_model_path,
         )
         predicted_pest = pest_result["predicted_pest"]
-        predicted_severity = severity_result["severity"]
+        confidence_score = pest_result["confidence_score"]
 
-        # Dynamic Recommendations based on both pest and severity
+        # Safe Precautionary Initial Recommendations
         from app.recommendations import recommend_actions
 
         recommendations_result = recommend_actions(
             pest=predicted_pest,
-            severity=predicted_severity,
         )
 
         final_result = {
             "success": True,
             "pest": predicted_pest,
-            "pest_confidence": pest_result["confidence_score"],
+            "possible_pest_title": f"Possible Pest: {predicted_pest}",
+            "pest_confidence": confidence_score,
             "pest_probabilities": pest_result["probabilities"],
-            "severity": predicted_severity,
-            "damage_percentage": severity_result["damage_percentage"],
-            "severity_confidence": severity_result["confidence_score"],
-            "severity_probabilities": severity_result["probabilities"],
             "recommendations": recommendations_result["recommendation"],
-            "risk_level": recommendations_result["risk"],
-            "urgency": recommendations_result["urgency"],
-            "risk_factors": recommendations_result["risk_factors"],
+            "precautionary_note": recommendations_result.get("precautionary_note", ""),
+            "risk_level": recommendations_result.get("risk", "Low"),
+            "urgency": recommendations_result.get("urgency", "Low"),
+            "risk_factors": recommendations_result.get("risk_factors", []),
         }
 
         logger.info(
-            f"Pipeline complete: Pest='{predicted_pest}' ({pest_result['confidence_score']:.1%}), "
-            f"Severity='{predicted_severity}' ({severity_result['confidence_score']:.1%})"
+            f"Pipeline complete: Possible Pest='{predicted_pest}' ({confidence_score:.1%})"
         )
         return final_result
 
@@ -125,9 +115,9 @@ def run_full_inference_pipeline(
             "success": False,
             "error": str(exc),
             "pest": "Unknown",
-            "severity": "Not available",
             "confidence": 0.0,
             "recommendations": [],
         }
     finally:
         clear_inference_memory()
+

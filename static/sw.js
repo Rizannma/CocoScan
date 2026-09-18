@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cocoscan-app-shell-v21';
-const RUNTIME_CACHE = 'cocoscan-pages-runtime-v21';
-const IMAGE_CACHE = 'cocoscan-report-images-v21';
+const CACHE_NAME = 'cocoscan-app-shell-v23';
+const RUNTIME_CACHE = 'cocoscan-pages-runtime-v23';
+const IMAGE_CACHE = 'cocoscan-report-images-v23';
 
 // Only precache truly public, unauthenticated assets to prevent login redirect caching corruption
 const PRECACHE_ASSETS = [
@@ -33,9 +33,9 @@ const PRECACHE_ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[SW v21] Precaching Public App Shell & Webfonts');
+            console.log('[SW v23] Precaching Public App Shell & Webfonts');
             return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-                console.warn('[SW v21] Precache assets load warning:', err);
+                console.warn('[SW v23] Precache assets load warning:', err);
             });
         }).then(() => self.skipWaiting())
     );

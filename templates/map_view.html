@@ -875,16 +875,9 @@
                 <div class="filter-button-group" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                     <button id="filter-all-btn" class="chip-filter-btn active-chip">All (0)</button>
                     <button id="filter-pest-btn" class="chip-filter-btn">Pest ▾</button>
-                    <button id="filter-severity-btn" class="chip-filter-btn">Severity ▾</button>
                 </div>
             </div>
             <div id="pest-dropdown" class="filter-dropdown"
-                style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
-                <div class="filter-dropdown-panel"
-                    style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:200px; max-height:240px; overflow:auto; pointer-events:auto;">
-                </div>
-            </div>
-            <div id="severity-dropdown" class="filter-dropdown"
                 style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
                 <div class="filter-dropdown-panel"
                     style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:200px; max-height:240px; overflow:auto; pointer-events:auto;">
@@ -895,20 +888,20 @@
             <section class="map-card-container">
                 <div id="map-canvas" class="map-viewport-frame"></div>
 
-                <!-- Severity Identification Legend Elements -->
+                <!-- Pest Identification Legend Elements -->
                 <div class="map-legend-row">
-                    <span style="font-size:0.75rem; font-weight:700; color:#64748b; margin-right:4px;">Severity:</span>
+                    <span style="font-size:0.75rem; font-weight:700; color:#64748b; margin-right:4px;">Pest Types:</span>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background-color: #22c55e;"></div>
-                        <span>Mild</span>
+                        <div class="legend-dot" style="background-color: #164630;"></div>
+                        <span>Rhinoceros Beetle</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background-color: #f59e0b;"></div>
-                        <span>Moderate</span>
+                        <div class="legend-dot" style="background-color: #d97706;"></div>
+                        <span>Brontispa</span>
                     </div>
                     <div class="legend-item">
-                        <div class="legend-dot" style="background-color: #ef4444;"></div>
-                        <span>Severe</span>
+                        <div class="legend-dot" style="background-color: #10b981;"></div>
+                        <span>Healthy Leaf</span>
                     </div>
                 </div>
             </section>
@@ -969,7 +962,6 @@
         let mapInstance = null;
         let markersLayerGroup = null;
         let activePestFilter = "all";
-        let activeSeverityFilter = "all";
         let searchPhrase = "";
         let mapSearchTimeout = null;
         let lastZoomedSearchPhrase = null;
@@ -987,18 +979,11 @@
             return geoReportsDataset.filter(item => {
                 const locationString = `${item.barangay || ''} ${item.municipality || ''} ${item.province || ''}`.toLowerCase();
                 const pestString = String(item.pest_type || "").toLowerCase();
-                const sevDetail = getSeverityDetails(item.severity || item.damage_severity, item.pest_type);
-                const sevString = sevDetail.label.toLowerCase();
                 
-                const matchesSearch = !searchPhrase || locationString.includes(searchPhrase) || pestString.includes(searchPhrase) || sevString.includes(searchPhrase);
+                const matchesSearch = !searchPhrase || locationString.includes(searchPhrase) || pestString.includes(searchPhrase);
                 const matchesPest = (activePestFilter === "all" || item.pest_type === activePestFilter);
                 
-                let matchesSeverity = true;
-                if (activeSeverityFilter !== "all") {
-                    matchesSeverity = (sevString === activeSeverityFilter.toLowerCase());
-                }
-                
-                return matchesSearch && matchesPest && matchesSeverity;
+                return matchesSearch && matchesPest;
             });
         }
 
@@ -1032,136 +1017,105 @@
                 }
                 return;
             }
-            if (normalizedQuery === lastZoomedSearchPhrase && !immediate) return;
+            if (normalizedQuery === lastZoomedSearchPhrase) return;
 
             const executeZoom = () => {
                 lastZoomedSearchPhrase = normalizedQuery;
                 if (records && records.length > 0) {
-                    if (records.length === 1) {
-                        mapInstance.flyTo([records[0].latitude, records[0].longitude], 15, { duration: 1.2 });
+                    const bounds = L.latLngBounds(records.map(r => [r.latitude, r.longitude]));
+                    if (!bounds.getNorthEast().equals(bounds.getSouthWest())) {
+                        mapInstance.flyToBounds(bounds, { padding: [50, 50], maxZoom: 15, duration: 1.0 });
                     } else {
-                        const bounds = L.latLngBounds(records.map(r => [r.latitude, r.longitude]));
-                        if (bounds.getNorthEast().equals(bounds.getSouthWest())) {
-                            mapInstance.flyTo([records[0].latitude, records[0].longitude], 15, { duration: 1.2 });
-                        } else {
-                            mapInstance.flyToBounds(bounds, { padding: [60, 60], maxZoom: 15, duration: 1.2 });
-                        }
+                        mapInstance.flyTo([records[0].latitude, records[0].longitude], 15, { duration: 1.0 });
                     }
-                } else {
-                    // Fallback to OpenStreetMap Nominatim API: Search nationwide first, and compare with local Laguna results
-                    Promise.all([
-                        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalizedQuery + ', Philippines')}&limit=3`).then(r => r.json()).catch(() => []),
-                        fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(normalizedQuery + ', Laguna, Philippines')}&limit=3`).then(r => r.json()).catch(() => [])
-                    ]).then(([phResults, lagunaResults]) => {
-                        let bestMatch = null;
-                        
-                        // Check if national search found a major province, city, island, or region (importance >= 0.5 or administrative boundary)
-                        const majorPhMatch = phResults.find(item => parseFloat(item.importance || 0) >= 0.5 || item.type === 'administrative' || item.class === 'boundary');
-                        
-                        // Check if Laguna search found a valid local place (municipality, barangay, or village)
-                        const validLagunaMatch = lagunaResults.find(item => parseFloat(item.importance || 0) >= 0.25 && item.class !== 'highway');
-                        
-                        if (majorPhMatch && parseFloat(majorPhMatch.importance || 0) >= 0.55 && (!validLagunaMatch || parseFloat(majorPhMatch.importance) > parseFloat(validLagunaMatch.importance || 0) + 0.15)) {
-                            bestMatch = majorPhMatch;
-                        } else if (validLagunaMatch) {
-                            bestMatch = validLagunaMatch;
-                        } else if (lagunaResults.length > 0) {
-                            bestMatch = lagunaResults[0];
-                        } else if (phResults.length > 0) {
-                            bestMatch = phResults[0];
-                        }
-
-                        if (bestMatch) {
-                            const lat = parseFloat(bestMatch.lat);
-                            const lon = parseFloat(bestMatch.lon);
-                            const zoomLevel = parseFloat(bestMatch.importance || 0) >= 0.6 ? 10 : 14;
-                            mapInstance.flyTo([lat, lon], zoomLevel, { duration: 1.2 });
-                        }
-                    });
                 }
             };
 
             if (immediate) {
                 executeZoom();
             } else {
-                mapSearchTimeout = setTimeout(executeZoom, 600);
+                mapSearchTimeout = setTimeout(executeZoom, 400);
             }
         }
 
         function initLeafletMapCanvas() {
-            // Instantiate map canvas center coordinate metrics pointing near San Pablo City, Laguna
-            mapInstance = L.map('map-canvas', {
-                zoomControl: true,
+            mapInstance = L.map("map-canvas", {
+                zoomControl: false,
                 attributionControl: false
             }).setView([14.0708, 121.3256], 13);
 
-            // Fetch clean standard OpenStreetMap tile layer (no API key required)
-            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            L.control.zoom({ position: "bottomright" }).addTo(mapInstance);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                 maxZoom: 19,
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                subdomains: ["a", "b", "c"]
             }).addTo(mapInstance);
 
             markersLayerGroup = L.markerClusterGroup({
-                chunkedLoading: true,
                 showCoverageOnHover: false,
-                maxClusterRadius: 50,
+                maxClusterRadius: 40,
                 spiderfyOnMaxZoom: true,
-                disableClusteringAtZoom: 17
+                disableClusteringAtZoom: 16
             });
             mapInstance.addLayer(markersLayerGroup);
+
+            if (geoReportsDataset && geoReportsDataset.length > 0) {
+                const bounds = L.latLngBounds(geoReportsDataset.map(r => [r.latitude, r.longitude]));
+                if (!bounds.getNorthEast().equals(bounds.getSouthWest())) {
+                    mapInstance.fitBounds(bounds, { padding: [50, 50], maxZoom: 14 });
+                } else {
+                    mapInstance.setView([geoReportsDataset[0].latitude, geoReportsDataset[0].longitude], 14);
+                }
+            }
         }
 
         function initFiltersAndSearch() {
-            const searchBar = document.getElementById("map-search-input");
-            const urlSearchParams = new URLSearchParams(window.location.search);
-            const initialSearchQuery = (urlSearchParams.get("search") || "").trim();
+            const searchInput = document.getElementById("map-search-input");
+            const allBtn = document.getElementById("filter-all-btn");
+            const pestBtn = document.getElementById("filter-pest-btn");
+            const pestPanel = document.querySelector("#pest-dropdown .filter-dropdown-panel");
+            const clearBtn = document.getElementById("clear-filters-btn");
+            const urlInitialSearch = new URLSearchParams(window.location.search).get("search");
 
-            if (searchBar) {
-                searchBar.value = initialSearchQuery;
-                searchPhrase = initialSearchQuery.toLowerCase().trim();
+            if (searchInput) {
+                if (urlInitialSearch) {
+                    searchPhrase = urlInitialSearch.toLowerCase().trim();
+                    searchInput.value = urlInitialSearch;
+                }
 
-                searchBar.addEventListener("input", (e) => {
+                searchInput.addEventListener("input", (e) => {
                     searchPhrase = e.target.value.toLowerCase().trim();
                     syncUrlSearchParameter();
+                    evaluateClearFilterButtonState();
+                    const currentFiltered = getCurrentFilteredRecords();
+                    renderMapDashboardComponents();
+                    triggerMapViewportUpdate(searchPhrase, currentFiltered);
+                });
+            }
+
+            if (allBtn) {
+                allBtn.addEventListener("click", () => {
+                    activePestFilter = "all";
+                    document.querySelectorAll(".dropdown-item").forEach(i => i.classList.remove("selected"));
+                    const allPestItem = document.querySelector("#pest-dropdown .dropdown-item[data-value='all']");
+                    if (allPestItem) allPestItem.classList.add("selected");
                     updateFilterButtonsUI();
                     evaluateClearFilterButtonState();
                     renderMapDashboardComponents();
-                    triggerMapViewportUpdate(searchPhrase, getCurrentFilteredRecords(), false);
-                });
-
-                searchBar.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") {
-                        e.preventDefault();
-                        searchBar.blur();
-                        searchPhrase = searchBar.value.toLowerCase().trim();
-                        syncUrlSearchParameter();
-                        updateFilterButtonsUI();
-                        evaluateClearFilterButtonState();
-                        renderMapDashboardComponents();
-                        triggerMapViewportUpdate(searchPhrase, getCurrentFilteredRecords(), true);
-                    }
                 });
             }
 
-            const allBtn = document.getElementById("filter-all-btn");
-            if (allBtn) {
-                allBtn.addEventListener("click", () => {
-                    clearAllActiveFilters();
-                });
+            if (clearBtn) {
+                clearBtn.addEventListener("click", clearAllActiveFilters);
             }
 
             // Build Pest Dropdown
-            const pestBtn = document.getElementById("filter-pest-btn");
-            const pestPanel = document.querySelector("#pest-dropdown .filter-dropdown-panel");
-            const pestOptions = [
-                { value: "all", label: "All Pests" },
-                { value: "Rhinoceros Beetle", label: "Rhinoceros Beetle" },
-                { value: "Brontispa", label: "Brontispa" }
-            ];
+            const uniquePests = ["all", ...new Set(geoReportsDataset.map(r => r.pest_type).filter(Boolean))];
             if (pestBtn && pestPanel) {
                 let pestHtml = "";
-                pestOptions.forEach(p => {
-                    pestHtml += `<button type="button" class="dropdown-item ${activePestFilter === p.value ? 'selected' : ''}" data-value="${p.value}">${p.label}</button>`;
+                uniquePests.forEach(p => {
+                    const label = (p === "all") ? "All Pests" : p;
+                    pestHtml += `<button type="button" class="dropdown-item ${activePestFilter === p ? 'selected' : ''}" data-value="${p}">${label}</button>`;
                 });
                 pestPanel.innerHTML = pestHtml;
 
@@ -1187,44 +1141,6 @@
                 });
             }
 
-            // Build Severity Dropdown
-            const sevBtn = document.getElementById("filter-severity-btn");
-            const sevPanel = document.querySelector("#severity-dropdown .filter-dropdown-panel");
-            const sevOptions = [
-                { value: "all", label: "All Severities" },
-                { value: "Mild", label: "Mild" },
-                { value: "Moderate", label: "Moderate" },
-                { value: "Severe", label: "Severe" }
-            ];
-            if (sevBtn && sevPanel) {
-                let sevHtml = "";
-                sevOptions.forEach(s => {
-                    sevHtml += `<button type="button" class="dropdown-item ${activeSeverityFilter === s.value ? 'selected' : ''}" data-value="${s.value}">${s.label}</button>`;
-                });
-                sevPanel.innerHTML = sevHtml;
-
-                sevBtn.addEventListener("click", function (e) {
-                    e.stopPropagation();
-                    const rect = sevBtn.getBoundingClientRect();
-                    sevPanel.style.top = `${rect.bottom + 6}px`;
-                    sevPanel.style.left = `${rect.left}px`;
-                    const isVisible = sevPanel.style.display === "block";
-                    document.querySelectorAll(".filter-dropdown-panel").forEach(p => p.style.display = "none");
-                    sevPanel.style.display = isVisible ? "none" : "block";
-                });
-
-                sevPanel.addEventListener("click", function (e) {
-                    const item = e.target.closest(".dropdown-item");
-                    if (!item) return;
-                    activeSeverityFilter = item.getAttribute("data-value");
-                    sevPanel.style.display = "none";
-                    sevPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activeSeverityFilter));
-                    updateFilterButtonsUI();
-                    evaluateClearFilterButtonState();
-                    renderMapDashboardComponents();
-                });
-            }
-
             document.addEventListener("click", function (e) {
                 if (!e.target.closest(".filter-dropdown") && !e.target.closest(".chip-filter-btn")) {
                     document.querySelectorAll(".filter-dropdown-panel").forEach(p => p.style.display = "none");
@@ -1237,9 +1153,8 @@
         function updateFilterButtonsUI() {
             const allBtn = document.getElementById("filter-all-btn");
             const pestBtn = document.getElementById("filter-pest-btn");
-            const sevBtn = document.getElementById("filter-severity-btn");
 
-            const isAllActive = (activePestFilter === "all" && activeSeverityFilter === "all" && !searchPhrase);
+            const isAllActive = (activePestFilter === "all" && !searchPhrase);
             if (allBtn) {
                 allBtn.classList.toggle("active-chip", isAllActive);
                 allBtn.textContent = `All (${geoReportsDataset.length})`;
@@ -1248,16 +1163,12 @@
                 pestBtn.classList.toggle("active-chip", activePestFilter !== "all");
                 pestBtn.textContent = activePestFilter !== "all" ? `${activePestFilter} ▾` : "Pest ▾";
             }
-            if (sevBtn) {
-                sevBtn.classList.toggle("active-chip", activeSeverityFilter !== "all");
-                sevBtn.textContent = activeSeverityFilter !== "all" ? `${activeSeverityFilter} ▾` : "Severity ▾";
-            }
         }
 
         function evaluateClearFilterButtonState() {
             const clearBtn = document.getElementById("clear-filters-btn");
             if (clearBtn) {
-                if (searchPhrase !== "" || activePestFilter !== "all" || activeSeverityFilter !== "all") {
+                if (searchPhrase !== "" || activePestFilter !== "all") {
                     clearBtn.style.display = "inline-flex";
                 } else {
                     clearBtn.style.display = "none";
@@ -1271,16 +1182,11 @@
 
             searchPhrase = "";
             activePestFilter = "all";
-            activeSeverityFilter = "all";
             lastZoomedSearchPhrase = null;
 
             const pestPanel = document.querySelector("#pest-dropdown .filter-dropdown-panel");
             if (pestPanel) {
                 pestPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === "all"));
-            }
-            const sevPanel = document.querySelector("#severity-dropdown .filter-dropdown-panel");
-            if (sevPanel) {
-                sevPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === "all"));
             }
 
             updateFilterButtonsUI();
@@ -1301,61 +1207,11 @@
         }
 
         function getPestHexColorCode(pestName) {
-            if (pestName === "Rhinoceros Beetle") return "#164630"; // Deep Green
-            if (pestName === "Brontispa") return "#d97706";         // Orange/Amber
+            const p = String(pestName || "").toLowerCase();
+            if (p.includes("brontispa")) return "#d97706";         // Orange/Amber
+            if (p.includes("rhino") || p.includes("beetle")) return "#164630"; // Deep Green
+            if (p.includes("healthy") || p.includes("malusog")) return "#10b981"; // Emerald Green
             return "#64748b";                                       // Fallback gray
-        }
-
-        function getSeverityDetails(sev, pestType) {
-            const s = String(sev || "").toLowerCase().trim();
-            if (s.includes("severe")) {
-                return {
-                    label: "Severe",
-                    class: "severe",
-                    hex: "#ef4444",
-                    bg: "#fef2f2",
-                    color: "#dc2626",
-                    border: "#fca5a5"
-                };
-            }
-            if (s.includes("mod")) {
-                return {
-                    label: "Moderate",
-                    class: "moderate",
-                    hex: "#f59e0b",
-                    bg: "#fffbeb",
-                    color: "#d97706",
-                    border: "#fde68a"
-                };
-            }
-            if (s.includes("mild")) {
-                return {
-                    label: "Mild",
-                    class: "mild",
-                    hex: "#22c55e",
-                    bg: "#ecfdf5",
-                    color: "#15803d",
-                    border: "#86efac"
-                };
-            }
-            if (String(pestType || "").toLowerCase().includes("healthy")) {
-                return {
-                    label: "Mild",
-                    class: "mild",
-                    hex: "#22c55e",
-                    bg: "#ecfdf5",
-                    color: "#15803d",
-                    border: "#86efac"
-                };
-            }
-            return {
-                label: "Moderate",
-                class: "moderate",
-                hex: "#f59e0b",
-                bg: "#fffbeb",
-                color: "#d97706",
-                border: "#fde68a"
-            };
         }
 
         function renderMapDashboardComponents() {
@@ -1364,14 +1220,7 @@
             const listContainer = document.getElementById("location-list-container");
             if (listContainer) listContainer.innerHTML = "";
 
-            // Filter context validation - search by pest name, severity, AND location
             let filteredRecords = getCurrentFilteredRecords();
-
-            // Update label metrics counter
-            const labelCount = document.getElementById("chip-count-label");
-            if (labelCount && activePestFilter === "all") {
-                labelCount.textContent = `All Pests (${filteredRecords.length})`;
-            }
 
             if (filteredRecords.length === 0) {
                 if (listContainer) {
@@ -1382,13 +1231,10 @@
 
             // Render all filtered records on map
             filteredRecords.forEach(record => {
-                const sevInfo = getSeverityDetails(record.severity || record.damage_severity, record.pest_type);
-                const markerColor = sevInfo.hex;
                 const pestColor = getPestHexColorCode(record.pest_type);
 
-                // Build modern dynamic map pins reflecting severity
                 const dynamicMarkerHtml = `
-                    <div class="custom-map-marker-pin" style="background-color: ${markerColor};">
+                    <div class="custom-map-marker-pin" style="background-color: ${pestColor};">
                         <i class="fa-solid fa-location-dot"></i>
                     </div>`;
 
@@ -1404,11 +1250,8 @@
                     <div style="min-width: 175px; padding: 4px; font-family: inherit;">
                         <h4 style="margin: 0 0 2px 0; font-size: 0.9rem; color: #0b251a; font-weight:700;">${record.barangay}</h4>
                         <p style="margin: 0 0 6px 0; font-size: 0.75rem; color: #64748b;">${record.municipality}, ${record.province}</p>
-                        <div style="font-weight: 700; font-size: 0.8rem; color: ${pestColor}; margin-bottom: 4px;">
+                        <div style="font-weight: 700; font-size: 0.85rem; color: ${pestColor}; margin-bottom: 12px;">
                             ${record.pest_type}
-                        </div>
-                        <div style="font-size: 0.8rem; font-weight: 700; color: ${sevInfo.color || sevInfo.hex}; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px;">
-                            ${sevInfo.label}
                         </div>
                         <button class="btn-view-action" style="width: 100%; padding: 6px 12px; font-size: 0.75rem; margin-top: 0;" onclick="openSpecificReportModal('${record.id}')">
                             <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Specific Report
@@ -1424,7 +1267,6 @@
             const recentRecords = filteredRecords.slice(0, 5);
             if (listContainer && recentRecords.length > 0) {
                 recentRecords.forEach(record => {
-                    const sevInfo = getSeverityDetails(record.severity || record.damage_severity, record.pest_type);
                     const pestColor = getPestHexColorCode(record.pest_type);
                     const nodeRow = document.createElement("div");
                     nodeRow.className = "location-node-row";
@@ -1433,8 +1275,7 @@
                             <h4>${record.barangay}</h4>
                             <p>${record.municipality}, ${record.province}</p>
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px;">
-                                <span style="font-size:0.75rem; font-weight:600; color:${pestColor};">${record.pest_type}</span>
-                                <span class="sched-severity-pill ${sevInfo.class}" style="font-size:0.65rem; padding:2px 8px;">${sevInfo.label}</span>
+                                <span style="font-size:0.78rem; font-weight:700; color:${pestColor};">${record.pest_type}</span>
                             </div>
                         </div>
                     `;
@@ -1461,7 +1302,6 @@
             // Use report_modal.js helper to get the proper display label
             const cleanDisplayStatus = (typeof getWorkflowStatusDisplayLabel === 'function') ? getWorkflowStatusDisplayLabel(record.status) : record.status;
             const isPendingState = ["Pending", "under_review", "ready_to_submit"].includes(record.status);
-            const sevInfo = getSeverityDetails(record.severity || record.damage_severity, record.pest_type);
 
             activeState.innerHTML = `
                 <div style="width:100%;">
@@ -1476,12 +1316,6 @@
                         <div class="data-table-row">
                             <span>Detected Pest</span>
                             <span style="color: ${getPestHexColorCode(record.pest_type)}; font-weight: 700;">${record.pest_type}</span>
-                        </div>
-                        <div class="data-table-row">
-                            <span>Severity Level</span>
-                            <div>
-                                <span class="sched-severity-pill ${sevInfo.class}" style="color:${sevInfo.color} !important; background-color:${sevInfo.bg} !important; border:1px solid ${sevInfo.border} !important;">${sevInfo.label}</span>
-                            </div>
                         </div>
                         <div class="data-table-row">
                             <span>Report Matrix Ref</span>

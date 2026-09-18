@@ -211,7 +211,8 @@
     "alert_notes_required": "Please provide your farmer notes before submitting the report.",
     "alert_no_network_save_draft": "No network connection detected. Save this scan as a draft instead?",
     "alert_submit_success": "SUCCESS: Report for {pest} has been submitted successfully.",
-    "alert_submit_failed_save_draft": "The report could not be synced right now. Save this scan as a draft instead?"
+    "alert_submit_failed_save_draft": "The report could not be synced right now. Save this scan as a draft instead?",
+    "possible_pest_prefix": "Possible Pest: "
   },
   "drafts_page": {
     "page_title": "Saved Drafts",
@@ -314,6 +315,14 @@
     "notes_card_placeholder": "Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).",
     "farmer_notes_placeholder": "Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).",
     "notes_empty": "No notes logged.",
+    "possible_pest_eyebrow": "POSSIBLE PEST",
+    "detected_pest_eyebrow": "DETECTED PEST",
+    "pending_validation_notice": "This is not a final result and will be validated by the agriculturist.",
+    "final_result_verified_by": "Final Result Verified by: {name}",
+    "safe_actions_notice": "You may proceed with these safe precautionary steps while waiting for final confirmation from the agriculturist.",
+    "btn_validate_correct": "Validate as Correct",
+    "btn_correct_result": "Correct / Change Result",
+    "agri_verification_title": "Expert Assessment & Verification",
     "initial_reco_title": "Initial Recommendations",
     "initial_reco_desc": "These are general recommendations for the detected pest to help your initial decision on what to do.",
     "initial_reco_subtext": "Tap the question mark icon for more details.",
