@@ -11,8 +11,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 
-from py_vapid import Vapid, b64urlencode
-from cryptography.hazmat.primitives import serialization
+try:
+    from py_vapid import Vapid, b64urlencode
+except ImportError:
+    Vapid = None
+    b64urlencode = None
+
+try:
+    from cryptography.hazmat.primitives import serialization
+except ImportError:
+    serialization = None
 
 try:
     from pywebpush import webpush, WebPushException
@@ -26,7 +34,7 @@ _VAPID_FILE_PATH = Path(__file__).parent / "vapid_private.pem"
 _VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:support@cocoscan.laguna.gov.ph")
 
 _lock = threading.Lock()
-_vapid_instance: Optional[Vapid] = None
+_vapid_instance: Any = None
 _vapid_public_b64: Optional[str] = None
 _vapid_private_pem: Optional[str] = None
 
@@ -37,6 +45,10 @@ _subscriptions: Dict[str, Dict[str, Any]] = {}
 def _init_vapid_keys():
     """Initializes or loads VAPID key pair."""
     global _vapid_instance, _vapid_public_b64, _vapid_private_pem
+    if Vapid is None or b64urlencode is None or serialization is None:
+        logger.warning("py_vapid or cryptography is not installed. Push notifications are disabled.")
+        return
+
     with _lock:
         if _vapid_instance is not None and _vapid_public_b64 is not None:
             return

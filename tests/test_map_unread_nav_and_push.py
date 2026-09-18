@@ -176,3 +176,55 @@ def test_farmer_dashboard_notification_bell_and_consent_modals(client):
     assert 'confirmEnablePushNotifications' in html
     assert 'dismissPushConsent' in html
 
+
+def test_push_public_key_endpoint(client):
+    """Verify that /api/push/public-key returns 200 and a public key."""
+    resp = client.get('/api/push/public-key')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['success'] is True
+    assert 'publicKey' in data
+
+
+def test_update_report_workflow_filters_unknown_columns(monkeypatch):
+    """Verify _update_report_workflow strips unknown columns and serializes complex data."""
+    import main
+    from unittest.mock import MagicMock
+
+    captured_payload = {}
+
+    class MockTable:
+        def update(self, payload):
+            nonlocal captured_payload
+            captured_payload = payload
+            return self
+
+        def eq(self, col, val):
+            return self
+
+        def execute(self):
+            return MagicMock(data=[{'id': 1}], error=None)
+
+        def select(self, *args, **kwargs):
+            return self
+
+    monkeypatch.setattr(main.supabase, 'table', lambda tbl: MockTable())
+    
+    main._update_report_workflow(
+        report_id=1,
+        status='Under Review',
+        extra_updates={
+            'unknown_column_xyz': 'should_be_stripped',
+            'last_read_at': 'should_be_stripped',
+            'expert_recommendations': ['spray water'],
+            'reviewed_by_id': 'invalid-uuid-string',
+        }
+    )
+
+    assert 'unknown_column_xyz' not in captured_payload
+    assert 'last_read_at' not in captured_payload
+    assert captured_payload['expert_recommendations'] == '["spray water"]'
+    assert captured_payload['reviewed_by_id'] is None
+    assert captured_payload['status'] == 'Under Review'
+
+

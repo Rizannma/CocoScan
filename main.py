@@ -290,6 +290,23 @@ def add_security_cache_headers(response):
     return response
 
 
+def _is_valid_uuid(val):
+    if not val:
+        return False
+    try:
+        import uuid
+        uuid.UUID(str(val).strip())
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _safe_uuid(val):
+    if _is_valid_uuid(val):
+        return str(val).strip()
+    return None
+
+
 def _resolve_app_user_id(session_data=None, *, lookup_user_id=None, lookup_email=None):
     """Return the public users.id that should be persisted into foreign-keyed columns."""
     active_session = session_data if session_data is not None else session
@@ -309,13 +326,14 @@ def _resolve_app_user_id(session_data=None, *, lookup_user_id=None, lookup_email
             if lookup_user_id(candidate_id):
                 return candidate_id
         else:
-            try:
-                response = supabase.table("users").select("id").eq("id", candidate_id).limit(1).execute()
-                rows = getattr(response, "data", None) or []
-                if rows:
-                    return candidate_id
-            except Exception as exc:
-                logger.warning(f"Unable to verify session user id {candidate_id}: {exc}")
+            if _is_valid_uuid(candidate_id):
+                try:
+                    response = supabase.table("users").select("id").eq("id", candidate_id).limit(1).execute()
+                    rows = getattr(response, "data", None) or []
+                    if rows:
+                        return candidate_id
+                except Exception as exc:
+                    logger.warning(f"Unable to verify session user id {candidate_id}: {exc}")
 
     if email:
         if lookup_email is not None:
@@ -524,13 +542,50 @@ def _fetch_visit_workflow_payload(report_id):
         "visit_images": visit_images,
     }
 
+REPORTS_TABLE_COLUMNS = {
+    "id",
+    "farmer_name",
+    "pest_type",
+    "confidence",
+    "image_url",
+    "farmer_notes",
+    "status",
+    "created_at",
+    "initial_recommendations",
+    "latitude",
+    "longitude",
+    "gps_accuracy",
+    "location_source",
+    "photo_taken_at",
+    "barangay",
+    "municipality",
+    "province",
+    "updated_at",
+    "submitted_at",
+    "user_id",
+    "reviewed_by_id",
+    "expert_recommendations",
+    "visit_request_reason",
+    "visit_requested_at",
+    "visit_schedule_date",
+    "visit_schedule_time",
+    "visit_summary",
+    "visit_completed_at",
+    "final_remarks",
+    "feedback",
+    "visit_reschedule_reason",
+    "visit_rescheduled_at",
+    "visit_rescheduled_by",
+}
+
+
 def _update_report_workflow(report_id, status, *, note=None, extra_updates=None):
     if not report_id:
         raise ValueError("Missing report reference")
 
     norm_status = normalize_report_status(status, default="Under Review")
     now_iso = datetime.now(UTC).isoformat()
-    update_data = {
+    raw_update = {
         "status": norm_status,
         "updated_at": now_iso,
     }
@@ -540,13 +595,30 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
         existing_rows = getattr(existing_response, "data", None) or []
         existing_report = existing_rows[0] if existing_rows else {}
         existing_notes = existing_report.get("farmer_notes") or ""
-        update_data["farmer_notes"] = _append_status_note(existing_notes, note)
+        raw_update["farmer_notes"] = _append_status_note(existing_notes, note)
 
     if extra_updates:
         if "farmer_notes" in extra_updates:
-            update_data["farmer_notes"] = extra_updates["farmer_notes"]
+            raw_update["farmer_notes"] = extra_updates["farmer_notes"]
             extra_updates = {k: v for k, v in extra_updates.items() if k != "farmer_notes"}
-        update_data.update(extra_updates)
+        raw_update.update(extra_updates)
+
+    # Sanitize and serialize payload fields for Supabase schema compatibility
+    update_data = {}
+    for k, v in raw_update.items():
+        if k not in REPORTS_TABLE_COLUMNS:
+            continue
+        if k in ("reviewed_by_id", "visit_rescheduled_by", "user_id"):
+            update_data[k] = _safe_uuid(v)
+        elif k in ("expert_recommendations", "initial_recommendations"):
+            if isinstance(v, (list, dict)):
+                update_data[k] = json.dumps(v)
+            elif v is None:
+                update_data[k] = None
+            else:
+                update_data[k] = str(v)
+        else:
+            update_data[k] = v
 
     try:
         update_response = supabase.table("reports").update(update_data).eq("id", report_id).execute()
@@ -631,15 +703,21 @@ def _persist_visit_images(report_id, files, user_id, *, uploaded_at=None):
         storage_name = f"visit_{datetime.now(UTC).strftime('%Y%m%d%H%M%S')}_{index}_{safe_name}"
         image_url = upload_image_to_supabase(image_bytes, storage_name, uploaded_file.mimetype)
         if image_url:
-            rows.append({
+            img_row = {
                 "report_id": report_id,
                 "image_url": image_url,
-                "uploaded_by": user_id,
                 "uploaded_at": uploaded_at,
-            })
+            }
+            uploader_uuid = _safe_uuid(user_id)
+            if uploader_uuid:
+                img_row["uploaded_by"] = uploader_uuid
+            rows.append(img_row)
 
     if rows:
-        supabase.table("visit_images").insert(rows).execute()
+        try:
+            supabase.table("visit_images").insert(rows).execute()
+        except Exception as img_err:
+            logger.warning(f"Error inserting visit_images: {img_err}")
     return rows
 
 # Notifications removed: backend persistence and helper functions have been deleted.
@@ -2924,12 +3002,16 @@ def agriculturist_map():
 def agri_schedules():
     user_id = session.get('user_id')
     user_role = normalize_role(session.get('user_role'))
+    user_name = "Agriculturist"
     try:
-        user_query = supabase.table("users").select("first_name, last_name").eq("id", user_id).execute()
-        user_name = f"{user_query.data[0].get('first_name', '')} {user_query.data[0].get('last_name', '')}".strip() if user_query.data else "Agriculturist"
+        if _is_valid_uuid(user_id):
+            user_query = supabase.table("users").select("first_name, last_name").eq("id", user_id).execute()
+            user_name = f"{user_query.data[0].get('first_name', '')} {user_query.data[0].get('last_name', '')}".strip() if user_query.data else "Agriculturist"
         
-        sched_resp = supabase.table('visit_schedules').select('*').eq('agriculturist_id', user_id).execute()
-        raw_schedules = getattr(sched_resp, 'data', []) or []
+        raw_schedules = []
+        if _is_valid_uuid(user_id):
+            sched_resp = supabase.table('visit_schedules').select('*').eq('agriculturist_id', user_id).execute()
+            raw_schedules = getattr(sched_resp, 'data', []) or []
         
         # Keep only the latest schedule row for each report_id
         raw_schedules.sort(key=lambda x: str(x.get('created_at') or x.get('id') or ''))
@@ -3170,11 +3252,12 @@ def farmer_submit_assessment_feedback():
                 logger.error(f"Assessment feedback update failed: {update_response.error}")
                 return jsonify({'success': False, 'message': 'The feedback could not be saved.'}), 500
 
-            if user_id and user_id != 'offline_farmer':
+            sender_uuid = _safe_uuid(user_id)
+            if sender_uuid:
                 try:
                     chat_insert_response = supabase.table('visit_chats').insert({
                         'report_id': report_id,
-                        'sender_id': user_id,
+                        'sender_id': sender_uuid,
                         'message': reason,
                     }).execute()
                     if getattr(chat_insert_response, 'error', None):
@@ -3241,15 +3324,19 @@ def save_visit_chat(report_id):
         if _should_archive_visit_discussion(current_status, report_row.get('visit_reschedule_reason')):
             return jsonify({'success': False, 'message': 'The visit discussion is archived.'}), 400
 
-        if user_id and user_id != 'offline_farmer':
+        sender_uuid = _safe_uuid(user_id)
+        if not sender_uuid:
+            sender_uuid = _safe_uuid(report_row.get('user_id')) if user_role == 'farmer' else _safe_uuid(report_row.get('reviewed_by_id'))
+
+        if sender_uuid:
             try:
                 insert_response = supabase.table('visit_chats').insert({
                     'report_id': report_id,
-                    'sender_id': user_id,
+                    'sender_id': sender_uuid,
                     'message': message,
                 }).execute()
                 if getattr(insert_response, 'error', None):
-                    logger.error(f"Visit chat insert failed: {insert_response.error}")
+                    logger.warning(f"Visit chat insert failed: {insert_response.error}")
             except Exception as c_err:
                 logger.warning(f"Visit chat insert exception: {c_err}")
 
@@ -3287,10 +3374,7 @@ def save_visit_chat(report_id):
 def api_mark_report_read(report_id):
     user_id = _get_current_app_user_id()
     now_iso = datetime.now(UTC).isoformat()
-    try:
-        supabase.table('reports').update({'last_read_at': now_iso}).eq('id', report_id).execute()
-    except Exception as db_err:
-        logger.debug(f"DB update last_read_at note: {db_err}")
+    # Read status is maintained per-device/session client-side in localStorage; avoid invalid database schema PATCH
     return jsonify({'success': True, 'report_id': report_id, 'last_read_at': now_iso})
 
 
@@ -3350,15 +3434,18 @@ def request_visit_reschedule(report_id):
         if not reason:
             return jsonify({'success': False, 'message': 'Please select a reschedule reason.'}), 400
 
+        extra_updates = {
+            'visit_reschedule_reason': reason,
+            'visit_rescheduled_at': datetime.now(UTC).isoformat(),
+        }
+        if rescheduled_by_uuid:
+            extra_updates['visit_rescheduled_by'] = rescheduled_by_uuid
+
         update_response = _update_report_workflow(
             report_id,
             'Awaiting Confirmed Schedule',
             note=None,
-            extra_updates={
-                'visit_reschedule_reason': reason,
-                'visit_rescheduled_at': datetime.now(UTC).isoformat(),
-                'visit_rescheduled_by': rescheduled_by_uuid,
-            },
+            extra_updates=extra_updates,
         )
         if getattr(update_response, 'error', None):
             logger.warning(f"Reschedule request update with extra_updates failed: {update_response.error}, falling back")
@@ -3434,8 +3521,16 @@ def agriculturist_finalize_visit_schedule():
             if datetime.strptime(normalized_start, "%H:%M:%S").time() < datetime.now().time():
                 return jsonify({'success': False, 'message': 'You cannot schedule a visit for a time that has already passed today.'}), 400
 
-        all_sched_query = supabase.table('visit_schedules').select('id, start_time, end_time, report_id, confirmed_date, created_at').eq('agriculturist_id', user_id).execute()
-        all_sched_rows = getattr(all_sched_query, 'data', None) or []
+        agri_uuid = _safe_uuid(user_id) or _safe_uuid(session.get('user_id'))
+
+        all_sched_rows = []
+        if agri_uuid:
+            try:
+                all_sched_query = supabase.table('visit_schedules').select('id, start_time, end_time, report_id, confirmed_date, created_at').eq('agriculturist_id', agri_uuid).execute()
+                all_sched_rows = getattr(all_sched_query, 'data', None) or []
+            except Exception as ex:
+                logger.warning(f"Unable to fetch existing schedules for conflict check: {ex}")
+
         all_sched_rows.sort(key=lambda x: str(x.get('created_at') or x.get('id') or ''))
         latest_active_map = {}
         for r in all_sched_rows:
@@ -3476,24 +3571,31 @@ def agriculturist_finalize_visit_schedule():
         schedule_label = _format_confirmed_schedule_label(confirmed_date, normalized_start, normalized_end)
         schedule_message = f"{'New schedule confirmed' if has_pending_reschedule else 'Visit confirmed'}: {schedule_label.replace('Confirmed: ', '')}"
 
-        schedule_insert_response = supabase.table('visit_schedules').insert({
+        schedule_insert_payload = {
             'report_id': report_id,
-            'agriculturist_id': user_id,
             'confirmed_date': confirmed_date,
             'start_time': normalized_start,
             'end_time': normalized_end,
-        }).execute()
+        }
+        if agri_uuid:
+            schedule_insert_payload['agriculturist_id'] = agri_uuid
+
+        schedule_insert_response = supabase.table('visit_schedules').insert(schedule_insert_payload).execute()
         if getattr(schedule_insert_response, 'error', None):
             logger.error(f"Visit schedule insert failed: {schedule_insert_response.error}")
             return jsonify({'success': False, 'message': 'The visit schedule could not be saved.'}), 500
 
-        chat_insert_response = supabase.table('visit_chats').insert({
-            'report_id': report_id,
-            'sender_id': user_id,
-            'message': schedule_message,
-        }).execute()
-        if getattr(chat_insert_response, 'error', None):
-            logger.warning(f"Visit schedule chat insert failed: {chat_insert_response.error}")
+        if agri_uuid:
+            try:
+                chat_insert_response = supabase.table('visit_chats').insert({
+                    'report_id': report_id,
+                    'sender_id': agri_uuid,
+                    'message': schedule_message,
+                }).execute()
+                if getattr(chat_insert_response, 'error', None):
+                    logger.warning(f"Visit schedule chat insert failed: {chat_insert_response.error}")
+            except Exception as c_err:
+                logger.warning(f"Visit schedule chat insert exception: {c_err}")
 
         update_response = _update_report_workflow(
             report_id,
