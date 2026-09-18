@@ -471,7 +471,7 @@ def _do_schedule_time_ranges_overlap(start_time_a, end_time_a, start_time_b, end
 
 
 def _fetch_visit_workflow_payload(report_id):
-    report_response = supabase.table("reports").select("id, status, user_id, reviewed_by_id, visit_request_reason, visit_requested_at, visit_summary, visit_completed_at, final_remarks, visit_reschedule_reason, visit_rescheduled_at, visit_rescheduled_by").eq("id", report_id).execute()
+    report_response = supabase.table("reports").select("id, status, user_id, reviewed_by_id, farmer_name, visit_request_reason, visit_requested_at, visit_summary, visit_completed_at, final_remarks, visit_reschedule_reason, visit_rescheduled_at, visit_rescheduled_by").eq("id", report_id).execute()
     report_row = (getattr(report_response, "data", None) or [{}])[0] if getattr(report_response, "data", None) else {}
 
     chats_response = supabase.table("visit_chats").select("id, sender_id, message, created_at").eq("report_id", report_id).order("created_at", desc=False).execute()
@@ -480,20 +480,68 @@ def _fetch_visit_workflow_payload(report_id):
     schedules_response = supabase.table("visit_schedules").select("id, agriculturist_id, confirmed_date, start_time, end_time, created_at").eq("report_id", report_id).order("created_at", desc=False).execute()
     schedule_rows = getattr(schedules_response, "data", None) or []
 
+    user_ids_to_fetch = set()
+    for chat_row in chat_rows:
+        sid = chat_row.get("sender_id")
+        if sid:
+            user_ids_to_fetch.add(str(sid))
+    if report_row.get("user_id"):
+        user_ids_to_fetch.add(str(report_row.get("user_id")))
+    if report_row.get("reviewed_by_id"):
+        user_ids_to_fetch.add(str(report_row.get("reviewed_by_id")))
+
+    users_name_map = {}
+    users_role_map = {}
+    if user_ids_to_fetch:
+        try:
+            u_resp = supabase.table("users").select("id, first_name, role").in_("id", list(user_ids_to_fetch)).execute()
+            for u in (getattr(u_resp, "data", None) or []):
+                uid = str(u.get("id"))
+                fname = (u.get("first_name") or "").strip()
+                if fname:
+                    users_name_map[uid] = fname
+                users_role_map[uid] = u.get("role")
+        except Exception as e:
+            logger.warning(f"Error fetching names for visit discussion: {e}")
+
+    farmer_first_name = ""
+    if report_row.get("user_id") and str(report_row.get("user_id")) in users_name_map:
+        farmer_first_name = users_name_map[str(report_row.get("user_id"))]
+    elif report_row.get("farmer_name"):
+        parts = str(report_row.get("farmer_name")).strip().split()
+        if parts:
+            farmer_first_name = parts[0]
+
+    agri_first_name = ""
+    if report_row.get("reviewed_by_id") and str(report_row.get("reviewed_by_id")) in users_name_map:
+        agri_first_name = users_name_map[str(report_row.get("reviewed_by_id"))]
+
     messages = []
     for chat_row in chat_rows:
         sender_id = chat_row.get("sender_id")
-        sender_label = "Farmer"
-        if sender_id and report_row.get("reviewed_by_id") and str(sender_id) == str(report_row.get("reviewed_by_id")):
-            sender_label = "Agriculturist"
-        elif sender_id and report_row.get("user_id") and str(sender_id) == str(report_row.get("user_id")):
-            sender_label = "Farmer"
+        sender_str = str(sender_id) if sender_id else ""
+        sender_role = "Farmer"
+        first_name = ""
+
+        if sender_id and report_row.get("reviewed_by_id") and sender_str == str(report_row.get("reviewed_by_id")):
+            sender_role = "Agriculturist"
+            first_name = agri_first_name or users_name_map.get(sender_str, "")
+        elif sender_id and report_row.get("user_id") and sender_str == str(report_row.get("user_id")):
+            sender_role = "Farmer"
+            first_name = farmer_first_name or users_name_map.get(sender_str, "")
+        elif sender_str in users_role_map and users_role_map[sender_str] in ('agri_expert', 'agriculturist', 'admin', 'lgu'):
+            sender_role = "Agriculturist"
+            first_name = users_name_map.get(sender_str, "")
         else:
-            sender_label = "Agriculturist" if sender_id and report_row.get("reviewed_by_id") else "Farmer"
+            first_name = users_name_map.get(sender_str, "") or farmer_first_name
+
+        display_label = f"{sender_role} ({first_name})" if first_name else sender_role
         messages.append({
             "id": chat_row.get("id"),
             "sender_id": sender_id,
-            "sender_label": sender_label,
+            "sender_role": sender_role,
+            "sender_first_name": first_name,
+            "sender_label": display_label,
             "message": chat_row.get("message") or "",
             "created_at": chat_row.get("created_at"),
         })
@@ -502,10 +550,13 @@ def _fetch_visit_workflow_payload(report_id):
     if visit_request_reason:
         has_reason = any(m.get("message", "").strip() == visit_request_reason for m in messages)
         if not has_reason:
+            display_label = f"Farmer ({farmer_first_name})" if farmer_first_name else "Farmer"
             messages.insert(0, {
                 "id": "reason",
                 "sender_id": report_row.get("user_id"),
-                "sender_label": "Farmer",
+                "sender_role": "Farmer",
+                "sender_first_name": farmer_first_name,
+                "sender_label": display_label,
                 "message": visit_request_reason,
                 "created_at": report_row.get("visit_requested_at") or report_row.get("updated_at") or datetime.now(UTC).isoformat(),
             })
@@ -3584,9 +3635,24 @@ def agriculturist_finalize_visit_schedule():
             return jsonify({'success': False, 'message': 'Please select a confirmed date.'}), 400
             
         try:
+            from zoneinfo import ZoneInfo
+            tz_manila = ZoneInfo("Asia/Manila")
+        except Exception:
+            from datetime import timezone, timedelta
+            tz_manila = timezone(timedelta(hours=8))
+
+        now_ph = datetime.now(tz_manila)
+        today_ph = now_ph.date()
+        current_time_ph = now_ph.time()
+
+        try:
             confirmed_dt = datetime.strptime(confirmed_date, "%Y-%m-%d").date()
-            if confirmed_dt < datetime.now().date():
-                return jsonify({'success': False, 'message': 'You cannot schedule a visit in the past.'}), 400
+            if confirmed_dt < today_ph:
+                today_formatted = today_ph.strftime("%B %d, %Y")
+                return jsonify({
+                    'success': False,
+                    'message': f"You cannot schedule a visit in the past. Today is {today_formatted}. Please choose a current or upcoming date."
+                }), 400
         except ValueError:
             return jsonify({'success': False, 'message': 'Invalid date format.'}), 400
 
@@ -3599,9 +3665,14 @@ def agriculturist_finalize_visit_schedule():
         except ValueError as e:
             return jsonify({'success': False, 'message': str(e)}), 400
 
-        if confirmed_dt == datetime.now().date():
-            if datetime.strptime(normalized_start, "%H:%M:%S").time() < datetime.now().time():
-                return jsonify({'success': False, 'message': 'You cannot schedule a visit for a time that has already passed today.'}), 400
+        if confirmed_dt == today_ph:
+            start_time_obj = datetime.strptime(normalized_start, "%H:%M:%S").time()
+            if start_time_obj <= current_time_ph:
+                time_str = start_time_obj.strftime("%I:%M %p").lstrip("0")
+                return jsonify({
+                    'success': False,
+                    'message': f"The visit start time ({time_str}) has already passed for today. Please choose an upcoming time slot."
+                }), 400
 
         agri_uuid = _safe_uuid(user_id) or _safe_uuid(session.get('user_id'))
 
@@ -3727,6 +3798,23 @@ def agriculturist_review_visit_request():
         if decision == 'accept':
             if not preferred_date or not preferred_time:
                 return jsonify({'success': False, 'message': 'Please confirm the visit date and time.'}), 400
+            try:
+                from zoneinfo import ZoneInfo
+                tz_manila = ZoneInfo("Asia/Manila")
+            except Exception:
+                from datetime import timezone, timedelta
+                tz_manila = timezone(timedelta(hours=8))
+            now_ph = datetime.now(tz_manila)
+            try:
+                pref_dt = datetime.strptime(preferred_date, "%Y-%m-%d").date()
+                if pref_dt < now_ph.date():
+                    today_formatted = now_ph.date().strftime("%B %d, %Y")
+                    return jsonify({
+                        'success': False,
+                        'message': f"You cannot schedule a visit in the past. Today is {today_formatted}. Please choose a current or upcoming date."
+                    }), 400
+            except ValueError:
+                pass
             note = f"Visit schedule confirmed for {preferred_date} at {preferred_time}."
             status = 'visit_scheduled'
         else:

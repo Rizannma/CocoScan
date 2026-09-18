@@ -41,7 +41,7 @@
     let activeReportModalSubmissionController = null;
     let currentWorkflowDefaultSubmitAction = null;
     let visitDiscussionPollTimer = null;
-    const VISIT_DISCUSSION_POLL_INTERVAL_MS = 4000;
+    const VISIT_DISCUSSION_POLL_INTERVAL_MS = 2500;
 
     function getModalRoot() {
         return document.querySelector("[data-report-modal]");
@@ -70,20 +70,60 @@
         if (!report || !report.id) return false;
         if (report.visitArchived) return false;
         const statusKey = getStatusKey(report.status || "");
-        const activeDiscussionStatuses = [
-            "awaiting_confirmed_schedule",
-            "visit_requested",
-            "waiting_for_agriculturist_confirmation",
-            "waiting_agriculturist_confirmation",
-            "visit_scheduled"
-        ];
-        return activeDiscussionStatuses.includes(statusKey);
+        const closedStatuses = ["resolved", "closed", "rejected"];
+        if (closedStatuses.includes(statusKey) && !report.visitRescheduleReason) {
+            return false;
+        }
+        return true;
     }
 
     function stopVisitDiscussionPoll() {
         if (visitDiscussionPollTimer !== null) {
             clearInterval(visitDiscussionPollTimer);
             visitDiscussionPollTimer = null;
+        }
+    }
+
+    function updateVisitDiscussionMessages(report = currentReportModalRecord) {
+        if (!report) return;
+        const feedbackContainer = document.getElementById("report-farmer-feedback");
+        if (!feedbackContainer) return;
+
+        const badgeCount = feedbackContainer.querySelector("#visit-discussion-badge-count");
+        const chats = Array.isArray(report.visitChats) ? report.visitChats : [];
+        if (badgeCount) {
+            badgeCount.textContent = chats.length;
+        }
+
+        const messagesContainer = feedbackContainer.querySelector("#visit-discussion-messages-container");
+        if (!messagesContainer) {
+            renderVisitDiscussionCard(currentReportModalMode, report);
+            return;
+        }
+
+        const isScrolledToBottom = (messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight) < 70;
+
+        messagesContainer.innerHTML = chats.length ? chats.map((chat) => {
+            const isAgriculturistMessage = String(chat.sender_role || chat.sender_label || "").toLowerCase().includes("agriculturist");
+            const role = isAgriculturistMessage ? "Agriculturist" : "Farmer";
+            const firstName = chat.sender_first_name || "";
+            const displayHeader = firstName ? `${role.toUpperCase()} (${firstName})` : role.toUpperCase();
+            return `
+                <div style="display:flex; justify-content:${isAgriculturistMessage ? "flex-end" : "flex-start"};">
+                    <div style="max-width:82%; display:grid; gap:4px;">
+                        <div style="font-size:0.74rem; font-weight:700; color:#64748b; letter-spacing:0.04em; padding:${isAgriculturistMessage ? "0 0 0 8px" : "0 8px 0 0"};">${escapeHtml(displayHeader)}</div>
+                        <div style="padding:10px 12px; border-radius:16px; background:${isAgriculturistMessage ? "#ecfdf5" : "#f8fafc"}; color:#0f172a; box-shadow:0 1px 2px rgba(15,23,42,0.06);">
+                            <div style="font-size:0.9rem; line-height:1.5;">${escapeHtml(chat.message || "")}</div>
+                            <div style="margin-top:6px; font-size:0.72rem; color:#64748b;">${escapeHtml(formatVisitChatTimestamp(chat.created_at) || t('reports.just_now', "Just now"))}</div>
+                        </div>
+                    </div>
+                </div>`;
+        }).join("") : `<div style="font-size:0.9rem; color:#64748b;">${escapeHtml(t('modal.discussion_empty', 'No discussion messages yet.'))}</div>`;
+
+        if (isScrolledToBottom) {
+            requestAnimationFrame(() => {
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            });
         }
     }
 
@@ -104,26 +144,17 @@
                     return;
                 }
 
-                // If the user is actively typing or has text in the input, skip this poll
-                const feedbackContainer = document.getElementById("report-farmer-feedback");
-                const activeInputs = feedbackContainer ? Array.from(feedbackContainer.querySelectorAll('input:not([type="radio"]):not([type="checkbox"]), textarea, select')) : [];
-                const hasUserInput = activeInputs.some(el => {
-                    const isFocused = (document.activeElement === el);
-                    const hasText = el && el.value && String(el.value).trim().length > 0;
-                    return isFocused || hasText;
-                });
-                if (hasUserInput) {
-                    // Skip update to avoid clearing user's in-progress message
-                    return;
-                }
-
+                const prevCount = (report.visitChats || []).length;
                 await loadVisitDiscussion(report);
                 if (!shouldPollVisitDiscussion(report)) {
                     stopVisitDiscussionPoll();
                     return;
                 }
 
-                renderVisitDiscussionCard(currentReportModalMode, report);
+                const newChats = report.visitChats || [];
+                if (newChats.length !== prevCount) {
+                    updateVisitDiscussionMessages(report);
+                }
             } catch (error) {
                 console.warn("Visit discussion poll failed", error);
             }
@@ -1424,7 +1455,7 @@
                     overflow:hidden;
                 ">
 
-                    <span style="
+                    <span id="visit-discussion-badge-count" style="
                         display:inline-flex;
                         align-items:center;
                         justify-content:center;
@@ -1444,12 +1475,14 @@
 
 
                     <!-- Title -->
-                    <span style="
+                    <span id="visit-discussion-toggle-title" style="
                         font-size:0.90rem;
                         font-weight:600;
                         white-space:nowrap;
                         overflow:hidden;
                         text-overflow:ellipsis;
+                        display:inline-block;
+                        transform:none !important;
                     ">
                         ${escapeHtml(t('modal.discussion_toggle_title', 'Visit Request Discussion'))}
                     </span>
@@ -1457,7 +1490,7 @@
                 </span>
 
                 <!-- Chevron -->
-                <span style="
+                <span id="visit-discussion-chevron" class="visit-discussion-chevron" style="
                     display:flex;
                     align-items:center;
                     justify-content:center;
@@ -1477,11 +1510,14 @@
                 <div id="visit-discussion-body" style="display:${isExpanded ? "grid" : "none"}; gap:10px;">
                     <div id="visit-discussion-messages-container" style="display:grid; gap:8px; padding:10px; border:1px solid #e2e8f0; border-radius:16px; background:#fff; max-height:320px; overflow-y:auto;">
                         ${chats.length ? chats.map((chat) => {
-            const isAgriculturistMessage = String(chat.sender_label || "").toLowerCase() === "agriculturist";
+            const isAgriculturistMessage = String(chat.sender_role || chat.sender_label || "").toLowerCase().includes("agriculturist");
+            const role = isAgriculturistMessage ? "Agriculturist" : "Farmer";
+            const firstName = chat.sender_first_name || "";
+            const displayHeader = firstName ? `${role.toUpperCase()} (${firstName})` : role.toUpperCase();
             return `
                                 <div style="display:flex; justify-content:${isAgriculturistMessage ? "flex-end" : "flex-start"};">
                                     <div style="max-width:82%; display:grid; gap:4px;">
-                                        <div style="font-size:0.74rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em; padding:${isAgriculturistMessage ? "0 0 0 8px" : "0 8px 0 0"};">${escapeHtml(chat.sender_label || (isAgriculturistMessage ? "Agriculturist" : "Farmer"))}</div>
+                                        <div style="font-size:0.74rem; font-weight:700; color:#64748b; letter-spacing:0.04em; padding:${isAgriculturistMessage ? "0 0 0 8px" : "0 8px 0 0"};">${escapeHtml(displayHeader)}</div>
                                         <div style="padding:10px 12px; border-radius:16px; background:${isAgriculturistMessage ? "#ecfdf5" : "#f8fafc"}; color:#0f172a; box-shadow:0 1px 2px rgba(15,23,42,0.06);">
                                             <div style="font-size:0.9rem; line-height:1.5;">${escapeHtml(chat.message || "")}</div>
                                             <div style="margin-top:6px; font-size:0.72rem; color:#64748b;">${escapeHtml(formatVisitChatTimestamp(chat.created_at) || t('reports.just_now', "Just now"))}</div>
@@ -1581,8 +1617,26 @@
                         messageInput.disabled = false;
                         return;
                     }
+
+                    // Clear message input and re-enable controls immediately
+                    messageInput.value = "";
+                    messageInput.style.height = "24px";
+                    sendButton.disabled = false;
+                    sendButton.innerHTML = '<i class="fa-solid fa-paper-plane" style="margin-right:2px; margin-top:1px; font-size:1rem;"></i>';
+                    messageInput.disabled = false;
+                    messageInput.focus();
+
                     await loadVisitDiscussion(report);
+                    updateVisitDiscussionMessages(report);
+                    const messagesContainer = feedbackContainer.querySelector('#visit-discussion-messages-container');
+                    if (messagesContainer) {
+                        requestAnimationFrame(() => {
+                            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                        });
+                    }
+
                     renderWorkflowActions(currentReportModalMode, report);
+                    startVisitDiscussionPoll(report);
 
                     if (scrollContainer) {
                         requestAnimationFrame(() => {
@@ -1817,7 +1871,11 @@
             existingModal.remove();
         }
 
-        const todayStr = new Date().toISOString().split("T")[0];
+        const localNow = new Date();
+        const curY = localNow.getFullYear();
+        const curM = String(localNow.getMonth() + 1).padStart(2, '0');
+        const curD = String(localNow.getDate()).padStart(2, '0');
+        const todayStr = `${curY}-${curM}-${curD}`;
         const modal = document.createElement("div");
         modal.id = "visit-schedule-mini-modal";
         modal.style.position = "fixed";
@@ -1908,6 +1966,39 @@
                 alert("Please enter the confirmed date and visit window.");
                 return;
             }
+
+            const currentNow = new Date();
+            const y = currentNow.getFullYear();
+            const m = String(currentNow.getMonth() + 1).padStart(2, '0');
+            const d = String(currentNow.getDate()).padStart(2, '0');
+            const currentTodayStr = `${y}-${m}-${d}`;
+
+            if (confirmedDate < currentTodayStr) {
+                alert("You cannot schedule a visit in the past. Please select today or an upcoming date.");
+                return;
+            }
+
+            const [startH, startM] = startTime.split(':').map(Number);
+            const [endH, endM] = endTime.split(':').map(Number);
+            const startMinutes = startH * 60 + startM;
+            const endMinutes = endH * 60 + endM;
+
+            if (endMinutes <= startMinutes) {
+                alert("The visit end time must be after the start time.");
+                return;
+            }
+
+            if (confirmedDate === currentTodayStr) {
+                const currentMinutes = currentNow.getHours() * 60 + currentNow.getMinutes();
+                if (startMinutes <= currentMinutes) {
+                    const ampm = startH < 12 ? 'AM' : 'PM';
+                    const h12 = startH % 12 || 12;
+                    const timeFormatted = `${h12}:${String(startM).padStart(2, '0')} ${ampm}`;
+                    alert(`The visit start time (${timeFormatted}) has already passed for today. Please select an upcoming time.`);
+                    return;
+                }
+            }
+
             setButtonLoading(saveBtn, true, "Saving Schedule...");
             try {
                 const response = await fetch("/agriculturist/finalize-visit-schedule", {
@@ -2386,6 +2477,11 @@
         const existing = container.querySelectorAll('.farmer-schedule-row');
         if (existing.length >= 3) return;
         const idx = existing.length + 1;
+        const localNow = new Date();
+        const curY = localNow.getFullYear();
+        const curM = String(localNow.getMonth() + 1).padStart(2, '0');
+        const curD = String(localNow.getDate()).padStart(2, '0');
+        const todayStr = `${curY}-${curM}-${curD}`;
         const row = document.createElement('div');
         row.className = 'farmer-schedule-row';
         row.style.display = 'grid';
@@ -2400,7 +2496,7 @@
                 <strong style="font-size:0.95rem; color:#102a43;">Preferred Schedule #${idx}</strong>
                 <label style="display:grid; gap:4px; font-size:0.9rem; color:#334155;">
                     <span style="font-weight:500;">Date</span>
-                    <input type="date" class="farmer-schedule-date schedule-input" value="${escapeHtml(dateVal)}">
+                    <input type="date" class="farmer-schedule-date schedule-input" min="${todayStr}" value="${escapeHtml(dateVal)}">
                 </label>
 
                 <label style="display:grid; gap:4px; font-size:0.9rem; color:#334155;">
@@ -2427,9 +2523,16 @@
     function collectFarmerSchedules(container) {
         if (!container) return [];
         const rows = Array.from(container.querySelectorAll('.farmer-schedule-row'));
+        const localNow = new Date();
+        const curY = localNow.getFullYear();
+        const curM = String(localNow.getMonth() + 1).padStart(2, '0');
+        const curD = String(localNow.getDate()).padStart(2, '0');
+        const todayStr = `${curY}-${curM}-${curD}`;
+
         const schedules = rows.map(r => {
             const d = r.querySelector('.farmer-schedule-date')?.value || '';
             const t = r.querySelector('.farmer-schedule-time')?.value || '';
+            if (d && d < todayStr) return null;
             let display = '';
             if (d && t) {
                 try {
@@ -2438,7 +2541,7 @@
                 } catch (e) { display = `${d} ${t}`; }
             }
             return { date: d, time: t, display };
-        }).filter(s => s.date && s.time);
+        }).filter(Boolean).filter(s => s.date && s.time);
         return schedules.slice(0, 3);
     }
 
@@ -3228,9 +3331,13 @@
 
         if (toggleBtn) {
             toggleBtn.setAttribute("aria-expanded", isNowExpanded ? "true" : "false");
-            const chevron = toggleBtn.querySelector("span:last-child");
+            const chevron = toggleBtn.querySelector("#visit-discussion-chevron") || toggleBtn.querySelector(".visit-discussion-chevron");
             if (chevron) {
                 chevron.style.transform = `rotate(${isNowExpanded ? 90 : 0}deg)`;
+            }
+            const title = toggleBtn.querySelector("#visit-discussion-toggle-title");
+            if (title) {
+                title.style.transform = "none";
             }
         }
         if (report) {
@@ -3241,6 +3348,13 @@
                 renderVisitDiscussionCard(currentReportModalMode, report);
             } catch (renderErr) {
                 console.warn("Failed to render visit discussion card on toggle:", renderErr);
+            }
+        } else if (isNowExpanded) {
+            const messagesContainer = document.getElementById("visit-discussion-messages-container");
+            if (messagesContainer) {
+                requestAnimationFrame(() => {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                });
             }
         }
     };
