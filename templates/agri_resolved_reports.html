@@ -662,12 +662,20 @@
             try {
                 const urlParams = new URLSearchParams(window.location.search);
                 const reportIdToOpen = urlParams.get('report_id');
-                if (!reportIdToOpen || !Array.isArray(reports) || reports.length === 0) {
-                    return;
-                }
-                const targetRecord = reports.find(item => String(item.id) === String(reportIdToOpen));
+                if (!reportIdToOpen) return;
+
+                const targetRecord = Array.isArray(reports) ? reports.find(item => String(item.id) === String(reportIdToOpen)) : null;
                 if (targetRecord) {
                     openReviewModal(targetRecord);
+                } else {
+                    fetch(`/api/reports/${encodeURIComponent(reportIdToOpen)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data && data.success && data.report) {
+                                openReviewModal(data.report);
+                            }
+                        })
+                        .catch(err => console.warn("Error fetching report from query param:", err));
                 }
             } catch (err) {
                 console.error("Error opening report from query params:", err);

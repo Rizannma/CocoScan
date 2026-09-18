@@ -1,4 +1,4 @@
-<div class="modal-screen-overlay" id="report-summary-modal" data-report-modal aria-hidden="true">
+<div class="modal-screen-overlay" id="report-summary-modal" data-report-modal data-user-role="{{ (session.get('user_role') or session.get('role') or '') | lower }}" aria-hidden="true">
     <div class="modal-sheet-sliding-card" data-report-sheet>
         <style>
             .modal-screen-overlay {
@@ -704,8 +704,8 @@
 {% if session.get('user_role') in ['admin', 'lgu'] %}
         <div class="premium-form-card" id="report-notes-card">
             <h4><i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.farmer_notes_title">{{ t('modal.farmer_notes_title', 'Farmer Notes') }}</span></h4>
-            <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder"></textarea>
-            <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
+            <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder" style="display:none;"></textarea>
+            <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0;">--</p>
         </div>
 
         <div class="premium-reco-card" id="report-initial-card">
@@ -751,14 +751,14 @@
 
         <div class="premium-form-card" id="report-notes-card">
             <h4><i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.farmer_notes_title">{{ t('modal.farmer_notes_title', 'Farmer Notes') }}</span></h4>
-            <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder"></textarea>
-            <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0; display: none;">--</p>
+            <textarea class="notes-input-box" id="field-notes-capture" placeholder="{{ t('modal.farmer_notes_placeholder', 'Describe what you observed on your coconut tree (e.g., yellowing leaves, damaged fruits, unusual insects, or other signs).') }}" data-i18n-placeholder="modal.farmer_notes_placeholder" style="display:none;"></textarea>
+            <p id="report-notes-display" style="font-size: 0.88rem; color: #64748b; line-height: 1.5; padding: 2px 0;">--</p>
         </div>
         {% endif %}
 
         <!-- Expert card removed from here; placed below Additional Images for agriculturist pending view -->
 
-        <div class="premium-form-card" data-scan-only>
+        <div class="premium-form-card" data-scan-only style="display:none;">
             <h4><i class="fa-solid fa-images"></i> <span data-i18n="modal.supporting_photos_title">{{ t('modal.supporting_photos_title', 'Supporting Photos (optional)') }}</span></h4>
             <div class="modern-micro-upload-zone" onclick="triggerSupportingPhotoUpload()">
                 <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -845,8 +845,8 @@
             </div>
         </div>
 
-        <div class="control-action-bar">
-            <button class="btn-control submit-primary" id="report-scan-submit-btn" type="button" onclick="submitReportPayload()">
+        <div class="control-action-bar" id="report-scan-action-bar" style="display:none;">
+            <button class="btn-control submit-primary" id="report-scan-submit-btn" type="button" onclick="submitReportPayload()" style="display:none;">
                 <i class="fa-solid fa-paper-plane"></i> <span data-i18n="modal.btn_submit_report">{{ t('modal.btn_submit_report', 'Submit Report') }}</span>
             </button>
         </div>

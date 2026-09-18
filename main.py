@@ -3420,6 +3420,38 @@ def save_visit_chat(report_id):
         return jsonify({'success': False, 'message': 'The message could not be saved.'}), 500
 
 
+@app.route('/api/reports/<int:report_id>', methods=['GET'])
+@require_role('farmer', 'agri_expert', 'lgu', 'admin')
+def get_report_details_json(report_id):
+    try:
+        reports_response = supabase.table("reports").select("*, visit_chats(count)").eq("id", report_id).execute()
+        raw_reports = getattr(reports_response, "data", []) or []
+        if not raw_reports:
+            return jsonify({'success': False, 'message': 'Report not found'}), 404
+
+        raw_reports = _enrich_reports_with_reviewer_info(raw_reports)
+        item = raw_reports[0]
+        supporting_map = _fetch_report_supporting_images([report_id])
+        payload = _build_report_modal_payload(
+            item,
+            supporting_images=supporting_map.get(str(report_id), []),
+            default_status="Pending Assessment",
+        )
+        return jsonify({
+            'success': True,
+            'report': {
+                **payload,
+                "location": payload["location_text"],
+                "full_location": payload["location_text"],
+                "farmer_notes": payload["notes"],
+                "img": payload["primary_image"],
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error fetching report {report_id} json: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @app.route('/api/reports/<int:report_id>/mark-read', methods=['POST'])
 def api_mark_report_read(report_id):
     user_id = _get_current_app_user_id()

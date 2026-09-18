@@ -47,6 +47,39 @@
         return document.querySelector("[data-report-modal]");
     }
 
+    function getCurrentUserRole() {
+        const modalRoot = getModalRoot();
+        const dataRole = (modalRoot?.getAttribute("data-user-role") || "").trim().toLowerCase();
+        if (["agriculturist", "agri", "agri_expert"].includes(dataRole)) return "agriculturist";
+        if (["admin", "lgu", "farmer"].includes(dataRole)) return dataRole;
+
+        const clientRole = (window.currentUserRole || localStorage.getItem('cocoscan_user_role') || "").trim().toLowerCase();
+        if (["agriculturist", "agri", "agri_expert"].includes(clientRole)) return "agriculturist";
+        if (["admin", "lgu", "farmer"].includes(clientRole)) return clientRole;
+
+        const path = (window.location.pathname || "").toLowerCase();
+        if (path.includes("/agriculturist/") || path.includes("/agri/")) return "agriculturist";
+        if (path.includes("/farmer/")) return "farmer";
+        if (path.includes("/admin/")) return "admin";
+        if (path.includes("/lgu/")) return "lgu";
+
+        return "farmer";
+    }
+
+    function shouldPollVisitDiscussion(report) {
+        if (!report || !report.id) return false;
+        if (report.visitArchived) return false;
+        const statusKey = getStatusKey(report.status || "");
+        const activeDiscussionStatuses = [
+            "awaiting_confirmed_schedule",
+            "visit_requested",
+            "waiting_for_agriculturist_confirmation",
+            "waiting_agriculturist_confirmation",
+            "visit_scheduled"
+        ];
+        return activeDiscussionStatuses.includes(statusKey);
+    }
+
     function stopVisitDiscussionPoll() {
         if (visitDiscussionPollTimer !== null) {
             clearInterval(visitDiscussionPollTimer);
@@ -56,12 +89,17 @@
 
     function startVisitDiscussionPoll(report) {
         stopVisitDiscussionPoll();
-        if (!report || !report.id) return;
+        if (!shouldPollVisitDiscussion(report)) return;
 
         visitDiscussionPollTimer = setInterval(async () => {
             try {
                 const modalRoot = getModalRoot();
                 if (!modalRoot || !modalRoot.classList.contains("open-modal") || currentReportModalRecord?.id !== report.id) {
+                    stopVisitDiscussionPoll();
+                    return;
+                }
+
+                if (!shouldPollVisitDiscussion(currentReportModalRecord)) {
                     stopVisitDiscussionPoll();
                     return;
                 }
@@ -80,11 +118,12 @@
                 }
 
                 await loadVisitDiscussion(report);
-                const discussionStatuses = ["awaiting_confirmed_schedule", "visit_requested", "visit_scheduled"];
-                const normalizedStatus = getStatusKey(report?.status || "");
-                if (discussionStatuses.includes(normalizedStatus)) {
-                    renderVisitDiscussionCard(currentReportModalMode, report);
+                if (!shouldPollVisitDiscussion(report)) {
+                    stopVisitDiscussionPoll();
+                    return;
                 }
+
+                renderVisitDiscussionCard(currentReportModalMode, report);
             } catch (error) {
                 console.warn("Visit discussion poll failed", error);
             }
@@ -967,6 +1006,9 @@
             setDisplay(agriVerificationGroup, showVerification, "block");
         }
 
+        const scanActionBar = document.getElementById("report-scan-action-bar");
+        if (scanActionBar) setDisplay(scanActionBar, normalizedMode === "scan", "flex");
+
         if (notesInput && notesDisplay) {
             if (normalizedMode === "scan") {
                 setDisplay(notesInput, true, "block");
@@ -974,6 +1016,7 @@
             } else {
                 setDisplay(notesInput, false);
                 setDisplay(notesDisplay, true, "block");
+                notesDisplay.textContent = report?.notes || t("modal.notes_empty", "No notes logged.");
             }
         }
     }
@@ -2855,17 +2898,30 @@
         if (rainfallNode) rainfallNode.textContent = weather?.is_down ? "Weather data unavailable" : `Rainfall: ${weatherLine(weather?.rainfall, weather?.rainfall === "--" ? "" : " mm")}`;
     }
 
-    async function openReportModal(reportData = {}, mode = "farmer") {
+    async function openReportModal(reportData = {}, mode) {
         const modalRoot = getModalRoot();
         if (!modalRoot) {
             return;
         }
 
-        const rawMode = String(mode || "farmer").toLowerCase();
-        currentReportModalMode = ["agriculturist", "agri", "agri_expert"].includes(rawMode) ? "agriculturist" : rawMode;
+        const activeUserRole = getCurrentUserRole();
+        let resolvedMode = mode;
+        if (resolvedMode === "scan" || reportData?.mode === "scan") {
+            resolvedMode = "scan";
+        } else if (resolvedMode && ["agriculturist", "agri", "agri_expert"].includes(String(resolvedMode).toLowerCase())) {
+            resolvedMode = "agriculturist";
+        } else if (activeUserRole === "agriculturist") {
+            resolvedMode = "agriculturist";
+        } else if (resolvedMode && ["farmer", "admin", "lgu"].includes(String(resolvedMode).toLowerCase())) {
+            resolvedMode = String(resolvedMode).toLowerCase();
+        } else {
+            resolvedMode = activeUserRole || "farmer";
+        }
+
+        currentReportModalMode = resolvedMode;
         currentReportModalRecord = normalizeReportData({ ...reportData, mode: currentReportModalMode });
 
-        const report = currentReportModalRecord;
+        let report = currentReportModalRecord;
         try { console.debug("[report_modal] opening report", { id: report.id, status: report.status, expertRecommendations: report.expertRecommendations }); } catch (e) { /* noop */ }
 
         // Immediately reveal the modal overlay
@@ -2965,7 +3021,6 @@
                 primaryImage.src = report.primaryImage || "https://images.unsplash.com/photo-1590005354167-6da97870c913?auto=format&fit=crop&w=480&q=80";
             }
 
-            const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
             if (notesInput) {
                 notesInput.value = report.notes || "";
             }
@@ -3100,17 +3155,57 @@
             console.warn("Initial modal render encountered an error", renderErr);
         }
 
-        // Fetch visit discussion messages and schedules asynchronously in background
-        try {
-            await loadVisitDiscussion(report);
-            if (currentReportModalRecord?.id === report.id) {
-                renderModalFields();
+        // If report is missing vital metadata (or opened with partial record), dynamically fetch from API
+        if (report.id && currentReportModalMode !== "scan") {
+            const isPartialData = !report.farmer || report.farmer === "Farmer" || !report.pest || report.pest === "Unknown Pest" || report.confidence === "--";
+            if (isPartialData) {
+                try {
+                    const apiRes = await fetch(`/api/reports/${encodeURIComponent(report.id)}`);
+                    const apiData = await apiRes.json().catch(() => ({}));
+                    if (apiRes.ok && apiData.success && apiData.report) {
+                        currentReportModalRecord = normalizeReportData({
+                            ...apiData.report,
+                            ...reportData,
+                            mode: currentReportModalMode,
+                        });
+                        report = currentReportModalRecord;
+                        renderModalFields();
+                    }
+                } catch (fetchErr) {
+                    console.warn("Dynamic report fetch encountered an error:", fetchErr);
+                }
             }
-        } catch (discErr) {
-            console.warn("Async visit discussion fetch failed", discErr);
         }
 
-        startVisitDiscussionPoll(report);
+        // Fetch visit discussion messages and schedules asynchronously only if relevant
+        if (report.id && currentReportModalMode !== "scan") {
+            const statusKey = getStatusKey(report.status || "");
+            const discussionStatuses = [
+                "awaiting_confirmed_schedule",
+                "visit_requested",
+                "waiting_for_agriculturist_confirmation",
+                "waiting_agriculturist_confirmation",
+                "visit_scheduled",
+                "visit_completed",
+                "final_remarks_issued"
+            ];
+            if (discussionStatuses.includes(statusKey) || report.chat_count > 0 || report.farmerFeedbackReason) {
+                try {
+                    await loadVisitDiscussion(report);
+                    if (currentReportModalRecord?.id === report.id) {
+                        renderModalFields();
+                    }
+                } catch (discErr) {
+                    console.warn("Async visit discussion fetch failed", discErr);
+                }
+            }
+        }
+
+        if (shouldPollVisitDiscussion(report)) {
+            startVisitDiscussionPoll(report);
+        } else {
+            stopVisitDiscussionPoll();
+        }
     }
 
     window.toggleVisitDiscussion = function (event) {

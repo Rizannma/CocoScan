@@ -694,13 +694,22 @@
             try {
                 const params = new URLSearchParams(window.location.search);
                 const reportIdToOpen = params.get('report_id');
-                if (!reportIdToOpen || !Array.isArray(allReportsData) || allReportsData.length === 0) {
-                    return;
-                }
-                const targetRecord = allReportsData.find(item => String(item.id) === String(reportIdToOpen));
+                if (!reportIdToOpen) return;
+
+                const targetRecord = Array.isArray(allReportsData) ? allReportsData.find(item => String(item.id) === String(reportIdToOpen)) : null;
                 if (targetRecord && typeof window.openReportModal === "function") {
                     const modalReport = typeof window.normalizeReportData === "function" ? window.normalizeReportData(targetRecord) : targetRecord;
                     window.openReportModal(modalReport, userRole);
+                } else if (typeof window.openReportModal === "function") {
+                    fetch(`/api/reports/${encodeURIComponent(reportIdToOpen)}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data && data.success && data.report) {
+                                const modalReport = typeof window.normalizeReportData === "function" ? window.normalizeReportData(data.report) : data.report;
+                                window.openReportModal(modalReport, userRole);
+                            }
+                        })
+                        .catch(err => console.warn("Error fetching report from query param:", err));
                 }
             } catch (err) {
                 console.error("Error opening report from query params:", err);
