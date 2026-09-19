@@ -446,7 +446,22 @@
         "Apply biological treatment or use light traps at night": "Apply biological treatment or use light traps at night",
         "Monitor weekly and consult an agricultural technician for severe cases": "Monitor weekly and consult an agricultural technician for severe cases",
         "Continue regular monitoring": "Continue regular monitoring",
-        "Maintain current sanitation practices": "Maintain current sanitation practices"
+        "Maintain current sanitation practices": "Maintain current sanitation practices",
+        "Inspect central spear leaves and unopened fronds weekly for early feeding streaks or browning edges.": "Inspect central spear leaves and unopened fronds weekly for early feeding streaks or browning edges.",
+        "Maintain clean weed management and ensure adequate sunlight penetration and aeration around younger palms.": "Maintain clean weed management and ensure adequate sunlight penetration and aeration around younger palms.",
+        "Carefully collect and safely compost or dispose of fallen, dried, or curled fronds to disrupt shelter sites.": "Carefully collect and safely compost or dispose of fallen, dried, or curled fronds to disrupt shelter sites.",
+        "Preserve native beneficial predator populations (such as earwigs); avoid broad-spectrum chemical sprays.": "Preserve native beneficial predator populations (such as earwigs); avoid broad-spectrum chemical sprays.",
+        "Improve general farm sanitation by clearing fallen decaying coconut logs, rotting wood, and compost heaps.": "Improve general farm sanitation by clearing fallen decaying coconut logs, rotting wood, and compost heaps.",
+        "Inspect palm crowns and spear leaves regularly for characteristic V-shaped cuts or entry boreholes.": "Inspect palm crowns and spear leaves regularly for characteristic V-shaped cuts or entry boreholes.",
+        "Install non-chemical perimeter light traps or organic pheromone monitoring traps to observe beetle activity.": "Install non-chemical perimeter light traps or organic pheromone monitoring traps to observe beetle activity.",
+        "Avoid applying unverified chemical insecticides; await formal recommendations from your agricultural officer.": "Avoid applying unverified chemical insecticides; await formal recommendations from your agricultural officer.",
+        "Maintain regular monthly orchard inspections to monitor tree crown vigor and spot any early pest arrivals.": "Maintain regular monthly orchard inspections to monitor tree crown vigor and spot any early pest arrivals.",
+        "Ensure balanced soil fertilization and organic mulching to maintain natural tree resistance.": "Ensure balanced soil fertilization and organic mulching to maintain natural tree resistance.",
+        "Keep palm bases clear of dense weeds and decaying organic litter.": "Keep palm bases clear of dense weeds and decaying organic litter.",
+        "Record routine tree observation dates in your farm notebook or digital log.": "Record routine tree observation dates in your farm notebook or digital log.",
+        "Ensure the camera is focused directly on a coconut leaf, frond, or crown section under daylight.": "Ensure the camera is focused directly on a coconut leaf, frond, or crown section under daylight.",
+        "Hold the device steady and re-scan from approximately 1 to 2 feet away.": "Hold the device steady and re-scan from approximately 1 to 2 feet away.",
+        "Avoid scanning non-plant objects, background scenery, or extremely blurry images.": "Avoid scanning non-plant objects, background scenery, or extremely blurry images."
       },
       "rhinoceros_beetle": [
         "Improve farm sanitation and remove breeding sites",
@@ -944,7 +959,22 @@
         "Apply biological treatment or use light traps at night": "Maglapat ng biological treatment o gumamit ng light trap sa gabi",
         "Monitor weekly and consult an agricultural technician for severe cases": "Subaybayan linggu-linggo at sumangguni sa agricultural technician kapag malala ang kaso",
         "Continue regular monitoring": "Ipagpatuloy ang regular na pagsubaybay",
-        "Maintain current sanitation practices": "Panatilihin ang kasalukuyang gawi sa kalinisan"
+        "Maintain current sanitation practices": "Panatilihin ang kasalukuyang gawi sa kalinisan",
+        "Inspect central spear leaves and unopened fronds weekly for early feeding streaks or browning edges.": "Suriin linggu-linggo ang mga gitnang ubod at hindi pa bumubukas na palapa para sa mga unang bakas ng pagkain ng uod o pangingitim ng gilid.",
+        "Maintain clean weed management and ensure adequate sunlight penetration and aeration around younger palms.": "Panatilihing malinis ang damo sa paligid at tiyaking nasisikatan ng araw at mahahanginan ang mga nakababatang puno.",
+        "Carefully collect and safely compost or dispose of fallen, dried, or curled fronds to disrupt shelter sites.": "Maingat na tipunin at ligtas na ibaon o linisin ang mga nalaglag, tuyo, o nakarolyong palapa upang sirain ang pamugaran ng peste.",
+        "Preserve native beneficial predator populations (such as earwigs); avoid broad-spectrum chemical sprays.": "Pangalagaan ang mga likas na kaibigang insekto (tulad ng mga earwig); iwasan ang pag-spray ng matatapang na kemikal.",
+        "Improve general farm sanitation by clearing fallen decaying coconut logs, rotting wood, and compost heaps.": "Pabutihin ang kalinisan ng sakahan sa pamamagitan ng pag-alis ng mga nabubulok na troso ng niyog, bulok na kahoy, at bunton ng compost.",
+        "Inspect palm crowns and spear leaves regularly for characteristic V-shaped cuts or entry boreholes.": "Regular na suriin ang tuktok ng puno at mga ubod para sa mga natatanging V-shaped na hiwa o butas na pinasukan ng uwang.",
+        "Install non-chemical perimeter light traps or organic pheromone monitoring traps to observe beetle activity.": "Maglagay ng mga light trap o organic na pheromone trap sa paligid upang masubaybayan ang paglipad ng mga uwang.",
+        "Avoid applying unverified chemical insecticides; await formal recommendations from your agricultural officer.": "Iwasan ang paggamit ng hindi beripikadong kemikal na pestisidyo; hintayin ang opisyal na rekomendasyon mula sa agriculturist.",
+        "Maintain regular monthly orchard inspections to monitor tree crown vigor and spot any early pest arrivals.": "Magsagawa ng regular na buwanang pag-iinspeksyon sa sakahan upang subaybayan ang sigla ng puno at maagang mapansin ang peste.",
+        "Ensure balanced soil fertilization and organic mulching to maintain natural tree resistance.": "Tiyakin ang balanseng pataba sa lupa at paglalagay ng organic mulch upang mapanatili ang likas na resistensya ng puno.",
+        "Keep palm bases clear of dense weeds and decaying organic litter.": "Panatilihing malinis ang paanan ng puno mula sa makakapal na damo at nabubulok na dumi.",
+        "Record routine tree observation dates in your farm notebook or digital log.": "Itala ang mga petsa ng regular na pagmamasid sa inyong talaan o digital log.",
+        "Ensure the camera is focused directly on a coconut leaf, frond, or crown section under daylight.": "Tiyaking nakatutok ang camera sa dahon, palapa, o tuktok ng puno ng niyog sa ilalim ng liwanag ng araw.",
+        "Hold the device steady and re-scan from approximately 1 to 2 feet away.": "Hawakan nang matatag ang camera at kumuha muli sa layong 1 hanggang 2 talampakan.",
+        "Avoid scanning non-plant objects, background scenery, or extremely blurry images.": "Iwasang kumuha ng litrato ng mga bagay na hindi halaman, tanawin sa paligid, o malabong larawan."
       },
       "rhinoceros_beetle": [
         "Pabutihin ang kalinisan ng sakahan at alisin ang mga pinamumugaran",
@@ -1028,7 +1058,16 @@
 
   function resolveDotKey(obj, key) {
     if (!obj || !key) return null;
-    let parts = key.split(".");
+    let parts;
+    if (key.startsWith("pest_knowledge_base.recommendations.initial_items.")) {
+      const item = key.substring("pest_knowledge_base.recommendations.initial_items.".length);
+      parts = obj.pest_knowledge_base ? ["pest_knowledge_base", "recommendations", "initial_items", item] : ["recommendations", "initial_items", item];
+    } else if (key.startsWith("recommendations.initial_items.")) {
+      const item = key.substring("recommendations.initial_items.".length);
+      parts = (obj.pest_knowledge_base && !obj.recommendations) ? ["pest_knowledge_base", "recommendations", "initial_items", item] : ["recommendations", "initial_items", item];
+    } else {
+      parts = key.split(".");
+    }
     if (parts && parts[0] === "scanner" && (!obj.scanner) && obj.scan_page) {
       parts[0] = "scan_page";
     } else if (parts && parts[0] === "scan_page" && (!obj.scan_page) && obj.scanner) {

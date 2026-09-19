@@ -754,7 +754,22 @@
             "Apply biological treatment or use light traps at night": t("recommendations.initial_items.Apply biological treatment or use light traps at night", "Maglapat ng biological treatment o gumamit ng light trap sa gabi"),
             "Monitor weekly and consult an agricultural technician for severe cases": t("recommendations.initial_items.Monitor weekly and consult an agricultural technician for severe cases", "Subaybayan linggu-linggo at sumangguni sa agricultural technician kapag malala ang kaso"),
             "Continue regular monitoring": t("recommendations.initial_items.Continue regular monitoring", "Ipagpatuloy ang regular na pagsubaybay"),
-            "Maintain current sanitation practices": t("recommendations.initial_items.Maintain current sanitation practices", "Panatilihin ang kasalukuyang gawi sa kalinisan")
+            "Maintain current sanitation practices": t("recommendations.initial_items.Maintain current sanitation practices", "Panatilihin ang kasalukuyang gawi sa kalinisan"),
+            "Inspect central spear leaves and unopened fronds weekly for early feeding streaks or browning edges.": t("recommendations.initial_items.Inspect central spear leaves and unopened fronds weekly for early feeding streaks or browning edges.", "Suriin linggu-linggo ang mga gitnang ubod at hindi pa bumubukas na palapa para sa mga unang bakas ng pagkain ng uod o pangingitim ng gilid."),
+            "Maintain clean weed management and ensure adequate sunlight penetration and aeration around younger palms.": t("recommendations.initial_items.Maintain clean weed management and ensure adequate sunlight penetration and aeration around younger palms.", "Panatilihing malinis ang damo sa paligid at tiyaking nasisikatan ng araw at mahahanginan ang mga nakababatang puno."),
+            "Carefully collect and safely compost or dispose of fallen, dried, or curled fronds to disrupt shelter sites.": t("recommendations.initial_items.Carefully collect and safely compost or dispose of fallen, dried, or curled fronds to disrupt shelter sites.", "Maingat na tipunin at ligtas na ibaon o linisin ang mga nalaglag, tuyo, o nakarolyong palapa upang sirain ang pamugaran ng peste."),
+            "Preserve native beneficial predator populations (such as earwigs); avoid broad-spectrum chemical sprays.": t("recommendations.initial_items.Preserve native beneficial predator populations (such as earwigs); avoid broad-spectrum chemical sprays.", "Pangalagaan ang mga likas na kaibigang insekto (tulad ng mga earwig); iwasan ang pag-spray ng matatapang na kemikal."),
+            "Improve general farm sanitation by clearing fallen decaying coconut logs, rotting wood, and compost heaps.": t("recommendations.initial_items.Improve general farm sanitation by clearing fallen decaying coconut logs, rotting wood, and compost heaps.", "Pabutihin ang kalinisan ng sakahan sa pamamagitan ng pag-alis ng mga nabubulok na troso ng niyog, bulok na kahoy, at bunton ng compost."),
+            "Inspect palm crowns and spear leaves regularly for characteristic V-shaped cuts or entry boreholes.": t("recommendations.initial_items.Inspect palm crowns and spear leaves regularly for characteristic V-shaped cuts or entry boreholes.", "Regular na suriin ang tuktok ng puno at mga ubod para sa mga natatanging V-shaped na hiwa o butas na pinasukan ng uwang."),
+            "Install non-chemical perimeter light traps or organic pheromone monitoring traps to observe beetle activity.": t("recommendations.initial_items.Install non-chemical perimeter light traps or organic pheromone monitoring traps to observe beetle activity.", "Maglagay ng mga light trap o organic na pheromone trap sa paligid upang masubaybayan ang paglipad ng mga uwang."),
+            "Avoid applying unverified chemical insecticides; await formal recommendations from your agricultural officer.": t("recommendations.initial_items.Avoid applying unverified chemical insecticides; await formal recommendations from your agricultural officer.", "Iwasan ang paggamit ng hindi beripikadong kemikal na pestisidyo; hintayin ang opisyal na rekomendasyon mula sa agriculturist."),
+            "Maintain regular monthly orchard inspections to monitor tree crown vigor and spot any early pest arrivals.": t("recommendations.initial_items.Maintain regular monthly orchard inspections to monitor tree crown vigor and spot any early pest arrivals.", "Magsagawa ng regular na buwanang pag-iinspeksyon sa sakahan upang subaybayan ang sigla ng puno at maagang mapansin ang peste."),
+            "Ensure balanced soil fertilization and organic mulching to maintain natural tree resistance.": t("recommendations.initial_items.Ensure balanced soil fertilization and organic mulching to maintain natural tree resistance.", "Tiyakin ang balanseng pataba sa lupa at paglalagay ng organic mulch upang mapanatili ang likas na resistensya ng puno."),
+            "Keep palm bases clear of dense weeds and decaying organic litter.": t("recommendations.initial_items.Keep palm bases clear of dense weeds and decaying organic litter.", "Panatilihing malinis ang paanan ng puno mula sa makakapal na damo at nabubulok na dumi."),
+            "Record routine tree observation dates in your farm notebook or digital log.": t("recommendations.initial_items.Record routine tree observation dates in your farm notebook or digital log.", "Itala ang mga petsa ng regular na pagmamasid sa inyong talaan o digital log."),
+            "Ensure the camera is focused directly on a coconut leaf, frond, or crown section under daylight.": t("recommendations.initial_items.Ensure the camera is focused directly on a coconut leaf, frond, or crown section under daylight.", "Tiyaking nakatutok ang camera sa dahon, palapa, o tuktok ng puno ng niyog sa ilalim ng liwanag ng araw."),
+            "Hold the device steady and re-scan from approximately 1 to 2 feet away.": t("recommendations.initial_items.Hold the device steady and re-scan from approximately 1 to 2 feet away.", "Hawakan nang matatag ang camera at kumuha muli sa layong 1 hanggang 2 talampakan."),
+            "Avoid scanning non-plant objects, background scenery, or extremely blurry images.": t("recommendations.initial_items.Avoid scanning non-plant objects, background scenery, or extremely blurry images.", "Iwasang kumuha ng litrato ng mga bagay na hindi halaman, tanawin sa paligid, o malabong larawan.")
         };
         return map[clean] || clean;
     }
@@ -1035,6 +1050,9 @@
         if (agriVerificationGroup) {
             const showVerification = isAgriMode && !assessmentAlreadyIssued;
             setDisplay(agriVerificationGroup, showVerification, "block");
+            if (showVerification && typeof window.setAgriValidationMode === "function") {
+                window.setAgriValidationMode("validate");
+            }
         }
 
         const scanActionBar = document.getElementById("report-scan-action-bar");
@@ -1130,11 +1148,15 @@
         if (val === "custom") {
             if (customWrap) customWrap.style.display = "block";
             if (customInput) {
+                const cur = (customInput.value || "").trim().toLowerCase();
+                if (!cur || cur === "brontispa" || cur.includes("rhino") || cur.includes("beetle") || cur.includes("healthy") || cur.includes("not a coconut")) {
+                    customInput.value = "";
+                }
                 customInput.focus();
             }
         } else {
             if (customWrap) customWrap.style.display = "none";
-            if (customInput) customInput.value = val;
+            if (customInput) customInput.value = "";
         }
     };
 
@@ -1142,6 +1164,7 @@
         currentAgriValidationMode = mode === "correct" ? "correct" : "validate";
         const btnValidate = document.getElementById("btn-tab-validate-correct");
         const btnCorrect = document.getElementById("btn-tab-correct-result");
+        const selectWrap = document.getElementById("agri-correction-select-wrap");
         const select = document.getElementById("agri-verified-pest-select");
         const customWrap = document.getElementById("agri-custom-pest-wrap");
         const customInput = document.getElementById("agri-custom-pest-input");
@@ -1151,21 +1174,36 @@
         if (btnCorrect) btnCorrect.classList.toggle("active", currentAgriValidationMode === "correct");
 
         if (currentAgriValidationMode === "validate") {
+            if (selectWrap) selectWrap.style.display = "none";
             if (customWrap) customWrap.style.display = "none";
             if (select && report?.pest) {
                 const pestName = String(report.pest || "").toLowerCase();
-                if (pestName.includes("brontispa")) select.value = "Brontispa";
-                else if (pestName.includes("rhino") || pestName.includes("beetle")) select.value = "Rhinoceros Beetle";
-                else if (pestName.includes("healthy") || pestName.includes("malusog")) select.value = "Healthy Coconut Leaf";
-                else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) select.value = "Not a Coconut Leaf Image";
-                else {
+                if (pestName.includes("brontispa")) {
+                    select.value = "Brontispa";
+                    if (customInput) customInput.value = "";
+                } else if (pestName.includes("rhino") || pestName.includes("beetle")) {
+                    select.value = "Rhinoceros Beetle";
+                    if (customInput) customInput.value = "";
+                } else if (pestName.includes("healthy") || pestName.includes("malusog")) {
+                    select.value = "Healthy Coconut Leaf";
+                    if (customInput) customInput.value = "";
+                } else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) {
+                    select.value = "Not a Coconut Leaf Image";
+                    if (customInput) customInput.value = "";
+                } else {
                     select.value = "custom";
                     if (customWrap) customWrap.style.display = "block";
                     if (customInput) customInput.value = report.pest;
                 }
             }
         } else {
-            if (select) select.focus();
+            if (selectWrap) selectWrap.style.display = "block";
+            if (select) {
+                if (select.value === "custom" && customWrap) {
+                    customWrap.style.display = "block";
+                }
+                select.focus();
+            }
         }
     };
 
@@ -3032,6 +3070,13 @@
         modalRoot.setAttribute("aria-hidden", "false");
         setReportModalSubmissionState(false);
 
+        const resizableContainer = document.getElementById("report-image-resizable-container");
+        if (resizableContainer) {
+            resizableContainer.style.width = "";
+            resizableContainer.style.height = "";
+        }
+        initResizableImageContainer();
+
         const renderModalFields = () => {
             const pestTitle = document.getElementById("report-pest-title");
             const confidenceNode = document.getElementById("report-confidence");
@@ -3088,18 +3133,34 @@
             }
             
             const verifiedSelect = document.getElementById("agri-verified-pest-select");
+            const customInput = document.getElementById("agri-custom-pest-input");
+            const customWrap = document.getElementById("agri-custom-pest-wrap");
             if (verifiedSelect) {
                 const pestName = String(report.pest || "").toLowerCase();
                 if (pestName.includes("brontispa")) {
                     verifiedSelect.value = "Brontispa";
+                    if (customInput) customInput.value = "";
+                    if (customWrap) customWrap.style.display = "none";
                 } else if (pestName.includes("rhino") || pestName.includes("beetle")) {
                     verifiedSelect.value = "Rhinoceros Beetle";
+                    if (customInput) customInput.value = "";
+                    if (customWrap) customWrap.style.display = "none";
                 } else if (pestName.includes("healthy") || pestName.includes("malusog")) {
                     verifiedSelect.value = "Healthy Coconut Leaf";
+                    if (customInput) customInput.value = "";
+                    if (customWrap) customWrap.style.display = "none";
                 } else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) {
                     verifiedSelect.value = "Not a Coconut Leaf Image";
+                    if (customInput) customInput.value = "";
+                    if (customWrap) customWrap.style.display = "none";
+                } else if (report.pest) {
+                    verifiedSelect.value = "custom";
+                    if (customInput) customInput.value = report.pest;
+                    if (customWrap) customWrap.style.display = "block";
                 } else {
-                    verifiedSelect.value = "Brontispa";
+                    verifiedSelect.value = "Healthy Coconut Leaf";
+                    if (customInput) customInput.value = "";
+                    if (customWrap) customWrap.style.display = "none";
                 }
             }
 
@@ -3367,109 +3428,417 @@
     window.setReportModalSubmissionState = setReportModalSubmissionState;
     window.abortReportSubmission = abortActiveReportModalSubmission;
 
-    // Print a clean, minimal representation of the current report modal
+    // Print a clean, document-style representation of the current report modal (single column)
     window.printReportModal = function () {
         try {
-            // Collect key elements from the modal instead of cloning the whole DOM
-            const title = (document.getElementById('report-pest-title')?.textContent || '').trim();
-            const confidence = (document.getElementById('report-confidence')?.textContent || '').trim();
+            const report = currentReportModalRecord || {};
+            const title = (document.getElementById('report-pest-title')?.textContent || report.pest || '').trim();
+            const confidence = (document.getElementById('report-confidence')?.textContent || report.confidence || '').trim();
             const imgEl = document.getElementById('report-primary-image');
-            const imageSrc = imgEl?.src || '';
-            const farmer = (document.getElementById('report-farmer-name')?.textContent || '').trim();
-            const location = (document.getElementById('report-location-text')?.textContent || '').trim();
-            const timestamp = (document.getElementById('report-timestamp-text')?.textContent || '').trim();
-            const notes = (document.getElementById('report-notes-display')?.textContent || '').trim();
+            const imageSrc = imgEl?.src || report.imageSrc || report.image || '';
+            const farmer = (document.getElementById('report-farmer-name')?.textContent || report.farmer || '').trim();
+            const location = (document.getElementById('report-location-text')?.textContent || report.locationText || '').trim();
+            const timestamp = (document.getElementById('report-timestamp-text')?.textContent || report.timestamp || '').trim();
+            const notes = (document.getElementById('report-notes-display')?.textContent || report.notes || '').trim();
 
-            // Collect recommendations lists text
-            const initialList = Array.from(document.querySelectorAll('#report-initial-list li')).map(li => li.textContent.trim()).filter(Boolean);
-            const expertList = Array.from(document.querySelectorAll('#report-expert-list li')).map(li => li.textContent.trim()).filter(Boolean);
+            // Collect recommendations text cleanly without tooltip DOM content
+            let initialItems = [];
+            if (Array.isArray(report.initialRecommendations) && report.initialRecommendations.length > 0) {
+                initialItems = report.initialRecommendations.map(item => {
+                    return typeof localizeRecommendationItem === 'function' ? localizeRecommendationItem(item) : item;
+                }).filter(Boolean);
+            } else {
+                initialItems = Array.from(document.querySelectorAll('#report-initial-list li')).map(li => {
+                    const span = li.querySelector('span');
+                    return (span ? span.textContent : li.childNodes[0]?.textContent || li.textContent).trim();
+                }).filter(t => t && !t.toLowerCase().includes('no initial recommendations'));
+            }
 
-            // Collect additional images (src attributes)
+            let expertItems = [];
+            if (Array.isArray(report.expertRecommendations) && report.expertRecommendations.length > 0) {
+                expertItems = report.expertRecommendations.map(item => String(item).trim()).filter(Boolean);
+            } else {
+                expertItems = Array.from(document.querySelectorAll('#report-expert-list li')).map(li => {
+                    const span = li.querySelector('span');
+                    return (span ? span.textContent : li.childNodes[0]?.textContent || li.textContent).trim();
+                }).filter(t => t && !t.toLowerCase().includes('no expert assessment'));
+            }
+
             const additionalImgs = Array.from(document.querySelectorAll('#report-additional-images-grid img')).map(i => i.src).filter(Boolean);
 
-            const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Report: ${escapeHtml(title)}</title>
-                <style>
-                    :root{--muted:#64748b;--card-border:#e6e8eb;--accent:#164630}
-                    body{font-family:Inter, Arial, Helvetica, sans-serif; color:#0f172a; margin:18px; background:#fff}
-                    .report-wrap{max-width:900px; margin:0 auto}
-                    .report-card{border:1px solid var(--card-border); border-radius:10px; padding:18px; background:#ffffff}
-                    .report-header{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; border-bottom:1px solid #f1f5f9; padding-bottom:12px}
-                    .report-title{font-size:22px; font-weight:700; margin:0}
-                    .report-meta{color:var(--muted); font-size:0.9rem; text-align:right}
-                    .main-grid{display:grid; grid-template-columns: 1fr 340px; gap:18px; margin-top:14px}
-                    .primary-image{width:100%; max-width:100%; max-height:260px; border-radius:8px; overflow:hidden; background:#f3f4f6}
-                    .primary-image img{width:100%; max-height:260px; object-fit:cover; display:block}
-                    .details{display:flex; flex-direction:column; gap:8px}
-                    .meta-row{font-size:0.95rem; color:var(--muted)}
-                    .section{margin-top:14px}
-                    .section h3{margin:0 0 8px 0; font-size:1rem}
-                    .notes{color:#475569; white-space:pre-wrap}
-                    .rec-list{margin:0; padding-left:18px}
-                    .additional-images{display:flex; gap:10px; flex-wrap:wrap; margin-top:12px}
-                    .additional-images img{width:180px; height:120px; object-fit:cover; border-radius:8px; border:1px solid #eef2f6}
-                    .footer-note{margin-top:18px; color:var(--muted); font-size:0.85rem}
-                    @media (max-width:760px){
-                        .main-grid{grid-template-columns:1fr}
-                        .report-meta{text-align:left}
-                    }
-                    @media print{ body{margin:6mm} .no-print{display:none !important} }
-                </style>
-            </head><body>
-                <div class="report-wrap">
-                    <div class="report-card">
-                        <div class="report-header">
-                                <div>
-                                <div class="report-title">${escapeHtml(title)}</div>
-                                <div style="color:var(--muted); font-size:0.9rem; margin-top:4px">Confidence: ${escapeHtml(confidence)}</div>
-                            </div>
-                            <div class="report-meta">
-                                <div>Farmer: ${escapeHtml(farmer)}</div>
-                                <div>Location: ${escapeHtml(location)}</div>
-                                <div>Scanned: ${escapeHtml(timestamp)}</div>
-                            </div>
-                        </div>
+            const isHealthy = String(title || '').toLowerCase().includes('healthy') || String(title || '').toLowerCase().includes('malusog');
+            const verifierName = report.reviewer_name || (document.getElementById('report-verifier-name')?.textContent || '').trim();
+            const verifierPos = report.reviewer_position || 'PCA Agriculturist';
+            const verifierOffice = report.reviewer_office || 'Philippine Coconut Authority';
+            const isVerified = Boolean(verifierName || ['assessment_issued', 'recommendation_issued', 'resolved', 'closed'].includes(report.status));
+            const statusDisplay = isVerified 
+                ? (verifierName ? `Verified by Agriculturist (${verifierName})` : 'Verified by Agriculturist') 
+                : 'Under Review (Pending Expert Verification)';
 
-                        <div class="main-grid">
-                            <div>
-                                ${imageSrc ? `<div class="primary-image"><img src="${escapeHtml(imageSrc)}" alt="Report image"></div>` : ''}
+            const reportId = report.id || '---';
+            const printTimestamp = new Date().toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
 
-                                <div class="section">
-                                    <h3>Farmer Notes</h3>
-                                    <div class="notes">${escapeHtml(notes) || '<em>No notes logged.</em>'}</div>
-                                </div>
+            const html = `<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>CocoScan Report #${escapeHtml(String(reportId))} - ${escapeHtml(title)}</title>
+    <style>
+        @page {
+            size: A4 portrait;
+            margin: 16mm 18mm;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            color: #0f172a;
+            background: #f1f5f9;
+            margin: 0;
+            padding: 32px 16px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+        .report-doc {
+            max-width: 740px;
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 36px 42px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.06);
+        }
+        @media print {
+            body {
+                background: #ffffff;
+                padding: 0;
+                margin: 0;
+            }
+            .report-doc {
+                border: none;
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+                border-radius: 0;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+        .doc-header {
+            padding-bottom: 16px;
+            border-bottom: 2px solid #0f172a;
+        }
+        .doc-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #0f172a;
+            letter-spacing: -0.02em;
+            margin: 0;
+        }
+        .meta-table {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px 24px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin: 20px 0;
+        }
+        .meta-field {
+            display: flex;
+            flex-direction: column;
+        }
+        .meta-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #64748b;
+            margin-bottom: 3px;
+        }
+        .meta-val {
+            font-size: 0.92rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .meta-status-tag {
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+        .meta-status-tag.verified {
+            color: #166534;
+        }
+        .meta-status-tag.pending {
+            color: #b45309;
+        }
+        .doc-section {
+            margin-top: 22px;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .section-heading {
+            font-size: 0.84rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #334155;
+            margin: 0 0 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+        }
+        .diagnosis-banner {
+            padding: 16px 20px;
+            border-radius: 8px;
+            background: #f0fdf4;
+            border: 1.5px solid #bbf7d0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .diagnosis-banner.pest {
+            background: #fefce8;
+            border-color: #fef08a;
+        }
+        .diagnosis-eyebrow {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #15803d;
+            margin-bottom: 3px;
+        }
+        .diagnosis-banner.pest .diagnosis-eyebrow {
+            color: #a16207;
+        }
+        .diagnosis-name {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #14532d;
+            margin: 0;
+        }
+        .diagnosis-banner.pest .diagnosis-name {
+            color: #854d0e;
+        }
+        .diagnosis-confidence {
+            font-size: 0.86rem;
+            font-weight: 700;
+            color: #166534;
+            background: #ffffff;
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid #86efac;
+        }
+        .diagnosis-banner.pest .diagnosis-confidence {
+            color: #854d0e;
+            border-color: #fde047;
+        }
+        .primary-image-wrap {
+            width: 100%;
+            margin-top: 14px;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .primary-image-wrap img {
+            width: 100%;
+            max-height: 360px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+            background: #f8fafc;
+        }
+        .image-caption {
+            font-size: 0.74rem;
+            color: #64748b;
+            text-align: center;
+            margin-top: 6px;
+            font-style: italic;
+        }
+        .supporting-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
+            margin-top: 10px;
+        }
+        .supporting-item img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #cbd5e1;
+        }
+        .notes-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 0.92rem;
+            color: #334155;
+            line-height: 1.55;
+            white-space: pre-wrap;
+        }
+        .clean-reco-list {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #1e293b;
+        }
+        .clean-reco-list li {
+            margin-bottom: 6px;
+        }
+        .empty-note {
+            font-size: 0.88rem;
+            color: #64748b;
+            font-style: italic;
+            margin: 4px 0;
+        }
+        .signature-box {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px dashed #cbd5e1;
+            display: inline-block;
+            min-width: 240px;
+        }
+        .sig-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #64748b;
+            margin-bottom: 4px;
+        }
+        .sig-name {
+            font-weight: 800;
+            color: #0f172a;
+            font-size: 0.96rem;
+        }
+        .sig-title {
+            font-size: 0.82rem;
+            color: #475569;
+            margin-top: 2px;
+        }
+        .doc-footer {
+            margin-top: 36px;
+            padding-top: 14px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+        @media (max-width: 600px) {
+            .meta-table {
+                grid-template-columns: 1fr;
+            }
+            .report-doc {
+                padding: 20px 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="report-doc">
+        <header class="doc-header">
+            <h1 class="doc-title">CocoScan Diagnostic Report</h1>
+        </header>
 
-                                <div class="section">
-                                    <h3>Initial Recommendations</h3>
-                                    <ul class="rec-list">${initialList.map(i => `<li>${escapeHtml(i)}</li>`).join('') || '<li>No recommendations.</li>'}</ul>
-                                </div>
+        <div class="meta-table">
+            <div class="meta-field">
+                <span class="meta-label">Farmer / Farm Owner</span>
+                <span class="meta-val">${escapeHtml(farmer || 'Unspecified')}</span>
+            </div>
+            <div class="meta-field">
+                <span class="meta-label">Barangay / Location</span>
+                <span class="meta-val">${escapeHtml(location || 'Unspecified')}</span>
+            </div>
+            <div class="meta-field">
+                <span class="meta-label">Date &amp; Time Scanned</span>
+                <span class="meta-val">${escapeHtml(timestamp || '---')}</span>
+            </div>
+            <div class="meta-field">
+                <span class="meta-label">Verification Status</span>
+                <span class="meta-val meta-status-tag ${isVerified ? 'verified' : 'pending'}">${escapeHtml(statusDisplay)}</span>
+            </div>
+        </div>
 
-                                <div class="section">
-                                    <h3>Expert Assessment</h3>
-                                    <ul class="rec-list">${expertList.map(i => `<li>${escapeHtml(i)}</li>`).join('') || '<li>No expert assessment.</li>'}</ul>
-                                </div>
-                            </div>
-
-                            <aside class="details">
-                                <div style="background:#f8fafc; border:1px solid #eef6f0; padding:12px; border-radius:8px">
-                                    <div style="font-weight:700; color:var(--accent)">Report Summary</div>
-                                    <div class="meta-row">Farmer: ${escapeHtml(farmer)}</div>
-                                    <div class="meta-row">Location: ${escapeHtml(location)}</div>
-                                    <div class="meta-row">Scanned: ${escapeHtml(timestamp)}</div>
-                                </div>
-
-                                ${additionalImgs.length ? `<div style="border:1px solid #eef2f6; padding:12px; border-radius:8px"><div style="font-weight:700; margin-bottom:8px">Additional Images</div><div class="additional-images">${additionalImgs.map(s => `<img src="${escapeHtml(s)}">`).join('')}</div></div>` : ''}
-
-                                <div style="border:1px solid #f1f5f9; padding:12px; border-radius:8px">
-                                    <div style="font-weight:700; margin-bottom:8px">Notes</div>
-                                    <div class="meta-row">This printout is a snapshot of the report generated by CocoScan.</div>
-                                </div>
-                            </aside>
-                        </div>
-
-                        <div class="footer-note">Generated by CocoScan • ${new Date().toLocaleString()}</div>
-                    </div>
+        <div class="doc-section">
+            <div class="diagnosis-banner ${isHealthy ? '' : 'pest'}">
+                <div>
+                    <div class="diagnosis-eyebrow">${isVerified ? 'Verified Classification' : 'Preliminary Detected Classification'}</div>
+                    <h2 class="diagnosis-name">${escapeHtml(title || 'Unidentified Result')}</h2>
                 </div>
-            </body></html>`;
+                <div class="diagnosis-confidence">AI Confidence: ${escapeHtml(confidence || '--')}</div>
+            </div>
+
+            ${imageSrc ? `
+            <div class="primary-image-wrap">
+                <img src="${escapeHtml(imageSrc)}" alt="Primary leaf diagnostic scan" />
+            </div>
+            <div class="image-caption">Primary Field Capture &amp; Diagnostic Scan</div>` : ''}
+        </div>
+
+        ${additionalImgs.length ? `
+        <div class="doc-section">
+            <div class="section-heading">Supporting Field Photos (${additionalImgs.length})</div>
+            <div class="supporting-grid">
+                ${additionalImgs.map((src, i) => `
+                    <div class="supporting-item">
+                        <img src="${escapeHtml(src)}" alt="Supporting photo ${i + 1}" />
+                    </div>
+                `).join('')}
+            </div>
+        </div>` : ''}
+
+        <div class="doc-section">
+            <div class="section-heading">Farmer Field Observations</div>
+            <div class="notes-box">${escapeHtml(notes) || '<em>No farmer notes recorded.</em>'}</div>
+        </div>
+
+        <div class="doc-section">
+            <div class="section-heading">Initial Precautionary Recommendations</div>
+            ${initialItems.length ? `
+            <ol class="clean-reco-list">
+                ${initialItems.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+            </ol>` : `<p class="empty-note">No initial recommendations available.</p>`}
+        </div>
+
+        <div class="doc-section">
+            <div class="section-heading">Expert Assessment &amp; Official Guidance</div>
+            ${expertItems.length ? `
+            <ul class="clean-reco-list" style="list-style-type: disc;">
+                ${expertItems.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+            </ul>` : `<p class="empty-note">No expert assessment notes recorded yet.</p>`}
+
+            ${isVerified ? `
+            <div class="signature-box">
+                <div class="sig-label">Evaluated &amp; Certified By</div>
+                <div class="sig-name">${escapeHtml(verifierName)}</div>
+                <div class="sig-title">${escapeHtml(verifierPos)}${verifierOffice ? ` • ${escapeHtml(verifierOffice)}` : ''}</div>
+            </div>` : ''}
+        </div>
+
+        <footer class="doc-footer">
+            <div>Official CocoScan Diagnostic Record • Confidential Agricultural Assessment</div>
+            <div>Printed on ${escapeHtml(printTimestamp)}</div>
+        </footer>
+    </div>
+</body>
+</html>`;
 
             // Open print window
             const w = window.open('', '_blank');
@@ -3486,6 +3855,66 @@
             alert('Unable to prepare print preview.');
         }
     };
+
+    function initResizableImageContainer() {
+        const container = document.getElementById("report-image-resizable-container");
+        const handle = document.getElementById("report-image-resize-handle");
+        if (!container || !handle) return;
+        if (handle.__resizeAttached) return;
+        handle.__resizeAttached = true;
+
+        let isDragging = false;
+        let startX = 0, startY = 0, startW = 0, startH = 0;
+
+        const onPointerDown = (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = container.getBoundingClientRect();
+            startW = rect.width;
+            startH = rect.height;
+            try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+            document.body.style.userSelect = "none";
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const onPointerMove = (e) => {
+            if (!isDragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            const parentWidth = container.parentElement ? container.parentElement.clientWidth : 360;
+            const minW = 180;
+            const maxW = parentWidth;
+            const minH = 160;
+            const maxH = 520;
+
+            const newW = Math.min(Math.max(startW + dx, minW), maxW);
+            const newH = Math.min(Math.max(startH + dy, minH), maxH);
+
+            container.style.width = `${newW}px`;
+            container.style.height = `${newH}px`;
+        };
+
+        const onPointerUp = (e) => {
+            if (!isDragging) return;
+            isDragging = false;
+            document.body.style.userSelect = "";
+            try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+        };
+
+        handle.addEventListener("pointerdown", onPointerDown);
+        handle.addEventListener("pointermove", onPointerMove);
+        handle.addEventListener("pointerup", onPointerUp);
+        handle.addEventListener("pointercancel", onPointerUp);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", initResizableImageContainer);
+    } else {
+        initResizableImageContainer();
+    }
 
     document.addEventListener("click", function (event) {
         const modalRoot = getModalRoot();

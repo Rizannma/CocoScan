@@ -105,11 +105,16 @@
                 z-index: 5;
                 display: block;
                 width: 100%;
-                min-height: 320px;
-                aspect-ratio: 16 / 9;
-                border-radius: 24px;
+                min-width: 180px;
+                max-width: 100%;
+                min-height: 160px;
+                max-height: 520px;
+                height: 230px;
+                resize: both;
                 overflow: hidden;
-                background: #e2e8f0;
+                border-radius: 18px;
+                background-color: #0f172a;
+                box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
                 margin-bottom: 16px;
             }
             .preview-media-frame img {
@@ -118,8 +123,38 @@
                 display: block;
                 width: 100%;
                 height: 100%;
-                min-height: 320px;
+                max-width: 100%;
                 object-fit: cover;
+                user-select: none;
+                -webkit-user-drag: none;
+                pointer-events: none;
+            }
+            .image-resize-handle-cue {
+                position: absolute;
+                bottom: 6px;
+                right: 6px;
+                z-index: 10;
+                width: 22px;
+                height: 22px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: rgba(15, 23, 42, 0.68);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                border-radius: 4px;
+                color: rgba(255, 255, 255, 0.85);
+                cursor: nwse-resize;
+                pointer-events: auto;
+                touch-action: none;
+                transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+            }
+            .preview-media-frame:hover .image-resize-handle-cue,
+            .image-resize-handle-cue:hover {
+                background: rgba(15, 23, 42, 0.92);
+                color: #ffffff;
+                transform: scale(1.05);
             }
             .image-timestamp-footer,
             .premium-form-card,
@@ -340,27 +375,7 @@
         .badge-main p { font-size: 0.85rem; opacity: 0.95; margin: 4px 0 0; color: inherit; }
         .badge-side-meta { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; text-align: right; opacity: 0.92; color: inherit; }
 
-        .preview-media-frame {
-            position: relative;
-            z-index: 5;
-            display: block;
-            width: 100%;
-            min-height: 220px;
-            aspect-ratio: 16 / 9;
-            border-radius: 16px;
-            overflow: hidden;
-            background-color: #eaeaea;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .preview-media-frame img {
-            position: relative;
-            z-index: 5;
-            display: block;
-            width: 100%;
-            height: 100%;
-            min-height: 220px;
-            object-fit: cover;
-        }
+
 
         .image-timestamp-footer,
         .premium-form-card,
@@ -688,8 +703,14 @@
             </div>
         </div>
 
-        <div class="preview-media-frame">
+        <div class="preview-media-frame resizable-image-container" id="report-image-resizable-container">
             <img id="report-primary-image" src="" alt="Report image">
+            <div class="image-resize-handle-cue" id="report-image-resize-handle" title="Drag corner to resize image" aria-label="Resize image">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                    <line x1="14" y1="6" x2="6" y2="14"></line>
+                    <line x1="14" y1="10" x2="10" y2="14"></line>
+                </svg>
+            </div>
         </div>
 
         <div style="font-size: 0.8rem; color: #64748b; line-height: 1.3; margin-top: 12px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 4px;">
@@ -786,16 +807,16 @@
                 </label>
 
                 <!-- Validation Action Mode Tabs -->
-                <div class="agri-action-tabs">
-                    <button type="button" id="btn-tab-validate-correct" class="agri-tab-btn active" onclick="setAgriValidationMode('validate')">
-                        <i class="fa-solid fa-check"></i> <span id="label-validate-correct" data-i18n="modal.btn_validate_correct">{{ t('modal.btn_validate_correct', 'Validate as Correct') }}</span>
+                <div class="agri-action-tabs" style="margin-bottom: 0;">
+                    <button type="button" id="btn-tab-validate-correct" class="agri-tab-btn active" onclick="(function(){ if (typeof setAgriValidationMode === 'function') setAgriValidationMode('validate'); var wrap = document.getElementById('agri-correction-select-wrap'); if (wrap) wrap.style.display = 'none'; })()">
+                        <i class="fa-solid fa-check"></i> <span id="label-validate-correct" data-i18n="modal.btn_validate_correct">{{ t('modal.btn_validate_correct', 'Mark as Verified') }}</span>
                     </button>
-                    <button type="button" id="btn-tab-correct-result" class="agri-tab-btn" onclick="setAgriValidationMode('correct')">
-                        <i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.btn_correct_result">{{ t('modal.btn_correct_result', 'Correct / Change Result') }}</span>
+                    <button type="button" id="btn-tab-correct-result" class="agri-tab-btn" onclick="(function(){ if (typeof setAgriValidationMode === 'function') setAgriValidationMode('correct'); var wrap = document.getElementById('agri-correction-select-wrap'); if (wrap) wrap.style.display = 'block'; var sel = document.getElementById('agri-verified-pest-select'); if (sel) sel.focus(); })()">
+                        <i class="fa-solid fa-pen-to-square"></i> <span data-i18n="modal.btn_correct_result">{{ t('modal.btn_correct_result', 'Re-verify Result') }}</span>
                     </button>
                 </div>
 
-                <div id="agri-correction-select-wrap" style="margin-bottom: 10px;">
+                <div id="agri-correction-select-wrap" style="display:none; margin-top: 10px;">
                     <label style="display:block; font-size: 0.78rem; font-weight: 700; color: #166534; margin-bottom: 4px;">
                         Verified Classification / Diagnosis:
                     </label>
@@ -810,11 +831,6 @@
                         <input type="text" id="agri-custom-pest-input" placeholder="Type the corrected pest or diagnosis..." style="width: 100%; height: 38px; border-radius: 8px; border: 1.5px solid #86efac; background: white; padding: 0 12px; font-size: 0.86rem; color: #14532d; outline: none; font-weight: 600;" />
                     </div>
                 </div>
-
-                <p style="font-size: 0.75rem; color: #15803d; margin: 0; line-height: 1.35; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-cloud-arrow-up"></i>
-                    <span>Verified sample will be automatically synced to Dataset Hub in Supabase Cloud Storage.</span>
-                </p>
             </div>
 
             <textarea id="expert-notes-input" class="notes-input-box" placeholder="Provide additional observations, clarifications, or recommendations based on your assessment of this report." style="display:none; margin-top: 12px;"></textarea>

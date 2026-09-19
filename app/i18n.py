@@ -50,7 +50,20 @@ def resolve_key(data: Dict[str, Any], key: str) -> Optional[Any]:
     """Resolves a dot-notated key in a nested dictionary with alias support."""
     if not data or not key:
         return None
-    keys = list(key.split("."))
+    if key.startswith("pest_knowledge_base.recommendations.initial_items."):
+        item = key[len("pest_knowledge_base.recommendations.initial_items."):]
+        if "pest_knowledge_base" in data:
+            keys = ["pest_knowledge_base", "recommendations", "initial_items", item]
+        else:
+            keys = ["recommendations", "initial_items", item]
+    elif key.startswith("recommendations.initial_items."):
+        item = key[len("recommendations.initial_items."):]
+        if "pest_knowledge_base" in data and "recommendations" not in data:
+            keys = ["pest_knowledge_base", "recommendations", "initial_items", item]
+        else:
+            keys = ["recommendations", "initial_items", item]
+    else:
+        keys = list(key.split("."))
     if keys and keys[0] == "scanner" and "scanner" not in data and "scan_page" in data:
         keys[0] = "scan_page"
     elif keys and keys[0] == "scan_page" and "scan_page" not in data and "scanner" in data:

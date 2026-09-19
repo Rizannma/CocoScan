@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cocoscan-app-shell-v23';
-const RUNTIME_CACHE = 'cocoscan-pages-runtime-v23';
-const IMAGE_CACHE = 'cocoscan-report-images-v23';
+const CACHE_NAME = 'cocoscan-app-shell-v29';
+const RUNTIME_CACHE = 'cocoscan-pages-runtime-v29';
+const IMAGE_CACHE = 'cocoscan-report-images-v29';
 
 // Only precache truly public, unauthenticated assets to prevent login redirect caching corruption
 const PRECACHE_ASSETS = [
@@ -18,6 +18,7 @@ const PRECACHE_ASSETS = [
     '/static/icons/favicon.ico',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff2',
+    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.woff',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-solid-900.ttf',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.woff2',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/webfonts/fa-regular-400.ttf',
@@ -33,9 +34,9 @@ const PRECACHE_ASSETS = [
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[SW v23] Precaching Public App Shell & Webfonts');
+            console.log('[SW v27] Precaching Public App Shell & Webfonts');
             return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-                console.warn('[SW v23] Precache assets load warning:', err);
+                console.warn('[SW v27] Precache assets load warning:', err);
             });
         }).then(() => self.skipWaiting())
     );

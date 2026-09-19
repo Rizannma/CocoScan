@@ -44,6 +44,14 @@ def test_i18n_translation_lookup_and_fallback():
     assert "dead leaves" in t("pest_knowledge_base.tooltips.sanitation", lang="en").lower()
     assert "hakbang" in t("pest_knowledge_base.tooltips.sanitation", lang="tl").lower()
 
+    # Initial safe recommendations translations
+    brontispa_rec = "Inspect central spear leaves and unopened fronds weekly for early feeding streaks or browning edges."
+    assert "Suriin" in t(f"pest_knowledge_base.recommendations.initial_items.{brontispa_rec}", lang="tl")
+    assert t(f"pest_knowledge_base.recommendations.initial_items.{brontispa_rec}", lang="en") == brontispa_rec
+
+    rhino_rec = "Inspect palm crowns and spear leaves regularly for characteristic V-shaped cuts or entry boreholes."
+    assert "V-shaped" in t(f"pest_knowledge_base.recommendations.initial_items.{rhino_rec}", lang="tl")
+
     # Fallback to English when key missing in Tagalog (or unknown lang)
     assert t("dashboard.page_title", lang="invalid_lang") == "Farmer Dashboard"
     # Default fallback when missing in both

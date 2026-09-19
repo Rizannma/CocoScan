@@ -185,7 +185,10 @@ class AgriReviewWorkflowTests(unittest.TestCase):
         # Expert Assessment & Verification controls
         self.assertIn('id="btn-tab-validate-correct"', html)
         self.assertIn('id="btn-tab-correct-result"', html)
+        self.assertIn('Mark as Verified', html)
+        self.assertIn('Re-verify Result', html)
         self.assertIn('id="agri-verified-pest-select"', html)
+        self.assertIn('id="agri-correction-select-wrap" style="display:none;', html)
 
     def test_cloud_dataset_routing_during_assessment(self):
         from app.dataset_hub import save_verified_sample
