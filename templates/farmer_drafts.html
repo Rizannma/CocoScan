@@ -226,32 +226,33 @@
             border: 1px solid #d1fae5;
         }
 
-        /* --- IMMACULATE BUTTON CONSOLE PANEL (FIXED REDESIGN) --- */
+        /* --- IMMACULATE BUTTON CONSOLE PANEL (MATCHED TO PRIMARY COCOSCAN BUTTONS) --- */
         .draft-actions {
             display: flex;
             flex-direction: column;
-            gap: 8px;
-            margin-top: 6px;
+            gap: 10px;
+            margin-top: 10px;
             width: 100%;
         }
 
         .main-actions-row {
             display: flex;
-            gap: 8px;
+            gap: 10px;
             width: 100%;
         }
 
         .btn-control {
-            padding: 10px 12px;
-            border-radius: 12px;
-            font-size: 0.88rem;
+            min-height: 48px;
+            padding: 13px 18px;
+            border-radius: 14px;
+            font-size: 0.94rem;
             font-weight: 700;
             cursor: pointer;
             border: none;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
             width: 100%;
             min-width: 0;
@@ -263,64 +264,73 @@
             flex: 1 1 50%;
         }
 
-        /* Submit: High Highlight Weight */
+        /* Submit / Scan: High Highlight Weight */
         .btn-control.btn-submit {
             background: #164630;
             color: #ffffff;
+            box-shadow: 0 4px 14px rgba(22, 70, 48, 0.2);
         }
 
         .btn-control.btn-submit:hover {
             background-color: #1e5c3f;
             transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(30, 92, 63, 0.28);
         }
 
         /* Continue/Edit: Balanced Outlined Outline */
         .btn-control.btn-edit {
             background: #ffffff;
             color: var(--brand-dark);
-            border: 1px solid rgba(82, 130, 101, 0.35);
+            border: 1.5px solid rgba(82, 130, 101, 0.35);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
         }
 
         .btn-control.btn-edit:hover {
             background-color: #e8f2f0;
             border-color: var(--primary-green);
+            transform: translateY(-1px);
         }
 
         /* Delete: Subtle Alert Design block */
         .btn-control.btn-delete {
             background-color: #fff5f5;
-            border: 1px solid rgba(239, 68, 68, 0.15);
-            color: #e53e3e;
-            padding: 9px 12px;
-            font-size: 0.84rem;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            color: #dc2626;
+            min-height: 44px;
+            padding: 12px 18px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border-radius: 14px;
         }
 
         .btn-control.btn-delete:hover {
             background-color: #fee2e2;
             color: #9b1c1c;
-            border-color: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.35);
         }
 
         @media (max-width: 480px) {
             .draft-actions {
-                gap: 6px;
+                gap: 8px;
             }
             .main-actions-row {
-                gap: 6px;
+                gap: 8px;
             }
             .btn-control {
-                padding: 9px 6px;
-                font-size: 0.82rem;
-                gap: 5px;
-                border-radius: 10px;
+                min-height: 46px;
+                padding: 12px 14px;
+                font-size: 0.9rem;
+                gap: 6px;
+                border-radius: 12px;
             }
             .btn-control i {
-                font-size: 0.8rem;
+                font-size: 0.9rem;
             }
             .btn-control.btn-delete {
-                padding: 8px 10px;
-                font-size: 0.8rem;
-                border-radius: 10px;
+                min-height: 42px;
+                padding: 11px 14px;
+                font-size: 0.88rem;
+                border-radius: 12px;
             }
         }
 

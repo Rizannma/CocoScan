@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 DEFAULT_PEST_MODEL = "pest_classifier.h5"
+DEFAULT_PEST_TFLITE_MODEL = "pest_classifier.tflite"
 
 
 def resolve_model_path(
@@ -10,6 +11,7 @@ def resolve_model_path(
     default_filename: str = DEFAULT_PEST_MODEL,
     model_dir: Optional[str] = None,
     env_value: Optional[str] = None,
+    prefer_tflite: bool = True,
 ) -> str:
     """Resolve a model path from environment config, falling back to the local model folder."""
     candidates = []
@@ -42,7 +44,11 @@ def resolve_model_path(
         ])
 
     for candidate in candidates:
-        if os.path.exists(candidate) and not candidate.endswith(".tflite"):
+        if prefer_tflite and candidate.endswith(".h5"):
+            tflite_candidate = candidate[:-3] + ".tflite"
+            if os.path.exists(tflite_candidate):
+                return tflite_candidate
+        if os.path.exists(candidate):
             return candidate
 
     return str((resolved_model_dir / default_filename).resolve())

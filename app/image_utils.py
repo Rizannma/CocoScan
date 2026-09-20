@@ -3,20 +3,27 @@ import logging
 from typing import Any, Optional, Set, Union
 from PIL import Image, ImageFile, ImageOps, UnidentifiedImageError
 
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+setattr(ImageFile, "LOAD_TRUNCATED_IMAGES", True)
 
 logger = logging.getLogger(__name__)
+
+# Safely register pillow_heif for HEIC/HEIF decoding if installed
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+except Exception as _heif_init_err:
+    logger.debug(f"pillow_heif opener registration notice: {_heif_init_err}")
 
 SAFE_MAX_DIMENSION = 1024
 DEFAULT_JPEG_QUALITY = 85
 
 INVALID_IMAGE_ERROR_MESSAGE = (
-    "Invalid image file format. Please upload a valid JPG, JPEG, or PNG image."
+    "Invalid image file format. Please upload a valid JPG, JPEG, PNG, or HEIC image."
 )
 STORAGE_LIMIT_ERROR_MESSAGE = (
     "Storage limit reached. Unable to save the image at this time. Please contact the administrator."
 )
-ALLOWED_IMAGE_FORMATS: Set[str] = {"JPEG", "JPG", "PNG"}
+ALLOWED_IMAGE_FORMATS: Set[str] = {"JPEG", "JPG", "PNG", "HEIC", "HEIF"}
 
 
 class InvalidImageFormatError(ValueError):
@@ -185,8 +192,8 @@ def process_and_compress_image(
     w, h = img.size
     if w > max_dimension or h > max_dimension:
         scale = min(max_dimension / w, max_dimension / h)
-        new_w = max(1, int(round(w * scale)))
-        new_h = max(1, int(round(h * scale)))
+        new_w = max(1, round(w * scale))
+        new_h = max(1, round(h * scale))
         logger.info(f"Downscaling uploaded photo from {w}x{h} to {new_w}x{new_h} (max {max_dimension}px).")
         img = img.resize((new_w, new_h), Image.Resampling.BILINEAR)
 

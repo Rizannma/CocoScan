@@ -3074,6 +3074,14 @@
         if (resizableContainer) {
             resizableContainer.style.width = "";
             resizableContainer.style.height = "";
+            const img = resizableContainer.querySelector("img");
+            if (img) {
+                img.style.setProperty("width", "100%", "important");
+                img.style.setProperty("height", "100%", "important");
+                img.style.setProperty("max-height", "none", "important");
+                img.style.setProperty("aspect-ratio", "auto", "important");
+                img.style.setProperty("object-fit", "cover", "important");
+            }
         }
         initResizableImageContainer();
 
@@ -3860,6 +3868,31 @@
         const container = document.getElementById("report-image-resizable-container");
         const handle = document.getElementById("report-image-resize-handle");
         if (!container || !handle) return;
+
+        const enforceImgFill = () => {
+            const img = container.querySelector("img");
+            if (img) {
+                img.style.setProperty("width", "100%", "important");
+                img.style.setProperty("height", "100%", "important");
+                img.style.setProperty("max-height", "none", "important");
+                img.style.setProperty("min-height", "100%", "important");
+                img.style.setProperty("aspect-ratio", "auto", "important");
+                img.style.setProperty("object-fit", "cover", "important");
+            }
+        };
+
+        enforceImgFill();
+
+        if (window.ResizeObserver && !container.__roAttached) {
+            container.__roAttached = true;
+            try {
+                const ro = new ResizeObserver(() => {
+                    enforceImgFill();
+                });
+                ro.observe(container);
+            } catch (_) {}
+        }
+
         if (handle.__resizeAttached) return;
         handle.__resizeAttached = true;
 
@@ -3875,39 +3908,77 @@
             startH = rect.height;
             try { handle.setPointerCapture(e.pointerId); } catch (_) {}
             document.body.style.userSelect = "none";
-            e.preventDefault();
-            e.stopPropagation();
+            window.addEventListener("pointermove", onPointerMove, { passive: false });
+            window.addEventListener("pointerup", onPointerUp);
+            window.addEventListener("pointercancel", onPointerUp);
+            if (typeof e.preventDefault === "function") e.preventDefault();
+            if (typeof e.stopPropagation === "function") e.stopPropagation();
         };
 
         const onPointerMove = (e) => {
             if (!isDragging) return;
-            const dx = e.clientX - startX;
-            const dy = e.clientY - startY;
+            const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0] ? e.touches[0].clientX : startX);
+            const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0] ? e.touches[0].clientY : startY);
+            const dx = clientX - startX;
+            const dy = clientY - startY;
 
             const parentWidth = container.parentElement ? container.parentElement.clientWidth : 360;
             const minW = 180;
             const maxW = parentWidth;
             const minH = 160;
-            const maxH = 520;
+            const maxH = 600;
 
             const newW = Math.min(Math.max(startW + dx, minW), maxW);
             const newH = Math.min(Math.max(startH + dy, minH), maxH);
 
             container.style.width = `${newW}px`;
             container.style.height = `${newH}px`;
+            enforceImgFill();
         };
 
         const onPointerUp = (e) => {
             if (!isDragging) return;
             isDragging = false;
             document.body.style.userSelect = "";
-            try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+            window.removeEventListener("pointermove", onPointerMove);
+            window.removeEventListener("pointerup", onPointerUp);
+            window.removeEventListener("pointercancel", onPointerUp);
+            try {
+                if (e && e.pointerId) handle.releasePointerCapture(e.pointerId);
+            } catch (_) {}
+            enforceImgFill();
         };
 
         handle.addEventListener("pointerdown", onPointerDown);
-        handle.addEventListener("pointermove", onPointerMove);
-        handle.addEventListener("pointerup", onPointerUp);
-        handle.addEventListener("pointercancel", onPointerUp);
+
+        // Mobile touch event support
+        handle.addEventListener("touchstart", (e) => {
+            if (e.touches && e.touches.length === 1) {
+                const t = e.touches[0];
+                onPointerDown({
+                    clientX: t.clientX,
+                    clientY: t.clientY,
+                    pointerId: 1,
+                    preventDefault: () => e.preventDefault(),
+                    stopPropagation: () => e.stopPropagation()
+                });
+            }
+        }, { passive: false });
+
+        window.addEventListener("touchmove", (e) => {
+            if (isDragging && e.touches && e.touches.length === 1) {
+                const t = e.touches[0];
+                onPointerMove({
+                    clientX: t.clientX,
+                    clientY: t.clientY
+                });
+                if (e.cancelable) e.preventDefault();
+            }
+        }, { passive: false });
+
+        window.addEventListener("touchend", () => {
+            if (isDragging) onPointerUp({});
+        });
     }
 
     if (document.readyState === "loading") {

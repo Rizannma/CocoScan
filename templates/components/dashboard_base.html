@@ -1322,7 +1322,7 @@
                 }
                 const ctxTrend = trendEl.getContext('2d');
                 const trendLabels = chartPayload && Array.isArray(chartPayload.trend_labels) && chartPayload.trend_labels.length ? chartPayload.trend_labels : ['No data'];
-                const trendDatasets = chartPayload && Array.isArray(chartPayload.trend_datasets) && chartPayload.trend_datasets.length ? chartPayload.trend_datasets : [{
+                let trendDatasets = chartPayload && Array.isArray(chartPayload.trend_datasets) && chartPayload.trend_datasets.length ? chartPayload.trend_datasets : [{
                     label: 'No reports yet',
                     data: [0],
                     borderColor: '#94a3b8',
@@ -1332,6 +1332,19 @@
                     pointRadius: 3,
                     fill: true
                 }];
+                trendDatasets = trendDatasets.filter(d => !String(d.label || '').toLowerCase().includes('healthy'));
+                if (!trendDatasets.length) {
+                    trendDatasets = [{
+                        label: 'No reports yet',
+                        data: [0],
+                        borderColor: '#94a3b8',
+                        backgroundColor: 'rgba(148, 163, 184, 0.15)',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        pointRadius: 3,
+                        fill: true
+                    }];
+                }
                 const trendChart = new Chart(ctxTrend, {
                     type: 'line',
                     data: {
@@ -1396,13 +1409,24 @@
                     console.debug('No existing distribution chart to destroy', e);
                 }
                 const ctxDist = distEl.getContext('2d');
-                const distributionLabels = Array.isArray(chartPayload?.distribution_labels) && chartPayload.distribution_labels.length ? chartPayload.distribution_labels : ['No reports yet'];
-                const distributionData = Array.isArray(chartPayload?.distribution_data) && chartPayload.distribution_data.length ? chartPayload.distribution_data : [0];
+                const rawDistLabels = Array.isArray(chartPayload?.distribution_labels) && chartPayload.distribution_labels.length ? chartPayload.distribution_labels : ['No reports yet'];
+                const rawDistData = Array.isArray(chartPayload?.distribution_data) && chartPayload.distribution_data.length ? chartPayload.distribution_data : [0];
+                let distributionLabels = [];
+                let distributionData = [];
+                for (let i = 0; i < rawDistLabels.length; i++) {
+                    if (!String(rawDistLabels[i]).toLowerCase().includes('healthy')) {
+                        distributionLabels.push(rawDistLabels[i]);
+                        distributionData.push(rawDistData[i] || 0);
+                    }
+                }
+                if (!distributionLabels.length) {
+                    distributionLabels = ['No reports yet'];
+                    distributionData = [0];
+                }
                 const distributionColors = distributionLabels.map((label) => {
                     const l = String(label).toLowerCase();
                     if (l.includes('brontispa') || l.includes('leaf beetle')) return '#164630';
                     if (l.includes('rhino') || l.includes('beetle')) return '#d97706';
-                    if (l.includes('healthy')) return '#22c55e';
                     return '#0f766e';
                 });
                 const distributionChart = new Chart(ctxDist, {

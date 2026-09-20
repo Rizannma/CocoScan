@@ -50,6 +50,27 @@ class TestImageDecodingAndValidation:
         assert isinstance(processed, Image.Image)
         assert processed.mode == "RGB"
 
+    def test_heic_or_heif_image_converted_to_rgb_and_jpeg_cleanly(self):
+        # Create an in-memory HEIF image
+        img = Image.new("RGB", (150, 150), color=(30, 160, 40))
+        buf = io.BytesIO()
+        try:
+            img.save(buf, format="HEIF")
+        except Exception:
+            pytest.skip("pillow-heif saving not available on this platform")
+        heic_bytes = buf.getvalue()
+
+        # Decoding via process_and_compress_image must succeed and return RGB image
+        processed = process_and_compress_image(heic_bytes)
+        assert isinstance(processed, Image.Image)
+        assert processed.mode == "RGB"
+
+        # Conversion to bytes should yield valid JPEG bytes
+        jpeg_bytes = compress_image_to_bytes(processed)
+        assert len(jpeg_bytes) > 0
+        reloaded = Image.open(io.BytesIO(jpeg_bytes))
+        assert reloaded.format == "JPEG"
+
     def test_corrupted_image_bytes_raises_invalid_format_error(self):
         corrupted_bytes = b"corrupted_header_not_a_valid_image_12345"
         with pytest.raises(InvalidImageFormatError) as exc_info:

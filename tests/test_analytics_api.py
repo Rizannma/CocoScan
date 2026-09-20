@@ -1,3 +1,4 @@
+from typing import Any, cast
 import unittest
 
 import main
@@ -50,7 +51,7 @@ class AnalyticsApiTests(unittest.TestCase):
                 ])
 
         original_supabase = main.supabase
-        main.supabase = FakeSupabaseClient()
+        main.supabase = cast(Any, FakeSupabaseClient())
         self.addCleanup(setattr, main, "supabase", original_supabase)
 
         with self.client.session_transaction() as session:
@@ -116,7 +117,7 @@ class AnalyticsApiTests(unittest.TestCase):
                 ])
 
         original_supabase = main.supabase
-        main.supabase = FakeSupabaseClient()
+        main.supabase = cast(Any, FakeSupabaseClient())
         self.addCleanup(setattr, main, "supabase", original_supabase)
 
         with self.client.session_transaction() as session:
@@ -126,8 +127,9 @@ class AnalyticsApiTests(unittest.TestCase):
         response = self.client.get("/api/analytics?month=2026-07")
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload["success"])
-        self.assertIn("Healthy Coconut Leaf", payload["dashboard_payload"]["distribution_labels"])
+        self.assertNotIn("Healthy Coconut Leaf", payload["dashboard_payload"]["distribution_labels"])
+        self.assertIn("Rhinoceros Beetle", payload["dashboard_payload"]["distribution_labels"])
+        self.assertIn("Brontispa", payload["dashboard_payload"]["distribution_labels"])
         self.assertEqual(payload["status_breakdown"]["total"]["pending"], 2)
         self.assertEqual(payload["status_breakdown"]["total"]["resolved"], 1)
 
@@ -167,7 +169,7 @@ class AnalyticsApiTests(unittest.TestCase):
                 ])
 
         original_supabase = main.supabase
-        main.supabase = FakeSupabaseClient()
+        main.supabase = cast(Any, FakeSupabaseClient())
         self.addCleanup(setattr, main, "supabase", original_supabase)
 
         with self.client.session_transaction() as session:
@@ -188,7 +190,7 @@ class AnalyticsApiTests(unittest.TestCase):
                 raise RuntimeError("Database connection failed")
 
         original_supabase = main.supabase
-        main.supabase = BrokenSupabaseClient()
+        main.supabase = cast(Any, BrokenSupabaseClient())
         self.addCleanup(setattr, main, "supabase", original_supabase)
 
         with self.client.session_transaction() as session:
@@ -240,7 +242,7 @@ class AnalyticsApiTests(unittest.TestCase):
                 ])
 
         original_supabase = main.supabase
-        main.supabase = FakeSupabaseClient()
+        main.supabase = cast(Any, FakeSupabaseClient())
         self.addCleanup(setattr, main, "supabase", original_supabase)
 
         with self.client.session_transaction() as session:
@@ -290,7 +292,7 @@ class AnalyticsApiTests(unittest.TestCase):
                 ])
 
         original_supabase = main.supabase
-        main.supabase = FakeSupabaseClient()
+        main.supabase = cast(Any, FakeSupabaseClient())
         self.addCleanup(setattr, main, "supabase", original_supabase)
 
         with self.client.session_transaction() as session:

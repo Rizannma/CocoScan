@@ -414,9 +414,9 @@
             }
 
             .trends-card {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-                margin-bottom: 10px !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
+                margin-bottom: 12px !important;
                 padding: 10px 14px !important;
             }
 
@@ -442,8 +442,8 @@
             }
 
             .affected-locations-block table {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
                 page-break-before: avoid !important;
                 break-before: avoid !important;
                 margin-top: 4px !important;
@@ -454,13 +454,26 @@
             }
 
             table {
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
+                page-break-inside: auto !important;
+                break-inside: auto !important;
                 border-color: #e2e8f0 !important;
                 background: white !important;
                 margin-top: 4px !important;
                 font-size: 0.85rem !important;
                 width: 100% !important;
+            }
+
+            thead {
+                display: table-header-group !important;
+            }
+
+            tfoot {
+                display: table-footer-group !important;
+            }
+
+            tr {
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
             }
 
             th, td {
@@ -590,6 +603,54 @@
                 <div class="chart-container-frame" style="position: relative; height: 260px;">
                     <canvas id="trendChart"></canvas>
                 </div>
+                {% set trend_breakdown = data.dashboard_payload.get('trend_breakdown', []) if data.dashboard_payload is defined else [] %}
+                {% set trend_pests = data.dashboard_payload.get('trend_pests', []) if data.dashboard_payload is defined else [] %}
+                {% set trend_pest_totals = data.dashboard_payload.get('trend_pest_totals', {}) if data.dashboard_payload is defined else {} %}
+                {% set trend_grand_total = data.dashboard_payload.get('trend_grand_total', 0) if data.dashboard_payload is defined else 0 %}
+                <div style="margin-top: 18px;">
+                    <div style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-bottom: 10px;">Pest Trend Breakdown</div>
+                    {% if trend_breakdown and trend_grand_total > 0 %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Timeline / Period</th>
+                                {% for pest in trend_pests %}
+                                {% if 'healthy' not in pest|lower %}
+                                <th style="text-align: right;">{{ pest }}</th>
+                                {% endif %}
+                                {% endfor %}
+                                <th style="text-align: right;">Total Cases</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in trend_breakdown %}
+                            <tr>
+                                <td><strong>{{ row.period }}</strong></td>
+                                {% for pest in trend_pests %}
+                                {% if 'healthy' not in pest|lower %}
+                                <td style="text-align: right;">{{ row.counts.get(pest, 0) }}</td>
+                                {% endif %}
+                                {% endfor %}
+                                <td style="text-align: right; font-weight: 700;">{{ row.total }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: #f8fafc; font-weight: 700; border-top: 2px solid #cbd5e1;">
+                                <td>Total</td>
+                                {% for pest in trend_pests %}
+                                {% if 'healthy' not in pest|lower %}
+                                <td style="text-align: right;">{{ trend_pest_totals.get(pest, 0) }}</td>
+                                {% endif %}
+                                {% endfor %}
+                                <td style="text-align: right; color: #164630;">{{ trend_grand_total }}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    {% else %}
+                    <p style="color: #64748b; font-style: italic; margin: 0;">No trend details available for this period.</p>
+                    {% endif %}
+                </div>
             </div>
             <div class="stat-box trends-card" style="grid-column: 1 / -1;">
                 <h3 style="font-size: 1.1rem; margin-bottom: 15px; color: #1e293b;">Pest Distribution</h3>
@@ -600,7 +661,7 @@
                 {% set distribution_data = data.dashboard_payload.get('distribution_data', []) if data.dashboard_payload is defined else [] %}
                 <div style="margin-top: 18px;">
                     <div style="font-size: 0.95rem; font-weight: 700; color: #1e293b; margin-bottom: 10px;">Distribution Breakdown</div>
-                    {% if distribution_labels and distribution_data %}
+                    {% if distribution_labels and distribution_data and distribution_labels[0] != 'No reports yet' %}
                     <table>
                         <thead>
                             <tr>
@@ -610,10 +671,12 @@
                         </thead>
                         <tbody>
                             {% for i in range(distribution_labels|length) %}
+                            {% if 'healthy' not in distribution_labels[i]|lower %}
                             <tr>
                                 <td>{{ distribution_labels[i] }}</td>
                                 <td style="text-align: right; font-weight: 700;">{{ distribution_data[i] }}</td>
                             </tr>
+                            {% endif %}
                             {% endfor %}
                         </tbody>
                     </table>
@@ -723,7 +786,7 @@
 
                     const ctxTrend = trendEl.getContext('2d');
                     const trendLabels = chartPayload && Array.isArray(chartPayload.trend_labels) && chartPayload.trend_labels.length ? chartPayload.trend_labels : ['No data'];
-                    const trendDatasets = chartPayload && Array.isArray(chartPayload.trend_datasets) && chartPayload.trend_datasets.length ? chartPayload.trend_datasets : [{
+                    let trendDatasets = chartPayload && Array.isArray(chartPayload.trend_datasets) && chartPayload.trend_datasets.length ? chartPayload.trend_datasets : [{
                         label: 'No reports yet',
                         data: [0],
                         borderColor: '#94a3b8',
@@ -733,6 +796,19 @@
                         pointRadius: 3,
                         fill: true
                     }];
+                    trendDatasets = trendDatasets.filter(d => !String(d.label || '').toLowerCase().includes('healthy'));
+                    if (!trendDatasets.length) {
+                        trendDatasets = [{
+                            label: 'No reports yet',
+                            data: [0],
+                            borderColor: '#94a3b8',
+                            backgroundColor: 'rgba(148, 163, 184, 0.15)',
+                            borderWidth: 2,
+                            tension: 0.2,
+                            pointRadius: 3,
+                            fill: true
+                        }];
+                    }
                     new Chart(ctxTrend, {
                         type: 'line',
                         data: {
@@ -767,13 +843,24 @@
                     } catch (e) {}
 
                     const ctxDist = distEl.getContext('2d');
-                    const distributionLabels = Array.isArray(chartPayload?.distribution_labels) && chartPayload.distribution_labels.length ? chartPayload.distribution_labels : ['No reports yet'];
-                    const distributionData = Array.isArray(chartPayload?.distribution_data) && chartPayload.distribution_data.length ? chartPayload.distribution_data : [0];
+                    const rawDistLabels = Array.isArray(chartPayload?.distribution_labels) && chartPayload.distribution_labels.length ? chartPayload.distribution_labels : ['No reports yet'];
+                    const rawDistData = Array.isArray(chartPayload?.distribution_data) && chartPayload.distribution_data.length ? chartPayload.distribution_data : [0];
+                    let distributionLabels = [];
+                    let distributionData = [];
+                    for (let i = 0; i < rawDistLabels.length; i++) {
+                        if (!String(rawDistLabels[i]).toLowerCase().includes('healthy')) {
+                            distributionLabels.push(rawDistLabels[i]);
+                            distributionData.push(rawDistData[i] || 0);
+                        }
+                    }
+                    if (!distributionLabels.length) {
+                        distributionLabels = ['No reports yet'];
+                        distributionData = [0];
+                    }
                     const distributionColors = distributionLabels.map((label) => {
                         const l = String(label).toLowerCase();
                         if (l.includes('brontispa') || l.includes('leaf beetle')) return '#164630';
                         if (l.includes('rhino') || l.includes('beetle')) return '#d97706';
-                        if (l.includes('healthy')) return '#22c55e';
                         return '#0f766e';
                     });
                     new Chart(ctxDist, {

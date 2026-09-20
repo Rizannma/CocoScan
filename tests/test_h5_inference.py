@@ -38,7 +38,13 @@ class TestH5Inference(unittest.TestCase):
     def test_model_paths_exist(self):
         pest_path = get_pest_model_path()
         self.assertTrue(pest_path.exists(), f"Pest model does not exist at {pest_path}")
-        self.assertTrue(str(pest_path).endswith("pest_classifier.h5"))
+        self.assertTrue(
+            str(pest_path).endswith("pest_classifier.tflite") or str(pest_path).endswith("pest_classifier.h5")
+        )
+
+    def test_tflite_model_used_by_default(self):
+        from model.inference import get_active_model_format
+        self.assertEqual(get_active_model_format(), "tflite")
 
     def test_global_preload_models(self):
         pest_model = preload_models()
