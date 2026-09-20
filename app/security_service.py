@@ -7,7 +7,8 @@ import logging
 import requests
 import secrets
 import hashlib
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any, Optional, Tuple, List
 
 logger = logging.getLogger(__name__)
 
@@ -15,9 +16,18 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "cocoscan_security.db")
 OTP_EXPIRY_SECONDS = 90
 OTP_RESEND_COOLDOWN_SECONDS = 45
 
+_db_initialized = False
+
 def _get_db():
+    global _db_initialized
     conn = sqlite3.connect(DB_PATH, timeout=15)
     conn.row_factory = sqlite3.Row
+    if not _db_initialized:
+        _db_initialized = True
+        try:
+            init_security_db()
+        except Exception:
+            pass
     return conn
 
 def init_security_db():
@@ -456,6 +466,12 @@ def _use_supabase_security() -> bool:
         return False
     return True
 
+def _get_supabase_client() -> Any:
+    from supabase import create_client
+    url = (os.getenv("SUPABASE_URL") or "").strip()
+    key = (os.getenv("SUPABASE_KEY") or "").strip()
+    return create_client(url, key)
+
 def requires_2fa(email: str, days: int = 7) -> bool:
     """
     Checks if a user requires 2FA verification (every 7 days).
@@ -469,14 +485,12 @@ def requires_2fa(email: str, days: int = 7) -> bool:
     
     if _use_supabase_security():
         try:
-            from supabase import create_client
-            url = os.getenv("SUPABASE_URL")
-            key = os.getenv("SUPABASE_KEY")
-            supabase_client = create_client(url, key)
+            supabase_client: Any = _get_supabase_client()
             response = supabase_client.table("two_factor_auth").select("last_verified_at").eq("email", email).execute()
-            if not response.data or len(response.data) == 0:
+            rows: Any = response.data
+            if not rows or len(rows) == 0:
                 return True
-            last_verified = response.data[0].get("last_verified_at")
+            last_verified = rows[0].get("last_verified_at")
             if not last_verified or (now - float(last_verified)) > (days * 86400):
                 return True
             return False
@@ -503,10 +517,7 @@ def record_2fa_verification(email: str):
     
     if _use_supabase_security():
         try:
-            from supabase import create_client
-            url = os.getenv("SUPABASE_URL")
-            key = os.getenv("SUPABASE_KEY")
-            supabase_client = create_client(url, key)
+            supabase_client: Any = _get_supabase_client()
             supabase_client.table("two_factor_auth").upsert({
                 "email": email,
                 "last_verified_at": now
@@ -535,10 +546,7 @@ def log_audit(email: str, role: str, action: str, details: str, ip_address: str 
     
     if _use_supabase_security():
         try:
-            from supabase import create_client
-            url = os.getenv("SUPABASE_URL")
-            key = os.getenv("SUPABASE_KEY")
-            supabase_client = create_client(url, key)
+            supabase_client: Any = _get_supabase_client()
             supabase_client.table("audit_logs").insert({
                 "timestamp": timestamp,
                 "user_email": email,
@@ -560,21 +568,18 @@ def log_audit(email: str, role: str, action: str, details: str, ip_address: str 
     except Exception as e:
         logger.error(f"Failed to record audit log: {e}")
 
-def get_audit_logs(page: int = 1, per_page: int = 10, search: str = "", action_filter: str = ""):
+def get_audit_logs(page: int = 1, per_page: int = 10, search: str = "", action_filter: str = "") -> Dict[str, Any]:
     """
     Fetches paginated audit logs with search and action filtering.
     Returns: dict with logs, total, page, per_page, total_pages.
     """
-    page = max(1, int(page))
-    per_page = max(1, int(per_page))
+    page = max(1, page)
+    per_page = max(1, per_page)
     offset = (page - 1) * per_page
     
     if _use_supabase_security():
         try:
-            from supabase import create_client
-            url = os.getenv("SUPABASE_URL")
-            key = os.getenv("SUPABASE_KEY")
-            supabase_client = create_client(url, key)
+            supabase_client: Any = _get_supabase_client()
             
             query = supabase_client.table("audit_logs").select("*", count="exact")
             if search and search.strip():
@@ -636,6 +641,52 @@ def get_audit_logs(page: int = 1, per_page: int = 10, search: str = "", action_f
     }
 
 
+def cleanup_old_logs(days: int = 90) -> int:
+    """
+    Removes audit log entries older than the given number of days.
+    Returns the count of deleted records.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff_str = cutoff.strftime("%Y-%m-%d %H:%M:%S UTC")
+    cutoff_iso = cutoff.isoformat()
+
+    deleted = 0
+    if _use_supabase_security():
+        try:
+            supabase_client: Any = _get_supabase_client()
+            res = supabase_client.table("audit_logs").delete().lt("timestamp", cutoff_str).execute()
+            if res.data:
+                deleted += len(res.data)
+        except Exception as e:
+            logger.warning(f"Supabase cleanup_old_logs failed ({e}), continuing with SQLite.")
+
+    try:
+        with _get_db() as conn:
+            cursor = conn.execute("DELETE FROM audit_logs WHERE timestamp < ? OR timestamp < ?", (cutoff_str, cutoff_iso))
+            conn.commit()
+            deleted += cursor.rowcount if cursor.rowcount > 0 else 0
+    except Exception as e:
+        logger.error(f"SQLite cleanup_old_logs failed: {e}")
+
+    return deleted
+
+
+class SecurityService:
+    """Facade class providing object-oriented access to security & audit functions."""
+    @staticmethod
+    def cleanup_old_logs(days: int = 90) -> int:
+        return cleanup_old_logs(days=days)
+
+    @staticmethod
+    def log_audit(email: str, role: str, action: str, details: str, ip_address: str = ""):
+        return log_audit(email=email, role=role, action=action, details=details, ip_address=ip_address)
+
+    @staticmethod
+    def get_audit_logs(page: int = 1, per_page: int = 10, search: str = "", action_filter: str = "") -> Dict[str, Any]:
+        return get_audit_logs(page=page, per_page=per_page, search=search, action_filter=action_filter)
+
+
+
 # --- REMEMBER ME TOKEN MANAGEMENT METHODS (EXCLUSIVELY FOR FARMERS) ---
 
 def create_remember_token(user_id: str, email: str, role: str = "farmer", user_name: str = "") -> tuple[str, float]:
@@ -663,7 +714,7 @@ def create_remember_token(user_id: str, email: str, role: str = "farmer", user_n
         conn.execute("""
             INSERT OR REPLACE INTO remember_tokens (token_hash, user_id, email, role, user_name, created_at, expires_at, last_used_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (token_hash, str(user_id), email, 'farmer', str(user_name or ""), now, expires_at, now))
+        """, (token_hash, user_id, email, 'farmer', user_name or "", now, expires_at, now))
         conn.commit()
         
     return raw_token, expires_at

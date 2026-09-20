@@ -1,0 +1,1803 @@
+{% extends 'components/base_layout.html' %}
+
+{% set active_page = 'storage_backups' %}
+{% set sidebar_role = 'Admin' %}
+{% block title %}CocoScan - Storage &amp; Backups{% endblock %}
+
+{% block mobile_restriction_overlay %}
+<div class="desktop-restriction-overlay">
+    <div class="desktop-card-prompt">
+        <div class="glow-effect"></div>
+        <div class="icon-pulse-container">
+            <div class="ripple-ring ring-1"></div>
+            <div class="ripple-ring ring-2"></div>
+            <i class="fa-solid fa-desktop"></i>
+        </div>
+        <h2>Desktop Access Required</h2>
+        <p>This area is restricted on mobile devices. Please use a desktop or larger screen to manage storage, system backups, and maintenance operations.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block user_role %}PCA Administrator{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Metrics Grid: responsive layout matching dashboard exactly */
+    .metrics-grid-matrix {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        width: 100%;
+    }
+
+    @media (min-width: 1024px) {
+        .metrics-grid-matrix {
+            grid-template-columns: repeat(4, 1fr);
+            gap: 24px;
+        }
+    }
+
+    /* Metric Cards: exact dashboard card style & sizing (no border line) */
+    .metric-card-node {
+        background-color: var(--bg-card, #ffffff);
+        border-radius: 16px;
+        padding: 16px;
+        border: none !important;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .metric-data h5 {
+        font-size: 0.7rem;
+        color: var(--text-muted, #64748b);
+        text-transform: uppercase;
+        font-weight: 700;
+        letter-spacing: 0.2px;
+        margin: 0;
+    }
+
+    .metric-data .metric-count {
+        font-size: 1.85rem;
+        font-weight: 800;
+        color: var(--brand-dark, #0b1315);
+        margin: 2px 0;
+        line-height: 1.1;
+    }
+
+    .metric-data p {
+        font-size: 0.68rem;
+        color: var(--text-muted, #64748b);
+        margin: 0;
+    }
+
+    .metric-icon-box {
+        width: 42px;
+        height: 42px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.15rem;
+        flex-shrink: 0;
+    }
+
+    .metric-card-node.storage .metric-icon-box {
+        color: #164630;
+        background-color: #f0f4f2;
+    }
+
+    .metric-card-node.dataset .metric-icon-box {
+        color: #059669;
+        background-color: #ecfdf5;
+    }
+
+    .metric-card-node.backups .metric-icon-box {
+        color: #2563eb;
+        background-color: #eff6ff;
+    }
+
+    .metric-card-node.limit .metric-icon-box {
+        color: #d97706;
+        background-color: #fffbeb;
+    }
+
+    /* Progress Bar inside Total Storage Card */
+    .storage-progress-wrapper {
+        margin-top: 8px;
+        width: 100%;
+    }
+
+    .storage-progress-bar {
+        width: 100%;
+        height: 6px;
+        background: #e2e8f0;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .storage-progress-fill {
+        height: 100%;
+        background: #164630;
+        border-radius: 999px;
+        transition: width 0.4s ease;
+    }
+
+    .storage-progress-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.68rem;
+        color: #64748b;
+        margin-top: 4px;
+        font-weight: 600;
+    }
+
+    /* Desktop Dashboard Card Sizing */
+    @media (min-width: 1024px) {
+        .metric-card-node {
+            padding: 24px !important;
+            border-radius: 20px !important;
+        }
+
+        .metric-data h5 {
+            font-size: 0.8rem !important;
+        }
+
+        .metric-data .metric-count {
+            font-size: 2.3rem !important;
+            margin: 6px 0 !important;
+            line-height: 1.1 !important;
+        }
+
+        .metric-data p {
+            font-size: 0.78rem !important;
+        }
+
+        .metric-icon-box {
+            width: 52px !important;
+            height: 52px !important;
+            border-radius: 12px !important;
+            font-size: 1.4rem !important;
+        }
+    }
+
+    /* Table Container: matching overview/reports */
+    .reports-table-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid var(--border-light, rgba(0, 0, 0, 0.05));
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: auto;
+    }
+
+    .reports-table-card table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 600px;
+    }
+
+    .reports-table-card thead tr {
+        border-bottom: 2px solid var(--bg-base, #f4f7f5);
+        text-align: left;
+    }
+
+    .reports-table-card th {
+        padding: 12px;
+        color: var(--text-muted, #64748b);
+        font-size: 0.85rem;
+        font-weight: 600;
+        background: transparent;
+    }
+
+    .reports-table-card tbody tr {
+        border-bottom: 1px solid var(--bg-base, #f1f5f9);
+        transition: background-color 0.2s ease;
+    }
+
+    .reports-table-card tbody tr:hover {
+        background-color: #fafbfc;
+    }
+
+    .reports-table-card tbody td {
+        padding: 16px 12px;
+        font-size: 0.9rem;
+        color: #1e293b;
+    }
+
+    .reports-table-card tfoot tr {
+        border-top: 2px solid var(--bg-base, #f4f7f5);
+    }
+
+    .reports-table-card tfoot td {
+        padding: 16px 12px;
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: var(--brand-dark, #0b1315);
+    }
+
+    .folder-path-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #f1f5f9;
+        color: #334155;
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .folder-path-pill i {
+        color: #164630;
+    }
+
+    /* Retention Policy Banner */
+    .retention-policy-banner {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 16px;
+        margin-bottom: 16px;
+        font-size: 0.84rem;
+        color: #475569;
+        line-height: 1.4;
+    }
+
+    .retention-policy-banner i {
+        color: #164630;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    /* Buttons (Strictly FontAwesome icons, NO emojis) */
+    .btn-generate-backup {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #164630;
+        color: #ffffff !important;
+        padding: 9px 18px;
+        border-radius: 10px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-decoration: none;
+        box-shadow: 0 4px 12px rgba(22, 70, 48, 0.18);
+        transition: all 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-generate-backup:hover {
+        background: #0f3122;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(22, 70, 48, 0.28);
+        color: #ffffff !important;
+    }
+
+    .btn-action-download {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 6px;
+        background-color: var(--brand-accent, #10b981);
+        color: #ffffff !important;
+        text-decoration: none;
+        transition: opacity 0.2s ease;
+        border: none;
+        cursor: pointer;
+    }
+
+    .btn-action-download:hover {
+        opacity: 0.9;
+        color: #ffffff !important;
+    }
+
+    .btn-action-delete {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border-radius: 6px;
+        background-color: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fca5a5;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-action-delete:hover {
+        background-color: #dc2626;
+        color: #ffffff;
+        border-color: #dc2626;
+    }
+
+    /* Badges */
+    .badge-backup-type {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .badge-backup-type.daily {
+        background: #eff6ff;
+        color: #1d4ed8;
+        border: 1px solid #bfdbfe;
+    }
+
+    .badge-backup-type.manual {
+        background: #f0fdf4;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    .status-pill-synced {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        background: #ecfdf5;
+        color: #047857;
+        border: 1px solid #a7f3d0;
+    }
+
+    /* Danger Zone Card */
+    .danger-zone-card {
+        background: #ffffff;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1.5px solid #fca5a5;
+        box-shadow: 0 4px 14px rgba(220, 38, 38, 0.05);
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .danger-zone-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 14px;
+        border-bottom: 1px solid #fee2e2;
+        margin-bottom: 16px;
+    }
+
+    .danger-zone-header h3 {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #991b1b;
+        margin: 0;
+    }
+
+    .danger-zone-header i {
+        color: #dc2626;
+        font-size: 1.35rem;
+    }
+
+    .danger-alert-box {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 10px;
+        padding: 12px 16px;
+        color: #991b1b;
+        font-size: 0.85rem;
+        line-height: 1.45;
+        margin-bottom: 18px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .danger-alert-box i {
+        font-size: 1.1rem;
+        margin-top: 2px;
+        flex-shrink: 0;
+    }
+
+    /* Danger Deletion Form Row */
+    .danger-control-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    @media (min-width: 768px) {
+        .danger-control-grid {
+            grid-template-columns: 2fr 1fr;
+            align-items: end;
+        }
+    }
+
+    .danger-input-group label {
+        display: block;
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+
+    /* Segmented Mode Switcher */
+    .danger-tabs-bar {
+        display: inline-flex;
+        background: #f1f5f9;
+        padding: 4px;
+        border-radius: 12px;
+        gap: 4px;
+        margin-bottom: 16px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .danger-tab-btn {
+        padding: 9px 18px;
+        border-radius: 8px;
+        font-size: 0.86rem;
+        font-weight: 600;
+        color: #64748b;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .danger-tab-btn.active {
+        background: #ffffff;
+        color: #0b1315;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+        font-weight: 700;
+    }
+
+    .danger-tab-btn:hover:not(.active) {
+        color: #1e293b;
+        background: rgba(255, 255, 255, 0.5);
+    }
+
+    .danger-tab-btn i {
+        font-size: 0.95rem;
+    }
+
+    .danger-tab-btn.active i {
+        color: #dc2626;
+    }
+
+    /* Modern Styled Dropdown Select Component */
+    .modern-select-container {
+        position: relative;
+        width: 100%;
+    }
+
+    .modern-select {
+        width: 100%;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        background-color: #ffffff;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23475569' stroke-width='2.2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 14px center;
+        background-size: 15px 15px;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 10px;
+        padding: 11px 40px 11px 14px;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s, background-color 0.15s;
+        cursor: pointer;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        box-sizing: border-box;
+    }
+
+    .modern-select:hover {
+        border-color: #94a3b8;
+        background-color: #fcfcfc;
+    }
+
+    .modern-select:focus {
+        border-color: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+        background-color: #ffffff;
+    }
+
+    .modern-input-text {
+        width: 100%;
+        padding: 11px 14px;
+        border-radius: 10px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        font-size: 0.88rem;
+        font-weight: 500;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        box-sizing: border-box;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+
+    .modern-input-text:hover {
+        border-color: #94a3b8;
+    }
+
+    .modern-input-text:focus {
+        border-color: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+    }
+
+    .danger-select-input {
+        width: 100%;
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1.5px solid #cbd5e1;
+        background: #ffffff;
+        font-size: 0.9rem;
+        color: #0f172a;
+        outline: none;
+        transition: border-color 0.2s;
+        box-sizing: border-box;
+    }
+
+    .danger-select-input:focus {
+        border-color: #dc2626;
+    }
+
+    .btn-trigger-danger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        background: #dc2626;
+        color: #ffffff !important;
+        border: none;
+        padding: 11px 20px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
+        width: 100%;
+    }
+
+    .btn-trigger-danger:hover {
+        background: #b91c1c;
+        transform: translateY(-1px);
+        box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
+    }
+
+    /* Confirmation Modal */
+    .danger-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(4px);
+        -webkit-backdrop-filter: blur(4px);
+        z-index: 99999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        box-sizing: border-box;
+    }
+
+    .danger-modal-content {
+        background: #ffffff;
+        border-radius: 20px;
+        max-width: 520px;
+        width: 100%;
+        padding: 28px;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+        border: 1.5px solid #fee2e2;
+        box-sizing: border-box;
+        animation: modalSlideUp 0.2s ease-out;
+    }
+
+    @keyframes modalSlideUp {
+        from {
+            opacity: 0;
+            transform: translateY(16px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .modal-danger-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .modal-danger-header .icon-circle {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: #fee2e2;
+        color: #dc2626;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+        flex-shrink: 0;
+    }
+
+    .modal-danger-header h3 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 800;
+        color: #991b1b;
+    }
+
+    .phrase-instruction-box {
+        background: #f8fafc;
+        border: 1px dashed #cbd5e1;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 14px 0;
+        text-align: center;
+    }
+
+    .phrase-to-type {
+        display: inline-block;
+        background: #fee2e2;
+        color: #991b1b;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        font-size: 0.95rem;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: 1px solid #fca5a5;
+        margin-top: 6px;
+        user-select: all;
+    }
+
+    .confirm-phrase-input {
+        width: 100%;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 2px solid #cbd5e1;
+        font-size: 0.95rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        outline: none;
+        box-sizing: border-box;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        margin-bottom: 18px;
+    }
+
+    .confirm-phrase-input:focus {
+        border-color: #dc2626;
+        box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
+    }
+
+    .modal-actions-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-modal-cancel {
+        background: #f1f5f9;
+        color: #475569;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .btn-modal-cancel:hover {
+        background: #e2e8f0;
+        color: #1e293b;
+    }
+
+    .btn-modal-delete {
+        background: #dc2626;
+        color: #ffffff;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 8px;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-modal-delete:disabled {
+        background: #fca5a5;
+        cursor: not-allowed;
+        opacity: 0.7;
+    }
+
+    .btn-modal-delete:not(:disabled):hover {
+        background: #b91c1c;
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+    }
+
+    .danger-zone-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 14px;
+        padding: 14px 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .danger-zone-item:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    .danger-zone-item-info h4 {
+        margin: 0 0 4px 0;
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #0f172a;
+    }
+
+    .danger-zone-item-info p {
+        margin: 0;
+        font-size: 0.82rem;
+        color: #64748b;
+    }
+
+    .btn-danger-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        color: #dc2626;
+        border: 1px solid #dc2626;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-danger-action:hover {
+        background: #dc2626;
+        color: #ffffff;
+    }
+
+    .flash-alert {
+        padding: 12px 16px;
+        border-radius: 10px;
+        margin-bottom: 16px;
+        font-size: 0.88rem;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: #f0fdf4;
+        color: #166534;
+        border: 1px solid #bbf7d0;
+    }
+
+    .flash-alert.flash-error {
+        background: #fef2f2;
+        color: #991b1b;
+        border: 1px solid #fecaca;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header: matching dashboard-header-container styling & margins -->
+<div class="dashboard-header-container" style="display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 16px; margin-bottom: 8px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0b1315; margin: 0; line-height: 1.1;">Storage &amp; Backups</h1>
+        <p style="font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0;">Centralized file management, system backups, and data cleanup operations.</p>
+    </div>
+</div>
+
+<!-- Flash Notifications -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+        <div class="flash-alert flash-{{ category }}">
+            <i class="fa-solid {% if category == 'error' %}fa-circle-exclamation{% else %}fa-circle-check{% endif %}"></i>
+            <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<!-- Top Metrics Overview Cards: matching dashboard cards styling & sizing -->
+<div class="metrics-grid-matrix">
+    <!-- Card 1: Total Storage Used -->
+    <div class="metric-card-node storage">
+        <div class="metric-data">
+            <h5>Total Storage Used</h5>
+            <div class="metric-count">{{ metrics.total_storage_formatted }}</div>
+            <p>{{ metrics.percent_used }}% of {{ metrics.limit_formatted }}</p>
+        </div>
+        <div class="metric-icon-box">
+            <i class="fa-solid fa-hard-drive"></i>
+        </div>
+    </div>
+
+    <!-- Card 2: Dataset Hub Storage -->
+    <div class="metric-card-node dataset">
+        <div class="metric-data">
+            <h5>Dataset Hub Storage</h5>
+            <div class="metric-count">{{ metrics.dataset_hub.size_formatted }}</div>
+            <p>{{ metrics.dataset_hub.total_samples }} Verified Samples</p>
+        </div>
+        <div class="metric-icon-box">
+            <i class="fa-solid fa-leaf"></i>
+        </div>
+    </div>
+
+    <!-- Card 3: System Backups Storage -->
+    <div class="metric-card-node backups">
+        <div class="metric-data">
+            <h5>System Backups Storage</h5>
+            <div class="metric-count">{{ metrics.system_backups.size_formatted }}</div>
+            <p>{{ metrics.system_backups.count }} Active Backup Archives</p>
+        </div>
+        <div class="metric-icon-box">
+            <i class="fa-solid fa-box-archive"></i>
+        </div>
+    </div>
+
+    <!-- Card 4: Supabase Bucket Capacity -->
+    <div class="metric-card-node limit">
+        <div class="metric-data">
+            <h5>Bucket Capacity</h5>
+            <div class="metric-count">{{ metrics.limit_formatted }}</div>
+            <p>Supabase Cloud Limit</p>
+        </div>
+        <div class="metric-icon-box">
+            <i class="fa-solid fa-cloud"></i>
+        </div>
+    </div>
+</div>
+
+<!-- Dataset Hub Storage Section (Placed after the cards, text matching Folder Structure table) -->
+<div class="reports-table-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: #0b1315; margin: 0; display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-cloud" style="color: #164630;"></i>
+            <span>Dataset Hub Storage Breakdown</span>
+        </h3>
+        <span class="status-pill-synced">
+            <i class="fa-solid fa-circle-check"></i>
+            <span>{{ metrics.dataset_hub.status }}</span>
+        </span>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 35%;">Folder Name</th>
+                <th style="width: 45%;">Class Label</th>
+                <th style="width: 20%; text-align: right;">Storage Size</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cat in metrics.dataset_hub.categories %}
+            <tr>
+                <td>
+                    <span class="folder-path-pill">
+                        <i class="fa-regular fa-folder-open"></i> {{ cat.slug }}/
+                    </span>
+                </td>
+                <td style="font-weight: 500;">{{ cat.label }}</td>
+                <td style="text-align: right; font-weight: 600; color: #0b1315;">{{ cat.size_formatted }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        <tfoot>
+            <tr>
+                <td>Total</td>
+                <td style="color: #64748b;">4 Classes</td>
+                <td style="text-align: right;">{{ metrics.dataset_hub.size_formatted }}</td>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<!-- Database Backups Section: matching overview/reports table style -->
+<div class="reports-table-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 14px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h3 style="font-size: 1.1rem; font-weight: 700; color: #0b1315; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-database" style="color: #164630;"></i>
+                <span>Database Backups</span>
+            </h3>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 2px 0 0 0;">Create manual snapshot dumps and manage database restore archives.</p>
+        </div>
+        <form method="POST" action="{{ url_for('admin_generate_backup') }}" id="generate-backup-form" data-loading-initialized="true" onsubmit="handleGenerateBackupSubmit(event)" style="margin: 0;">
+            <button type="submit" id="btn-generate-backup" class="btn-generate-backup" title="Trigger database snapshot dump">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+                <span id="btn-generate-backup-text">Generate Backup Now</span>
+            </button>
+        </form>
+    </div>
+
+    <!-- 5-Second Generation Progress Container -->
+    <div id="generate-backup-progress-container" style="display: none; margin-bottom: 16px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <span style="font-size: 0.84rem; font-weight: 700; color: #166534; display: flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-circle-notch fa-spin text-success"></i>
+                <span id="generate-progress-status-title">Generating Database Snapshot (5s)...</span>
+            </span>
+            <span id="generate-progress-timer-badge" style="font-size: 0.78rem; font-weight: 700; color: #15803d; background: #fff; padding: 2px 10px; border-radius: 9999px; border: 1px solid #86efac;">5.0s</span>
+        </div>
+        <div style="background: #e2e8f0; height: 7px; border-radius: 9999px; overflow: hidden; margin-bottom: 8px;">
+            <div id="generate-progress-bar-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #10b981, #059669); transition: width 0.15s linear;"></div>
+        </div>
+        <div id="generate-progress-step-text" style="font-size: 0.78rem; color: #166534; line-height: 1.4;">
+            Querying remote database tables &amp; schemas in parallel...
+        </div>
+    </div>
+
+    <!-- Tiered Retention Policy Note Banner -->
+    <div class="retention-policy-banner">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <div>
+            <strong>Tiered Retention Policy:</strong> Daily automated backups are retained for 14 days, weekly backups are preserved for 2 months, and monthly archives are kept for 1 year. Old dumps beyond retention limits are automatically rotated.
+        </div>
+    </div>
+
+    <!-- Backup History Table -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 38%;">File Name</th>
+                <th style="width: 18%;">Type</th>
+                <th style="width: 14%;">Size</th>
+                <th style="width: 18%;">Date Created</th>
+                <th style="width: 12%; text-align: center;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% if backups and backups|length > 0 %}
+                {% for b in backups %}
+                <tr>
+                    <td>
+                        <span style="font-family: monospace; font-size: 0.85rem; background: #f1f5f9; color: #334155; padding: 4px 8px; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+                            <i class="fa-regular fa-file-zipper" style="color: #164630;"></i> {{ b.filename }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge-backup-type {% if b.type == 'Manual' %}manual{% else %}daily{% endif %}">
+                            <i class="fa-solid {% if b.type == 'Manual' %}fa-user-gear{% else %}fa-robot{% endif %}"></i> {{ b.type }}
+                        </span>
+                    </td>
+                    <td style="font-weight: 600; color: #1e293b;">{{ b.size_formatted }}</td>
+                    <td style="color: #64748b;">{{ b.created_at }}</td>
+                    <td style="text-align: center;">
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                            <a href="{{ url_for('admin_download_backup', filename=b.filename) }}" class="btn-action-download" title="Download backup archive">
+                                <i class="fa-solid fa-download"></i>
+                                <span>Download</span>
+                            </a>
+                            <button type="button" class="btn-action-delete" title="Delete backup archive" onclick="openBackupDeleteModal('{{ b.filename }}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 36px 12px; color: #64748b;">
+                        <i class="fa-solid fa-box-open" style="font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px;"></i>
+                        No backup archives generated yet. Click <strong>Generate Backup Now</strong> above to create your first dump.
+                    </td>
+                </tr>
+            {% endif %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Danger Zone & Cascading Report Deletion Section (Unified) -->
+<div class="danger-zone-card">
+    <div class="danger-zone-header">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <div>
+            <h3>Danger Zone: Cascading Report Deletion</h3>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 2px 0 0 0;">Unified cleanup console: Purge specific report instances or execute bulk date-range deletions to permanently reclaim Supabase Cloud Storage.</p>
+        </div>
+    </div>
+
+    <!-- Alert Note -->
+    <div class="danger-alert-box">
+        <i class="fa-solid fa-shield-halved"></i>
+        <div>
+            <strong>High-Security Deletion Protocol:</strong> Every deletion executes a complete cascading cleanup—permanently removing database records, visit schedules, chats, and all associated leaf photos from Supabase Storage. To protect against accidental loss, typing the administrator confirmation phrase is mandatory.
+        </div>
+    </div>
+
+    <!-- Unified Segmented Mode Switcher -->
+    <div class="danger-tabs-bar" role="tablist">
+        <button type="button" class="danger-tab-btn active" id="tab-single-btn" onclick="switchDangerTab('single')">
+            <i class="fa-solid fa-file-circle-xmark"></i>
+            <span>By Specific Report</span>
+        </button>
+        <button type="button" class="danger-tab-btn" id="tab-bulk-btn" onclick="switchDangerTab('bulk')">
+            <i class="fa-solid fa-calendar-xmark"></i>
+            <span>By Date Range / Bulk</span>
+        </button>
+    </div>
+
+    <!-- Unified Panel Container -->
+    <div style="background: #fafafa; border: 1.5px solid #f1f5f9; border-radius: 14px; padding: 20px;">
+        <!-- Tab 1: By Specific Report -->
+        <div id="panel-single-delete" style="display: block;">
+            <div style="margin-bottom: 14px;">
+                <h4 style="font-size: 0.95rem; font-weight: 700; color: #0b1315; margin: 0 0 4px 0;">Target Single Report Deletion</h4>
+                <p style="font-size: 0.82rem; color: #64748b; margin: 0;">Select a recent report from the dropdown or enter an ID to remove the record and permanently delete its images from Cloud Storage.</p>
+            </div>
+            <div class="danger-control-grid">
+                <div class="danger-input-group">
+                    <label for="recent-reports-dropdown" style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                        Select Report to Delete
+                    </label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div class="modern-select-container" style="flex: 2; min-width: 260px;">
+                            <select id="recent-reports-dropdown" class="modern-select" onchange="handleRecentReportChange(this.value)">
+                                <option value="">-- Choose from recent reports --</option>
+                                {% for r in recent_reports %}
+                                <option value="{{ r.id }}" data-label="{{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}">
+                                    {{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div style="flex: 1; min-width: 140px; max-width: 170px;">
+                            <input type="number" id="target-report-id-input" class="modern-input-text" placeholder="Or enter ID..." oninput="handleIdInputChange(this.value)">
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button type="button" class="btn-trigger-danger" onclick="openSingleReportDeleteModal()">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span>Trigger Report Deletion...</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: By Date Range / Bulk -->
+        <div id="panel-bulk-delete" style="display: none;">
+            <div style="margin-bottom: 14px;">
+                <h4 style="font-size: 0.95rem; font-weight: 700; color: #0b1315; margin: 0 0 4px 0;">Bulk Delete by Date Range</h4>
+                <p style="font-size: 0.82rem; color: #64748b; margin: 0;">Batch-delete older agricultural scan reports from a specific Month or an entire Year to efficiently free up database and cloud storage space.</p>
+            </div>
+            <div class="danger-control-grid">
+                <div class="danger-input-group">
+                    <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                        Select Timeframe for Bulk Deletion
+                    </label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div class="modern-select-container" style="flex: 1; min-width: 140px;">
+                            <select id="bulk-delete-year-select" class="modern-select">
+                                {% set current_year = 2026 %}
+                                {% for y in range(current_year, 2019, -1) %}
+                                <option value="{{ y }}" {% if y == current_year %}selected{% endif %}>Year {{ y }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="modern-select-container" style="flex: 1.5; min-width: 200px;">
+                            <select id="bulk-delete-month-select" class="modern-select">
+                                <option value="all">All Months (Full Year)</option>
+                                <option value="1">January (01)</option>
+                                <option value="2">February (02)</option>
+                                <option value="3">March (03)</option>
+                                <option value="4">April (04)</option>
+                                <option value="5">May (05)</option>
+                                <option value="6">June (06)</option>
+                                <option value="7">July (07)</option>
+                                <option value="8">August (08)</option>
+                                <option value="9">September (09)</option>
+                                <option value="10">October (10)</option>
+                                <option value="11">November (11)</option>
+                                <option value="12">December (12)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button type="button" class="btn-trigger-danger" onclick="openBulkDeleteModal()">
+                        <i class="fa-solid fa-calendar-xmark"></i>
+                        <span>Bulk Delete by Date Range</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Secure Confirmation for Cascading Report Deletion (Single & Bulk) -->
+<div id="danger-zone-delete-modal" class="danger-modal-overlay" onclick="handleModalBackdropClick(event)">
+    <div class="danger-modal-content">
+        <div class="modal-danger-header">
+            <div class="icon-circle">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 id="modal-danger-title">Confirm Permanent Report Deletion</h3>
+                <p id="modal-danger-subtitle" style="margin: 0; font-size: 0.8rem; color: #64748b;">Cascading delete &amp; cloud storage reclamation</p>
+            </div>
+        </div>
+
+        <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 12px; font-size: 0.84rem; color: #9f1239; line-height: 1.45; margin-bottom: 14px;">
+            <strong>Warning:</strong> <span id="modal-warning-description">This will permanently delete the targeted report records, visit schedules, chat threads, and delete all corresponding image files from Supabase Storage.</span> An immutable audit trail entry will be recorded.
+        </div>
+
+        <div id="modal-bulk-count-box" style="display: none; margin-bottom: 14px; padding: 12px 14px; border-radius: 8px; font-size: 0.84rem; line-height: 1.45; border: 1px solid transparent;">
+            <div id="modal-bulk-count-text"></div>
+        </div>
+
+        <div class="phrase-instruction-box" id="phrase-instruction-container">
+            <div style="font-size: 0.82rem; color: #475569;">To proceed, type the exact confirmation phrase:</div>
+            <div class="phrase-to-type" id="required-phrase-display">delete report {{ admin_name }}</div>
+        </div>
+
+        <form method="POST" action="{{ url_for('admin_danger_delete_report') }}" id="danger-delete-form" data-loading-initialized="true" onsubmit="handleReportDeleteSubmit(event)">
+            <input type="hidden" name="report_id" id="hidden-delete-report-id" value="">
+            <input type="hidden" name="year" id="hidden-delete-year" value="">
+            <input type="hidden" name="month" id="hidden-delete-month" value="">
+
+            <div id="confirmation-phrase-input-group">
+                <label for="confirm-phrase-input" style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px;">Confirmation Phrase:</label>
+                <input type="text" id="confirm-phrase-input" name="confirmation_phrase" class="confirm-phrase-input" placeholder="Type phrase here..." autocomplete="off" oninput="validateConfirmationPhrase()">
+            </div>
+
+            <!-- 5-Second Processing Progress Container -->
+            <div id="report-delete-progress-container" style="display: none; margin-top: 14px; background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.84rem; font-weight: 700; color: #9b2c2c; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-circle-notch fa-spin text-danger"></i>
+                        <span id="report-progress-status-title">Processing Permanent Deletion (5s)...</span>
+                    </span>
+                    <span id="report-progress-timer-badge" style="font-size: 0.78rem; font-weight: 700; color: #c53030; background: #fff; padding: 2px 10px; border-radius: 9999px; border: 1px solid #feb2b2;">5.0s</span>
+                </div>
+                <div style="background: #e2e8f0; height: 7px; border-radius: 9999px; overflow: hidden; margin-bottom: 8px;">
+                    <div id="report-progress-bar-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #f43f5e, #be123c); transition: width 0.15s linear;"></div>
+                </div>
+                <div id="report-progress-step-text" style="font-size: 0.78rem; color: #742a2a; line-height: 1.4;">
+                    Verifying authorization &amp; locking target records...
+                </div>
+            </div>
+
+            <div class="modal-actions-row" id="report-modal-actions-row">
+                <button type="button" class="btn-modal-cancel" id="btn-modal-cancel" onclick="closeReportDeleteModal()">Cancel</button>
+                <button type="submit" id="danger-delete-submit-btn" class="btn-modal-delete" disabled>
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span id="modal-submit-btn-text">Permanently Delete Report</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Secure Confirmation for Database Backup Deletion -->
+<div id="danger-backup-delete-modal" class="danger-modal-overlay" onclick="handleBackupModalBackdropClick(event)">
+    <div class="danger-modal-content">
+        <div class="modal-danger-header">
+            <div class="icon-circle">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div>
+                <h3 id="modal-backup-danger-title">Confirm Database Backup Deletion</h3>
+                <p id="modal-backup-danger-subtitle" style="margin: 0; font-size: 0.8rem; color: #64748b;">Permanent archive removal &amp; audit logging</p>
+            </div>
+        </div>
+
+        <div style="background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 12px; font-size: 0.84rem; color: #9f1239; line-height: 1.45; margin-bottom: 14px;">
+            <strong>Warning:</strong> This will permanently delete database backup archive <strong id="modal-backup-target-name"></strong>. This snapshot file cannot be restored once deleted. An immutable audit trail entry will be recorded.
+        </div>
+
+        <div class="phrase-instruction-box" id="phrase-backup-instruction-container">
+            <div style="font-size: 0.82rem; color: #475569;">To proceed, type the exact confirmation phrase:</div>
+            <div class="phrase-to-type" id="required-backup-phrase-display">delete backup {{ admin_name }}</div>
+        </div>
+
+        <form method="POST" action="" id="backup-delete-form" data-loading-initialized="true" onsubmit="handleBackupDeleteSubmit(event)">
+            <div id="confirmation-backup-phrase-input-group">
+                <label for="confirm-backup-phrase-input" style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px;">Confirmation Phrase:</label>
+                <input type="text" id="confirm-backup-phrase-input" name="confirmation_phrase" class="confirm-phrase-input" placeholder="Type phrase here..." autocomplete="off" oninput="validateBackupConfirmationPhrase()">
+            </div>
+
+            <!-- 5-Second Processing Progress Container -->
+            <div id="backup-delete-progress-container" style="display: none; margin-top: 14px; background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 14px 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.84rem; font-weight: 700; color: #9b2c2c; display: flex; align-items: center; gap: 8px;">
+                        <i class="fa-solid fa-circle-notch fa-spin text-danger"></i>
+                        <span id="backup-progress-status-title">Processing Backup Deletion (5s)...</span>
+                    </span>
+                    <span id="backup-progress-timer-badge" style="font-size: 0.78rem; font-weight: 700; color: #c53030; background: #fff; padding: 2px 10px; border-radius: 9999px; border: 1px solid #feb2b2;">5.0s</span>
+                </div>
+                <div style="background: #e2e8f0; height: 7px; border-radius: 9999px; overflow: hidden; margin-bottom: 8px;">
+                    <div id="backup-progress-bar-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #f43f5e, #be123c); transition: width 0.15s linear;"></div>
+                </div>
+                <div id="backup-progress-step-text" style="font-size: 0.78rem; color: #742a2a; line-height: 1.4;">
+                    Permanently unlinking archive snapshot from storage...
+                </div>
+            </div>
+
+            <div class="modal-actions-row" id="backup-modal-actions-row">
+                <button type="button" class="btn-modal-cancel" id="btn-backup-modal-cancel" onclick="closeBackupDeleteModal()">Cancel</button>
+                <button type="submit" id="danger-backup-delete-submit-btn" class="btn-modal-delete" disabled>
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span id="backup-modal-submit-btn-text">Permanently Delete Backup</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const activeAdminName = "{{ admin_name }}";
+    const expectedPhrase = ("delete report " + activeAdminName).trim().toLowerCase();
+    const expectedBackupPhrase = ("delete backup " + activeAdminName).trim().toLowerCase();
+    const singleDeleteUrl = "{{ url_for('admin_danger_delete_report') }}";
+    const bulkDeleteUrl = "{{ url_for('admin_danger_bulk_delete_reports') }}";
+    const bulkCountUrl = "{{ url_for('admin_danger_count_bulk') }}";
+
+    function switchDangerTab(mode) {
+        const singleBtn = document.getElementById("tab-single-btn");
+        const bulkBtn = document.getElementById("tab-bulk-btn");
+        const singlePanel = document.getElementById("panel-single-delete");
+        const bulkPanel = document.getElementById("panel-bulk-delete");
+
+        if (mode === "bulk") {
+            singleBtn.classList.remove("active");
+            bulkBtn.classList.add("active");
+            singlePanel.style.display = "none";
+            bulkPanel.style.display = "block";
+        } else {
+            bulkBtn.classList.remove("active");
+            singleBtn.classList.add("active");
+            bulkPanel.style.display = "none";
+            singlePanel.style.display = "block";
+        }
+    }
+
+    function handleRecentReportChange(value) {
+        const targetInput = document.getElementById("target-report-id-input");
+        if (targetInput) {
+            targetInput.value = value;
+        }
+    }
+
+    function handleIdInputChange(value) {
+        const dropdown = document.getElementById("recent-reports-dropdown");
+        if (dropdown) {
+            dropdown.value = value || "";
+        }
+    }
+
+    function setConfirmationPhraseVisibility(visible) {
+        const instructionBox = document.getElementById("phrase-instruction-container");
+        const inputGroup = document.getElementById("confirmation-phrase-input-group");
+        const submitBtn = document.getElementById("danger-delete-submit-btn");
+        const cancelBtn = document.getElementById("btn-modal-cancel");
+
+        if (visible) {
+            if (instructionBox) instructionBox.style.display = "block";
+            if (inputGroup) inputGroup.style.display = "block";
+            if (submitBtn) submitBtn.style.display = "inline-flex";
+            if (cancelBtn) cancelBtn.textContent = "Cancel";
+        } else {
+            if (instructionBox) instructionBox.style.display = "none";
+            if (inputGroup) inputGroup.style.display = "none";
+            if (submitBtn) submitBtn.style.display = "none";
+            if (cancelBtn) cancelBtn.textContent = "Close";
+        }
+    }
+
+    function openSingleReportDeleteModal(reportId) {
+        const idToUse = reportId || (document.getElementById("target-report-id-input") ? document.getElementById("target-report-id-input").value.trim() : "");
+        if (!idToUse) {
+            alert("Please enter or select a valid Report ID to delete.");
+            return;
+        }
+
+        const dropdown = document.getElementById("recent-reports-dropdown");
+        let contextLabel = "Report #" + idToUse;
+        if (dropdown && dropdown.value === idToUse && dropdown.selectedIndex >= 0) {
+            const selectedOpt = dropdown.options[dropdown.selectedIndex];
+            if (selectedOpt && selectedOpt.getAttribute("data-label")) {
+                contextLabel = selectedOpt.getAttribute("data-label");
+            }
+        }
+
+        const form = document.getElementById("danger-delete-form");
+        form.action = singleDeleteUrl;
+        document.getElementById("hidden-delete-report-id").value = idToUse;
+        document.getElementById("hidden-delete-year").value = "";
+        document.getElementById("hidden-delete-month").value = "";
+
+        // Hide bulk count box for single report deletion and ensure phrase is shown
+        const bulkBox = document.getElementById("modal-bulk-count-box");
+        if (bulkBox) bulkBox.style.display = "none";
+        setConfirmationPhraseVisibility(true);
+
+        document.getElementById("modal-danger-title").textContent = "Confirm Permanent Report Deletion";
+        document.getElementById("modal-danger-subtitle").textContent = "Cascading delete for Report #" + idToUse;
+        document.getElementById("modal-warning-description").innerHTML = "This will permanently delete <strong>" + contextLabel + "</strong>, all associated visit schedules, chat threads, and delete all corresponding image files from Supabase Storage.";
+        document.getElementById("modal-submit-btn-text").textContent = "Permanently Delete Report";
+
+        resetAndShowModal();
+    }
+
+    function openBulkDeleteModal() {
+        const yearSelect = document.getElementById("bulk-delete-year-select");
+        const monthSelect = document.getElementById("bulk-delete-month-select");
+        const year = yearSelect ? yearSelect.value : "2026";
+        const month = monthSelect ? monthSelect.value : "all";
+        const monthText = monthSelect ? monthSelect.options[monthSelect.selectedIndex].text : "All Months";
+
+        const form = document.getElementById("danger-delete-form");
+        form.action = bulkDeleteUrl;
+        document.getElementById("hidden-delete-report-id").value = "";
+        document.getElementById("hidden-delete-year").value = year;
+        document.getElementById("hidden-delete-month").value = month;
+
+        const rangeLabel = month === "all" ? "the entire Year " + year : monthText + " " + year;
+
+        document.getElementById("modal-danger-title").textContent = "Confirm Bulk Cascading Deletion";
+        document.getElementById("modal-danger-subtitle").textContent = "Bulk cleanup for " + rangeLabel;
+        document.getElementById("modal-warning-description").innerHTML = "This will permanently batch-delete all reports from <strong>" + rangeLabel + "</strong>, including their supporting photos, visit images, and chat logs, freeing up Supabase storage space.";
+        document.getElementById("modal-submit-btn-text").textContent = "Permanently Bulk Delete";
+
+        // Display bulk items found / not found status inside the confirmation modal
+        const countBox = document.getElementById("modal-bulk-count-box");
+        const countText = document.getElementById("modal-bulk-count-text");
+        if (countBox && countText) {
+            countBox.style.display = "block";
+            countBox.style.background = "#f8fafc";
+            countBox.style.border = "1px solid #e2e8f0";
+            countBox.style.color = "#475569";
+            countText.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px; color: #0284c7;"></i> Checking matching records for <strong>' + rangeLabel + '</strong>...';
+
+            fetch(`${bulkCountUrl}?year=${encodeURIComponent(year)}&month=${encodeURIComponent(month)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.success) {
+                        const count = typeof data.count === "number" ? data.count : 0;
+                        if (count > 0) {
+                            setConfirmationPhraseVisibility(true);
+                            countBox.style.background = "#fff1f2";
+                            countBox.style.border = "1px solid #fecdd3";
+                            countBox.style.color = "#9f1239";
+                            countText.innerHTML = '<i class="fa-solid fa-circle-exclamation" style="margin-right: 6px; color: #e11d48;"></i> Found <strong>' + count + ' report' + (count === 1 ? '' : 's') + '</strong> for ' + data.date_range_label + '. All associated records, visit logs, and cloud storage images will be permanently purged.';
+                        } else {
+                            // No reports found: hide confirmation phrase because there is nothing to delete
+                            setConfirmationPhraseVisibility(false);
+                            countBox.style.background = "#f0fdf4";
+                            countBox.style.border = "1px solid #bbf7d0";
+                            countBox.style.color = "#166534";
+                            countText.innerHTML = '<i class="fa-solid fa-circle-check" style="margin-right: 6px; color: #16a34a;"></i> <strong>No reports found</strong> for ' + data.date_range_label + ' (0 reports found). No records or cloud images will be affected.';
+                        }
+                    } else {
+                        setConfirmationPhraseVisibility(true);
+                        countBox.style.background = "#f8fafc";
+                        countBox.style.border = "1px solid #cbd5e1";
+                        countBox.style.color = "#475569";
+                        countText.innerHTML = '<i class="fa-solid fa-circle-info" style="margin-right: 6px; color: #64748b;"></i> Scope: <strong>' + rangeLabel + '</strong>.';
+                    }
+                })
+                .catch(err => {
+                    setConfirmationPhraseVisibility(true);
+                    countBox.style.background = "#f8fafc";
+                    countBox.style.border = "1px solid #cbd5e1";
+                    countBox.style.color = "#475569";
+                    countText.innerHTML = '<i class="fa-solid fa-circle-info" style="margin-right: 6px; color: #64748b;"></i> Scope: <strong>' + rangeLabel + '</strong>.';
+                });
+        } else {
+            setConfirmationPhraseVisibility(true);
+        }
+
+        resetAndShowModal();
+    }
+
+    window.openReportDeleteModal = openSingleReportDeleteModal;
+
+    let reportProgressTimer = null;
+    let backupProgressTimer = null;
+
+    function normalizePhrase(str) {
+        return (str || "").trim().replace(/\s+/g, " ").toLowerCase();
+    }
+
+    function resetAndShowModal() {
+        if (reportProgressTimer) {
+            clearInterval(reportProgressTimer);
+            reportProgressTimer = null;
+        }
+
+        // Reset display components
+        const progressContainer = document.getElementById("report-delete-progress-container");
+        if (progressContainer) progressContainer.style.display = "none";
+
+        const phraseContainer = document.getElementById("phrase-instruction-container");
+        if (phraseContainer) phraseContainer.style.display = "block";
+
+        const inputGroup = document.getElementById("confirmation-phrase-input-group");
+        if (inputGroup) inputGroup.style.display = "block";
+
+        const actionsRow = document.getElementById("report-modal-actions-row");
+        if (actionsRow) actionsRow.style.display = "flex";
+
+        const input = document.getElementById("confirm-phrase-input");
+        if (input) input.value = "";
+
+        const submitBtn = document.getElementById("danger-delete-submit-btn");
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.remove("btn-loading");
+            submitBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> <span id="modal-submit-btn-text">Permanently Delete Report</span>';
+        }
+
+        const form = document.getElementById("danger-delete-form");
+        if (form) delete form.dataset.submitting;
+
+        document.getElementById("danger-zone-delete-modal").style.display = "flex";
+        setTimeout(() => {
+            if (input && input.offsetParent !== null) {
+                input.focus();
+            }
+        }, 100);
+    }
+
+    function closeReportDeleteModal() {
+        if (reportProgressTimer) {
+            clearInterval(reportProgressTimer);
+            reportProgressTimer = null;
+        }
+        document.getElementById("danger-zone-delete-modal").style.display = "none";
+        const input = document.getElementById("confirm-phrase-input");
+        if (input) input.value = "";
+        const submitBtn = document.getElementById("danger-delete-submit-btn");
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.remove("btn-loading");
+        }
+        const bulkBox = document.getElementById("modal-bulk-count-box");
+        if (bulkBox) bulkBox.style.display = "none";
+        setConfirmationPhraseVisibility(true);
+    }
+
+    function handleModalBackdropClick(event) {
+        if (event.target.id === "danger-zone-delete-modal") {
+            closeReportDeleteModal();
+        }
+    }
+
+    function validateConfirmationPhrase() {
+        const inputVal = document.getElementById("confirm-phrase-input").value;
+        const submitBtn = document.getElementById("danger-delete-submit-btn");
+        if (normalizePhrase(inputVal) === normalizePhrase(expectedPhrase)) {
+            submitBtn.disabled = false;
+        } else {
+            submitBtn.disabled = true;
+        }
+    }
+
+    function handleReportDeleteSubmit(event) {
+        event.preventDefault();
+        const inputVal = document.getElementById("confirm-phrase-input").value;
+        if (normalizePhrase(inputVal) !== normalizePhrase(expectedPhrase)) {
+            return;
+        }
+
+        // Hide inputs & show 5-second progress container
+        const phraseContainer = document.getElementById("phrase-instruction-container");
+        if (phraseContainer) phraseContainer.style.display = "none";
+
+        const inputGroup = document.getElementById("confirmation-phrase-input-group");
+        if (inputGroup) inputGroup.style.display = "none";
+
+        const actionsRow = document.getElementById("report-modal-actions-row");
+        if (actionsRow) actionsRow.style.display = "none";
+
+        const progressContainer = document.getElementById("report-delete-progress-container");
+        if (progressContainer) progressContainer.style.display = "block";
+
+        const progressBar = document.getElementById("report-progress-bar-fill");
+        const timerBadge = document.getElementById("report-progress-timer-badge");
+        const stepText = document.getElementById("report-progress-step-text");
+
+        // 5-second countdown timer
+        const totalDurationMs = 5000;
+        const tickMs = 100;
+        let elapsedMs = 0;
+
+        if (reportProgressTimer) clearInterval(reportProgressTimer);
+
+        reportProgressTimer = setInterval(() => {
+            elapsedMs += tickMs;
+            const pct = Math.min(100, Math.round((elapsedMs / totalDurationMs) * 100));
+            if (progressBar) progressBar.style.width = pct + "%";
+
+            const secondsLeft = Math.max(0, ((totalDurationMs - elapsedMs) / 1000)).toFixed(1);
+            if (timerBadge) timerBadge.textContent = secondsLeft + "s";
+
+            if (stepText) {
+                if (elapsedMs < 1500) {
+                    stepText.textContent = "Verifying authorization & locking target report records...";
+                } else if (elapsedMs < 3500) {
+                    stepText.textContent = "Purging database records & clearing Cloud Storage media...";
+                } else {
+                    stepText.textContent = "Recording audit trail entry & finalizing deletion...";
+                }
+            }
+
+            if (elapsedMs >= totalDurationMs) {
+                clearInterval(reportProgressTimer);
+                reportProgressTimer = null;
+                if (timerBadge) timerBadge.textContent = "Complete!";
+                if (progressBar) progressBar.style.width = "100%";
+                // Redirect on completion of 5-second process
+                window.location.href = "{{ url_for('admin_storage_backups') }}";
+            }
+        }, tickMs);
+
+        // Execute form post via fetch asynchronously
+        const form = document.getElementById("danger-delete-form");
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        }).catch(err => {
+            console.error("Report deletion fetch error:", err);
+        });
+    }
+
+    /* Database Backup Deletion Modal Handlers */
+    function openBackupDeleteModal(filename) {
+        if (backupProgressTimer) {
+            clearInterval(backupProgressTimer);
+            backupProgressTimer = null;
+        }
+
+        const form = document.getElementById("backup-delete-form");
+        form.action = "{{ url_for('admin_delete_backup', filename='BACKUP_PLACEHOLDER') }}".replace('BACKUP_PLACEHOLDER', encodeURIComponent(filename));
+        delete form.dataset.submitting;
+
+        document.getElementById("modal-backup-target-name").textContent = filename;
+        document.getElementById("modal-backup-danger-subtitle").textContent = "Archive: " + filename;
+
+        const progressContainer = document.getElementById("backup-delete-progress-container");
+        if (progressContainer) progressContainer.style.display = "none";
+
+        const phraseContainer = document.getElementById("phrase-backup-instruction-container");
+        if (phraseContainer) phraseContainer.style.display = "block";
+
+        const inputGroup = document.getElementById("confirmation-backup-phrase-input-group");
+        if (inputGroup) inputGroup.style.display = "block";
+
+        const actionsRow = document.getElementById("backup-modal-actions-row");
+        if (actionsRow) actionsRow.style.display = "flex";
+
+        const input = document.getElementById("confirm-backup-phrase-input");
+        if (input) input.value = "";
+
+        const submitBtn = document.getElementById("danger-backup-delete-submit-btn");
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.remove("btn-loading");
+            submitBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i> <span id="backup-modal-submit-btn-text">Permanently Delete Backup</span>';
+        }
+
+        document.getElementById("danger-backup-delete-modal").style.display = "flex";
+        setTimeout(() => {
+            if (input) input.focus();
+        }, 100);
+    }
+
+    function closeBackupDeleteModal() {
+        if (backupProgressTimer) {
+            clearInterval(backupProgressTimer);
+            backupProgressTimer = null;
+        }
+        document.getElementById("danger-backup-delete-modal").style.display = "none";
+        const input = document.getElementById("confirm-backup-phrase-input");
+        if (input) input.value = "";
+        const submitBtn = document.getElementById("danger-backup-delete-submit-btn");
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.classList.remove("btn-loading");
+        }
+    }
+
+    function handleBackupModalBackdropClick(event) {
+        if (event.target.id === "danger-backup-delete-modal") {
+            closeBackupDeleteModal();
+        }
+    }
+
+    function validateBackupConfirmationPhrase() {
+        const inputVal = document.getElementById("confirm-backup-phrase-input").value;
+        const submitBtn = document.getElementById("danger-backup-delete-submit-btn");
+        if (normalizePhrase(inputVal) === normalizePhrase(expectedBackupPhrase)) {
+            submitBtn.disabled = false;
+        } else {
+            submitBtn.disabled = true;
+        }
+    }
+
+    function handleBackupDeleteSubmit(event) {
+        event.preventDefault();
+        const inputVal = document.getElementById("confirm-backup-phrase-input").value;
+        if (normalizePhrase(inputVal) !== normalizePhrase(expectedBackupPhrase)) {
+            return;
+        }
+
+        // Hide inputs & show 5-second progress container
+        const phraseContainer = document.getElementById("phrase-backup-instruction-container");
+        if (phraseContainer) phraseContainer.style.display = "none";
+
+        const inputGroup = document.getElementById("confirmation-backup-phrase-input-group");
+        if (inputGroup) inputGroup.style.display = "none";
+
+        const actionsRow = document.getElementById("backup-modal-actions-row");
+        if (actionsRow) actionsRow.style.display = "none";
+
+        const progressContainer = document.getElementById("backup-delete-progress-container");
+        if (progressContainer) progressContainer.style.display = "block";
+
+        const progressBar = document.getElementById("backup-progress-bar-fill");
+        const timerBadge = document.getElementById("backup-progress-timer-badge");
+        const stepText = document.getElementById("backup-progress-step-text");
+
+        // 5-second countdown timer
+        const totalDurationMs = 5000;
+        const tickMs = 100;
+        let elapsedMs = 0;
+
+        if (backupProgressTimer) clearInterval(backupProgressTimer);
+
+        backupProgressTimer = setInterval(() => {
+            elapsedMs += tickMs;
+            const pct = Math.min(100, Math.round((elapsedMs / totalDurationMs) * 100));
+            if (progressBar) progressBar.style.width = pct + "%";
+
+            const secondsLeft = Math.max(0, ((totalDurationMs - elapsedMs) / 1000)).toFixed(1);
+            if (timerBadge) timerBadge.textContent = secondsLeft + "s";
+
+            if (stepText) {
+                if (elapsedMs < 1500) {
+                    stepText.textContent = "Verifying administrator authorization & file signature...";
+                } else if (elapsedMs < 3500) {
+                    stepText.textContent = "Unlinking backup snapshot archive from server storage...";
+                } else {
+                    stepText.textContent = "Recording audit trail entry & updating storage metrics...";
+                }
+            }
+
+            if (elapsedMs >= totalDurationMs) {
+                clearInterval(backupProgressTimer);
+                backupProgressTimer = null;
+                if (timerBadge) timerBadge.textContent = "Complete!";
+                if (progressBar) progressBar.style.width = "100%";
+                // Redirect on completion of 5-second process
+                window.location.href = "{{ url_for('admin_storage_backups') }}";
+            }
+        }, tickMs);
+
+        // Execute form post via fetch asynchronously
+        const form = document.getElementById("backup-delete-form");
+        const formData = new FormData(form);
+        fetch(form.action, {
+            method: "POST",
+            body: formData,
+            credentials: "same-origin"
+        }).catch(err => {
+            console.error("Backup deletion fetch error:", err);
+        });
+    }
+
+    let generateProgressTimer = null;
+
+    function handleGenerateBackupSubmit(event) {
+        event.preventDefault();
+        const btn = document.getElementById("btn-generate-backup");
+        if (btn) {
+            btn.disabled = true;
+            btn.style.opacity = "0.6";
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> <span>Generating...</span>';
+        }
+
+        const progressContainer = document.getElementById("generate-backup-progress-container");
+        if (progressContainer) progressContainer.style.display = "block";
+
+        const progressBar = document.getElementById("generate-progress-bar-fill");
+        const timerBadge = document.getElementById("generate-progress-timer-badge");
+        const stepText = document.getElementById("generate-progress-step-text");
+
+        const totalDurationMs = 5000;
+        const tickMs = 100;
+        let elapsedMs = 0;
+
+        if (generateProgressTimer) clearInterval(generateProgressTimer);
+
+        generateProgressTimer = setInterval(() => {
+            elapsedMs += tickMs;
+            const pct = Math.min(100, Math.round((elapsedMs / totalDurationMs) * 100));
+            if (progressBar) progressBar.style.width = pct + "%";
+
+            const secondsLeft = Math.max(0, ((totalDurationMs - elapsedMs) / 1000)).toFixed(1);
+            if (timerBadge) timerBadge.textContent = secondsLeft + "s";
+
+            if (stepText) {
+                if (elapsedMs < 1500) {
+                    stepText.textContent = "Querying remote database tables & schemas in parallel...";
+                } else if (elapsedMs < 3500) {
+                    stepText.textContent = "Extracting records & compiling snapshot payload...";
+                } else {
+                    stepText.textContent = "Compressing archive (.json.gz) & writing to storage...";
+                }
+            }
+
+            if (elapsedMs >= totalDurationMs) {
+                clearInterval(generateProgressTimer);
+                generateProgressTimer = null;
+                if (timerBadge) timerBadge.textContent = "Complete!";
+                if (progressBar) progressBar.style.width = "100%";
+                window.location.href = "{{ url_for('admin_storage_backups') }}";
+            }
+        }, tickMs);
+
+        const form = document.getElementById("generate-backup-form");
+        fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin"
+        }).catch(err => {
+            console.error("Generate backup fetch error:", err);
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const fillEl = document.getElementById("storage-progress-fill");
+        if (fillEl) {
+            const pct = fillEl.getAttribute("data-progress") || "0";
+            fillEl.style.width = pct + "%";
+        }
+    });
+</script>
+{% endblock %}
+

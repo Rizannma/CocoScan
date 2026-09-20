@@ -125,16 +125,16 @@ def format_report_date(value: Any) -> str:
 
 def build_report_payload(
     *,
-    user_id: str,
+    user_id: str | None = None,
     pest_type: str,
     farmer_notes: str,
     confidence: Any,
-    latitude: str,
-    longitude: str,
-    gps_accuracy: str,
-    location_source: str,
-    photo_taken_at: str,
-    initial_recommendations: Any,
+    latitude: Any = None,
+    longitude: Any = None,
+    gps_accuracy: Any = "",
+    location_source: str = "camera_gps",
+    photo_taken_at: str = "",
+    initial_recommendations: Any = None,
     farmer_name: str = "Farmer",
     created_at: str | None = None,
     submitted_at: str | None = None,
@@ -159,15 +159,17 @@ def build_report_payload(
         initial_recommendations = []
 
     # Convert coordinate strings to floats for database compatibility
+    parsed_lat: float | None = None
     try:
-        latitude = float(latitude) if latitude else None
+        parsed_lat = float(latitude) if latitude else None
     except (ValueError, TypeError):
-        latitude = None
+        parsed_lat = None
     
+    parsed_lng: float | None = None
     try:
-        longitude = float(longitude) if longitude else None
+        parsed_lng = float(longitude) if longitude else None
     except (ValueError, TypeError):
-        longitude = None
+        parsed_lng = None
     
     # Convert confidence to float
     try:
@@ -187,8 +189,8 @@ def build_report_payload(
         "status": status,
         "created_at": created_at,
         "initial_recommendations": initial_recommendations,
-        "latitude": latitude,
-        "longitude": longitude,
+        "latitude": parsed_lat,
+        "longitude": parsed_lng,
         "gps_accuracy": gps_accuracy,
         "location_source": location_source,
         "photo_taken_at": photo_taken_at,

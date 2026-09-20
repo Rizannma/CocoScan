@@ -6,6 +6,7 @@ Implements Farmer-exclusive Remember Me persistence:
 - Standard Active Session Inactivity Timeout: 15 minutes (900 seconds)
 """
 from datetime import datetime, timezone, timedelta
+from typing import Optional, Any
 from flask.sessions import SecureCookieSessionInterface
 from app.route_utils import normalize_role
 
@@ -27,18 +28,18 @@ ROLE_REMEMBER_ME_DAYS = {
 REMEMBER_COOKIE_NAME = "cocoscan_remember_token"
 
 
-def is_farmer_role(role: str) -> bool:
+def is_farmer_role(role: Optional[str] = None) -> bool:
     """Check if the given role is eligible for Remember Me (Farmer only)."""
     return normalize_role(role) in ['farmer', 'offline_farmer']
 
 
-def get_remember_me_days(role: str) -> int:
+def get_remember_me_days(role: Optional[str] = None) -> int:
     """Return the Remember Me lifetime in days (90 for farmers, 0 for other roles)."""
     norm = normalize_role(role)
     return ROLE_REMEMBER_ME_DAYS.get(norm, 0)
 
 
-def get_remember_me_lifetime_seconds(role: str) -> int:
+def get_remember_me_lifetime_seconds(role: Optional[str] = None) -> int:
     """Return the Remember Me lifetime in seconds for the given role."""
     return get_remember_me_days(role) * 24 * 60 * 60
 

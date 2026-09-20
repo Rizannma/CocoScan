@@ -14,6 +14,7 @@ from io import BytesIO
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 from dotenv import load_dotenv
+from typing import Any, Optional, Dict, List, Union
 from supabase import create_client, Client
 from PIL import Image
 import re
@@ -121,9 +122,10 @@ def _jinja_t(key, default=None, **kwargs):
     lang = _get_current_language()
     return t(key, lang=lang, default=default, **kwargs)
 
-app.jinja_env.globals['t'] = _jinja_t
-app.jinja_env.globals['get_active_language'] = _get_current_language
-app.jinja_env.globals['get_all_translations'] = get_all_translations
+jinja_globals: Any = app.jinja_env.globals
+jinja_globals['t'] = _jinja_t
+jinja_globals['get_active_language'] = _get_current_language
+jinja_globals['get_all_translations'] = get_all_translations
 
 @app.context_processor
 def inject_i18n():
@@ -167,9 +169,9 @@ def handle_file_too_large(error):
     )
 
 # Initialize Supabase Client Connection
-url: str = os.getenv("SUPABASE_URL")
-key: str = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+url: str = os.getenv("SUPABASE_URL", "")
+key: str = os.getenv("SUPABASE_KEY", "")
+supabase: Any = create_client(url, key)
 
 
 def normalize_role(value) -> str:
@@ -316,7 +318,7 @@ def _resolve_app_user_id(session_data=None, *, lookup_user_id=None, lookup_email
     email = str(active_session.get("user_email") or active_session.get("email") or "").strip()
     if not email:
         try:
-            email = str(request.cookies.get('cocoscan_user_email') or '').strip()
+            email = (request.cookies.get('cocoscan_user_email') or '').strip()
         except Exception:
             pass
 
@@ -635,7 +637,7 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
 
     norm_status = normalize_report_status(status, default="Under Review")
     now_iso = datetime.now(UTC).isoformat()
-    raw_update = {
+    raw_update: dict[str, Any] = {
         "status": norm_status,
         "updated_at": now_iso,
     }
@@ -666,7 +668,7 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
             elif v is None:
                 update_data[k] = None
             else:
-                update_data[k] = str(v)
+                update_data[k] = v if isinstance(v, str) else str(v)
         else:
             update_data[k] = v
 
@@ -1961,7 +1963,7 @@ def get_current_weather(latitude=14.0708, longitude=121.3256, location_name="San
     if cached and now < cached.get("expires_at", 0):
         return cached["data"].copy()
 
-    weather = {
+    weather: dict[str, Any] = {
         "location": location_name,
         "temp": "--",
         "humidity": "--",
@@ -3235,7 +3237,7 @@ def agriculturist_submit_assessment():
             logger.warning(f"Error fetching reviewer profile: {e}")
 
         from app.recommendations import get_official_recommendations
-        official_recos = get_official_recommendations(target_label)
+        official_recos = get_official_recommendations(str(target_label or "Unknown"))
 
         logger.info(f"Report ID #{report_id} assessment logged by expert #{user_id}.")
         return jsonify({
@@ -3690,7 +3692,7 @@ def agriculturist_finalize_visit_schedule():
             rid = r.get('report_id')
             if rid:
                 latest_active_map[str(rid)] = r
-        conflict_rows = [r for r in latest_active_map.values() if str(r.get('confirmed_date') or '') == str(confirmed_date)]
+        conflict_rows = [r for r in latest_active_map.values() if str(r.get('confirmed_date') or '') == confirmed_date]
         for row in conflict_rows:
             if str(row.get('report_id') or '') == str(report_id):
                 continue
@@ -4175,7 +4177,7 @@ def farmer_submit_report():
             logger.warning(f"Unable to load farmer name for report insert: {str(user_lookup_error)}")
 
         report_payload = build_report_payload(
-            user_id=user_id,
+            user_id=str(user_id or ""),
             pest_type=pest_type,
             farmer_notes=farmer_notes,
             confidence=confidence,
@@ -4403,7 +4405,7 @@ def admin_user_management():
 
     except Exception as e:
         flash(f"Database alignment execution error: {str(e)}", "error")
-        paginated_users, total_pages, current_page = [], 1, 1
+        paginated_users, total_pages, current_page, total_records = [], 1, 1, 0
 
     return render_template(
         'admin_user_management.html', 
@@ -4912,6 +4914,279 @@ def admin_export_dataset_zip():
         logger.error(f"Error exporting dataset ZIP: {e}")
         flash(f"Failed to export dataset ZIP: {str(e)}", "error")
         return redirect(url_for('admin_dataset_hub'))
+
+
+# ==============================================================================
+# Admin Storage, Backups & Danger Zone Management Routes
+# ==============================================================================
+
+@app.route('/admin/storage-backups')
+@require_role('admin')
+def admin_storage_backups():
+    """Dedicated Storage, Backups & Danger Zone admin page."""
+    from app.backup_service import get_storage_metrics, list_backups, get_recent_reports_for_danger_zone
+    metrics = get_storage_metrics(supabase)
+    backups = list_backups()
+    recent_reports = get_recent_reports_for_danger_zone(supabase, limit=20)
+    admin_name = session.get('user_name', 'Administrator')
+    return render_template(
+        'admin_storage_backups.html',
+        user_name=admin_name,
+        admin_name=admin_name,
+        user_role=normalize_role(session.get('user_role')),
+        metrics=metrics,
+        backups=backups,
+        recent_reports=recent_reports,
+    )
+
+
+@app.route('/admin/storage-backups/generate', methods=['POST'])
+@require_role('admin')
+def admin_generate_backup():
+    """Manually trigger a full database backup dump."""
+    try:
+        from app.backup_service import generate_database_backup
+        backup_info = generate_database_backup(supabase, backup_type='Manual')
+        flash(f"Database backup '{backup_info['filename']}' ({backup_info['size_formatted']}) generated successfully.", "success")
+    except Exception as e:
+        logger.error(f"Error generating database backup: {e}")
+        flash(f"Failed to generate backup: {str(e)}", "error")
+    return redirect(url_for('admin_storage_backups'))
+
+
+@app.route('/admin/storage-backups/download/<filename>')
+@require_role('admin')
+def admin_download_backup(filename):
+    """Download a database backup file."""
+    from app.backup_service import get_backup_path
+    filepath = get_backup_path(filename)
+    if not filepath or not filepath.exists():
+        flash("Requested backup file was not found or has expired.", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    return send_file(
+        filepath,
+        mimetype='application/gzip',
+        as_attachment=True,
+        download_name=filename,
+    )
+
+
+@app.route('/admin/storage-backups/delete/<filename>', methods=['POST'])
+@require_role('admin')
+def admin_delete_backup(filename):
+    """Safely delete a database backup file with phrase confirmation and audit logging."""
+    admin_name = session.get('user_name', 'Administrator').strip()
+    admin_id = str(session.get('user_id', 'admin'))
+    admin_email = session.get('user_email', '')
+    import re
+    expected_phrase = re.sub(r'\s+', ' ', f"delete backup {admin_name}").strip().lower()
+
+    submitted_phrase = re.sub(r'\s+', ' ', request.form.get('confirmation_phrase', '')).strip().lower()
+    if submitted_phrase != expected_phrase:
+        flash(f"Confirmation phrase mismatch. Backup deletion cancelled. Required phrase: 'delete backup {admin_name}'", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    try:
+        from app.backup_service import delete_backup
+        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '')
+        success = delete_backup(
+            filename=filename,
+            admin_id=admin_id,
+            admin_name=admin_name,
+            admin_email=admin_email,
+            ip_address=ip_address,
+        )
+        if success:
+            flash(f"Backup archive '{filename}' deleted successfully.", "success")
+        else:
+            flash(f"Could not delete backup '{filename}'. File may not exist.", "error")
+    except Exception as e:
+        logger.error(f"Error deleting backup {filename}: {e}")
+        flash(f"Failed to delete backup: {str(e)}", "error")
+    return redirect(url_for('admin_storage_backups'))
+
+
+@app.route('/admin/storage-backups/danger/delete-report', methods=['POST'])
+@require_role('admin')
+def admin_danger_delete_report():
+    """
+    Danger Zone: Cascading report deletion with typed confirmation phrase verification
+    and automated audit trail logging.
+    """
+    admin_name = session.get('user_name', 'Administrator').strip()
+    admin_id = str(session.get('user_id', 'admin'))
+    admin_email = session.get('user_email', '')
+    import re
+    expected_phrase = re.sub(r'\s+', ' ', f"delete report {admin_name}").strip().lower()
+
+    submitted_phrase = re.sub(r'\s+', ' ', request.form.get('confirmation_phrase', '')).strip().lower()
+    report_id = request.form.get('report_id', '').strip()
+
+    if not report_id:
+        flash("Please specify a valid Report ID to delete.", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    if submitted_phrase != expected_phrase:
+        flash(f"Confirmation phrase mismatch. Deletion cancelled. Required phrase: 'delete report {admin_name}'", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    try:
+        from app.backup_service import delete_report_cascading
+        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '')
+        result = delete_report_cascading(
+            report_id=report_id,
+            admin_id=admin_id,
+            admin_name=admin_name,
+            admin_email=admin_email,
+            supabase_client=supabase,
+            ip_address=ip_address,
+        )
+
+        if result.get("success"):
+            flash(
+                f"Report #{report_id} and {result.get('deleted_images_count', 0)} associated image(s) "
+                f"were permanently purged. Storage reclaimed and audit log recorded.",
+                "success",
+            )
+        else:
+            flash(f"Deletion failed: {result.get('error')}", "error")
+    except Exception as e:
+        logger.error(f"Error during cascading report deletion: {e}")
+        flash(f"Failed to delete report: {str(e)}", "error")
+
+    return redirect(url_for('admin_storage_backups'))
+
+
+@app.route('/admin/storage-backups/danger/prune-cache', methods=['POST'])
+@require_role('admin')
+def admin_danger_prune_cache():
+    """Danger Zone: Clean up temporary files, uploads, and scratch cache."""
+    try:
+        from app.backup_service import prune_temporary_cache
+        res = prune_temporary_cache()
+        flash(f"Pruned {res['pruned_items']} temporary items. Freed {res['freed_formatted']} of storage.", "success")
+    except Exception as e:
+        logger.error(f"Error pruning temporary cache: {e}")
+        flash(f"Failed to prune cache: {str(e)}", "error")
+    return redirect(url_for('admin_storage_backups'))
+
+
+@app.route('/admin/storage-backups/danger/cleanup-logs', methods=['POST'])
+@require_role('admin')
+def admin_danger_cleanup_logs():
+    """Danger Zone: Clean up aged audit logs older than retention period."""
+    try:
+        from app.backup_service import cleanup_old_audit_logs
+        days = request.form.get('retention_days', 90, type=int)
+        res = cleanup_old_audit_logs(days=days)
+        if res.get('success'):
+            flash(f"Cleaned up {res['deleted_records']} audit log records older than {days} days.", "success")
+        else:
+            flash(f"Audit log cleanup encountered an error: {res.get('error')}", "error")
+    except Exception as e:
+        logger.error(f"Error cleaning up old audit logs: {e}")
+        flash(f"Failed to clean up logs: {str(e)}", "error")
+    return redirect(url_for('admin_storage_backups'))
+
+
+@app.route('/admin/storage-backups/danger/count-bulk', methods=['GET'], endpoint='admin_danger_count_bulk')
+@require_role('admin')
+def admin_danger_count_bulk():
+    """Returns the count of reports found for the specified year/month."""
+    year_raw = request.args.get('year', '').strip()
+    month_raw = request.args.get('month', '').strip()
+    try:
+        year = int(year_raw)
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid year', 'count': 0}), 400
+
+    month = None
+    if month_raw and month_raw != 'all':
+        try:
+            month = int(month_raw)
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'error': 'Invalid month', 'count': 0}), 400
+
+    from app.backup_service import count_reports_by_date_range
+    result = count_reports_by_date_range(year=year, month=month, supabase_client=supabase)
+    return jsonify(result)
+
+
+@app.route('/admin/storage-backups/danger/bulk-delete', methods=['POST'], endpoint='admin_danger_bulk_delete_reports')
+@app.route('/admin/danger-zone/bulk-delete-reports', methods=['POST'], endpoint='admin_danger_bulk_delete_reports_alias')
+@require_role('admin')
+def admin_danger_bulk_delete_reports():
+    """Danger Zone: Bulk cascading deletion of reports by Month or Year."""
+    admin_name = session.get('user_name', 'Administrator')
+    admin_id = str(session.get('user_id', 'admin'))
+    admin_email = session.get('user_email', '')
+    expected_phrase = f"delete report {admin_name}".strip().lower()
+
+    submitted_phrase = request.form.get('confirmation_phrase', '').strip().lower()
+    year_raw = request.form.get('year', '').strip()
+    month_raw = request.form.get('month', '').strip()
+
+    if not year_raw:
+        flash("Please select a valid Year for bulk deletion.", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    try:
+        year = int(year_raw)
+    except ValueError:
+        flash("Invalid Year provided.", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    month: Optional[int] = None
+    if month_raw and month_raw != "all":
+        try:
+            month = int(month_raw)
+        except ValueError:
+            flash("Invalid Month provided.", "error")
+            return redirect(url_for('admin_storage_backups'))
+
+    import re
+    expected_phrase = re.sub(r'\s+', ' ', f"delete report {admin_name}").strip().lower()
+    submitted_phrase = re.sub(r'\s+', ' ', request.form.get('confirmation_phrase', '')).strip().lower()
+
+    if submitted_phrase != expected_phrase:
+        flash(f"Confirmation phrase mismatch. Bulk deletion cancelled. Required phrase: 'delete report {admin_name}'", "error")
+        return redirect(url_for('admin_storage_backups'))
+
+    try:
+        from app.backup_service import bulk_delete_reports_by_date_range
+        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '')
+        result = bulk_delete_reports_by_date_range(
+            year=year,
+            month=month,
+            admin_id=admin_id,
+            admin_name=admin_name,
+            admin_email=admin_email,
+            supabase_client=supabase,
+            ip_address=ip_address,
+        )
+
+        if result.get("success"):
+            del_reports = result.get('deleted_reports_count', 0)
+            del_imgs = result.get('deleted_images_count', 0)
+            label = result.get('date_range_label', '')
+            if del_reports == 0:
+                flash(f"No reports found for {label}. No records were modified.", "info")
+            else:
+                flash(
+                    f"Bulk deletion completed for {label}: Permanently purged {del_reports} report(s) "
+                    f"and {del_imgs} associated image file(s). Storage reclaimed and audit log recorded.",
+                    "success",
+                )
+        else:
+            flash(f"Bulk deletion failed: {result.get('error')}", "error")
+    except Exception as e:
+        logger.error(f"Error during bulk report deletion: {e}")
+        flash(f"Failed to execute bulk deletion: {str(e)}", "error")
+
+    return redirect(url_for('admin_storage_backups'))
+
+
 
 
 @app.route('/logout')
