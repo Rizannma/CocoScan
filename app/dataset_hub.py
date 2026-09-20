@@ -85,7 +85,7 @@ def get_public_storage_url(storage_path: str) -> str:
     """Construct the public HTTP URL for an object in Supabase storage."""
     base_url = os.getenv("SUPABASE_URL", "https://utvltqgxqnpcqrphuojc.supabase.co").rstrip("/")
     bucket = get_storage_bucket()
-    clean_path = str(storage_path).lstrip("/")
+    clean_path = storage_path.lstrip("/")
     return f"{base_url}/storage/v1/object/public/{bucket}/{clean_path}"
 
 
@@ -93,7 +93,7 @@ def normalize_class_label(label: str) -> str:
     """Normalize user or API strings to canonical class names."""
     if not label:
         return "Not a Coconut Leaf Image"
-    cleaned = str(label).strip().lower()
+    cleaned = label.strip().lower()
     if "brontispa" in cleaned or "leaf beetle" in cleaned:
         return "Brontispa"
     if "rhino" in cleaned or "beetle" in cleaned or "oryctes" in cleaned:
@@ -227,8 +227,8 @@ def save_verified_sample(
         "verified_label": canonical_label,
         "original_prediction": original_prediction or "Unknown",
         "is_correction": is_correction,
-        "agriculturist_id": str(agriculturist_id) if agriculturist_id else None,
-        "notes": str(notes or "").strip(),
+        "agriculturist_id": agriculturist_id if agriculturist_id else None,
+        "notes": (notes or "").strip(),
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
@@ -255,7 +255,7 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
             # Query reports with pest_type and images
             rep_resp = (
                 client.table("reports")
-                .select("id, pest_type, image_url, expert_recommendations, reviewer_notes, status, created_at, reviewed_by_id")
+                .select("id, pest_type, image_url, expert_recommendations, final_remarks, status, created_at, reviewed_by_id")
                 .order("created_at", desc=True)
                 .execute()
             )
@@ -272,7 +272,8 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
                 status = str(row.get("status") or "").lower()
                 expert_rec = row.get("expert_recommendations") or []
                 notes = (
-                    row.get("reviewer_notes")
+                    row.get("final_remarks")
+                    or row.get("reviewer_notes")
                     or (expert_rec[0] if isinstance(expert_rec, list) and len(expert_rec) > 0 else "")
                     or ""
                 )

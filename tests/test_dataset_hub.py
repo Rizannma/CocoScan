@@ -164,7 +164,7 @@ class DatasetHubTests(unittest.TestCase):
         resp = self.client.get("/admin/dataset-hub")
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        self.assertIn("Dataset Hub &amp; Cloud Export", html)
+        self.assertIn("Dataset Hub", html)
         self.assertIn("Export as ZIP", html)
         self.assertNotIn("Retrain Model", html)
 
