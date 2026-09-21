@@ -1205,7 +1205,7 @@
                 } else if (pestName.includes("healthy") || pestName.includes("malusog")) {
                     select.value = "Healthy Coconut Leaf";
                     if (customInput) customInput.value = "";
-                } else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) {
+                } else if (pestName.includes("not a coconut") || pestName.includes("not coconut") || pestName.includes("hindi larawan")) {
                     select.value = "Not a Coconut Leaf Image";
                     if (customInput) customInput.value = "";
                 } else {
@@ -3337,7 +3337,7 @@
                     verifiedSelect.value = "Healthy Coconut Leaf";
                     if (customInput) customInput.value = "";
                     if (customWrap) customWrap.style.display = "none";
-                } else if (pestName.includes("not a coconut") || pestName.includes("hindi larawan")) {
+                } else if (pestName.includes("not a coconut") || pestName.includes("not coconut") || pestName.includes("hindi larawan")) {
                     verifiedSelect.value = "Not a Coconut Leaf Image";
                     if (customInput) customInput.value = "";
                     if (customWrap) customWrap.style.display = "none";

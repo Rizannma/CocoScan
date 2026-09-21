@@ -14,6 +14,8 @@ import numpy as np
 from PIL import Image
 
 from model.inference import (
+    PEST_CLASSES,
+    PEST_LABELS,
     clear_inference_memory,
     predict_pest,
     predict_pest_from_base64,
@@ -21,7 +23,13 @@ from model.inference import (
 
 logger = logging.getLogger(__name__)
 
-PEST_LABELS = ["Brontispa", "Healthy Coconut Leaf", "Rhinoceros Beetle", "Not a Coconut Leaf Image"]
+PEST_CLASSES = [
+    "Brontispa",          # Index 0
+    "Healthy",            # Index 1
+    "Not Coconut Leaf",   # Index 2
+    "Rhinoceros",         # Index 3
+]
+PEST_LABELS = PEST_CLASSES
 
 
 def _to_pil_image(image_source: Union[str, np.ndarray, Image.Image]) -> Image.Image:
@@ -82,19 +90,21 @@ def run_full_inference_pipeline(
             model_path=pest_model_path,
         )
         predicted_pest = pest_result["predicted_pest"]
+        canonical_pest = pest_result.get("canonical_pest") or predicted_pest
         confidence_score = pest_result["confidence_score"]
 
         # Safe Precautionary Initial Recommendations
         from app.recommendations import recommend_actions
 
         recommendations_result = recommend_actions(
-            pest=predicted_pest,
+            pest=canonical_pest,
         )
 
         final_result = {
             "success": True,
-            "pest": predicted_pest,
-            "possible_pest_title": f"Possible Pest: {predicted_pest}",
+            "pest": canonical_pest,
+            "raw_pest": predicted_pest,
+            "possible_pest_title": f"Possible Pest: {canonical_pest}",
             "pest_confidence": confidence_score,
             "pest_probabilities": pest_result["probabilities"],
             "recommendations": recommendations_result["recommendation"],
@@ -105,7 +115,7 @@ def run_full_inference_pipeline(
         }
 
         logger.info(
-            f"Pipeline complete: Possible Pest='{predicted_pest}' ({confidence_score:.1%})"
+            f"Pipeline complete: Possible Pest='{canonical_pest}' (raw='{predicted_pest}', {confidence_score:.1%})"
         )
         return final_result
 

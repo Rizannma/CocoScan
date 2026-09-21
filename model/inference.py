@@ -21,12 +21,29 @@ PEST_H5_FILE_NAME = "pest_classifier.h5"
 PEST_MODEL_FILE_NAME = PEST_TFLITE_FILE_NAME
 
 # The trained 4-class pest model output order:
-# [Brontispa, Healthy Coconut Leaf, Rhinoceros Beetle, Not a Coconut Leaf Image]
-PEST_LABELS = ["Brontispa", "Healthy Coconut Leaf", "Rhinoceros Beetle", "Not a Coconut Leaf Image"]
+PEST_CLASSES = [
+    "Brontispa",          # Index 0
+    "Healthy",            # Index 1
+    "Not Coconut Leaf",   # Index 2
+    "Rhinoceros",         # Index 3
+]
+PEST_LABELS = PEST_CLASSES
+
+# Canonical mapping for system-wide display, database storage, and recommendations
+PEST_CANONICAL_MAP = {
+    "Brontispa": "Brontispa",
+    "Healthy": "Healthy Coconut Leaf",
+    "Healthy Coconut Leaf": "Healthy Coconut Leaf",
+    "Not Coconut Leaf": "Not a Coconut Leaf Image",
+    "Not a Coconut Leaf Image": "Not a Coconut Leaf Image",
+    "Rhinoceros": "Rhinoceros Beetle",
+    "Rhinoceros Beetle": "Rhinoceros Beetle",
+}
 
 # Minimum confidence cutoff for acceptable predictions
 MIN_CONFIDENCE_THRESHOLD = 0.25
-NOT_COCONUT_LEAF_LABEL = "Not a Coconut Leaf Image"
+NOT_COCONUT_LEAF_LABEL = "Not Coconut Leaf"
+NOT_COCONUT_LEAF_LABELS = {"Not Coconut Leaf", "Not a Coconut Leaf Image"}
 UNKNOWN_LABEL_BASE = NOT_COCONUT_LEAF_LABEL
 MIN_IMAGE_DIMENSION = 32
 GREEN_MEAN_THRESHOLD = 20.0
@@ -407,7 +424,7 @@ def predict_pest(image: Image.Image, model_path: Optional[str] = None) -> Dict:
         predicted_pest = labels[label_index]
         confidence = float(probabilities[label_index])
 
-        if predicted_pest == NOT_COCONUT_LEAF_LABEL:
+        if predicted_pest in NOT_COCONUT_LEAF_LABELS or label_index == 2:
             raise ValueError(
                 "This appears not to be a coconut leaf image. Please upload a proper coconut leaf photo."
             )
@@ -415,8 +432,11 @@ def predict_pest(image: Image.Image, model_path: Optional[str] = None) -> Dict:
         if confidence < MIN_CONFIDENCE_THRESHOLD:
             raise ValueError("Prediction confidence is too low. Please upload a clearer leaf image.")
 
+        canonical_pest = PEST_CANONICAL_MAP.get(predicted_pest, predicted_pest)
+
         return {
             "predicted_pest": predicted_pest,
+            "canonical_pest": canonical_pest,
             "confidence_score": confidence,
             "probabilities": {labels[idx]: float(probabilities[idx]) for idx in range(len(probabilities))},
         }

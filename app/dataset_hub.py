@@ -48,9 +48,17 @@ SLUG_TO_LABEL: Dict[str, str] = {
     "not_coconut_leaf": "Not a Coconut Leaf Image",
 }
 
+# The trained 4-class pest model output order:
+PEST_CLASSES = [
+    "Brontispa",          # Index 0
+    "Healthy",            # Index 1
+    "Not Coconut Leaf",   # Index 2
+    "Rhinoceros",         # Index 3
+]
+
 # The canonical 4-class output order
 CANONICAL_CLASSES = ["Brontispa", "Healthy Coconut Leaf", "Rhinoceros Beetle", "Not a Coconut Leaf Image"]
-CLASS_TO_INDEX = {name: idx for idx, name in enumerate(CANONICAL_CLASSES)}
+CLASS_TO_INDEX = {name: idx for idx, name in enumerate(PEST_CLASSES)}
 
 
 def get_supabase_client(client: Optional[Any] = None) -> Optional[Any]:

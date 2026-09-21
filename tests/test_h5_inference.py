@@ -9,6 +9,7 @@ from PIL import Image
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from model.inference import (
+    PEST_CLASSES,
     PEST_LABELS,
     get_pest_model_path,
     predict_pest,
@@ -20,12 +21,14 @@ from app.inference_pipeline import run_full_inference_pipeline
 
 
 def _create_synthetic_leaf_image(width: int = 224, height: int = 224) -> Image.Image:
-    """Create a synthetic green leaf-like image for testing."""
-    arr = np.zeros((height, width, 3), dtype=np.uint8)
-    arr[:, :, 0] = 30   # R
-    arr[:, :, 1] = 160  # G (strong green)
-    arr[:, :, 2] = 40   # B
-    return Image.fromarray(arr, "RGB")
+    """Create a synthetic green leaf-like image with natural texture for testing."""
+    rng = np.random.RandomState(42)
+    base = rng.randint(40, 180, (224, 224, 3), dtype=np.uint8)
+    base[:, :, 1] = np.clip(base[:, :, 1].astype(int) + 60, 0, 255).astype(np.uint8)
+    img_base = Image.fromarray(base, "RGB")
+    if (width, height) != (224, 224):
+        return img_base.resize((width, height), Image.Resampling.NEAREST)
+    return img_base
 
 
 def _image_to_base64(image: Image.Image) -> str:
@@ -70,7 +73,11 @@ class TestH5Inference(unittest.TestCase):
         self.assertIn("predicted_pest", result)
         self.assertIn("confidence_score", result)
         self.assertIn("probabilities", result)
-        self.assertIn(result["predicted_pest"], PEST_LABELS)
+        self.assertIn(result["predicted_pest"], PEST_CLASSES)
+        self.assertEqual(
+            PEST_CLASSES,
+            ["Brontispa", "Healthy", "Not Coconut Leaf", "Rhinoceros"],
+        )
         self.assertGreaterEqual(result["confidence_score"], 0.0)
         self.assertLessEqual(result["confidence_score"], 1.0)
         self.assertEqual(len(result["probabilities"]), 4)
