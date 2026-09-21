@@ -12,7 +12,7 @@ try:
     import pillow_heif
     pillow_heif.register_heif_opener()
 except Exception as _heif_init_err:
-    logger.debug(f"pillow_heif opener registration notice: {_heif_init_err}")
+    logger.warning(f"pillow_heif opener registration failed (HEIC support unavailable): {_heif_init_err}")
 
 SAFE_MAX_DIMENSION = 1024
 DEFAULT_JPEG_QUALITY = 85
