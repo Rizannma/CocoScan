@@ -473,7 +473,7 @@ def _do_schedule_time_ranges_overlap(start_time_a, end_time_a, start_time_b, end
 
 
 def _fetch_visit_workflow_payload(report_id):
-    report_response = supabase.table("reports").select("id, status, user_id, reviewed_by_id, farmer_name, visit_request_reason, visit_requested_at, visit_summary, visit_completed_at, final_remarks, visit_reschedule_reason, visit_rescheduled_at, visit_rescheduled_by").eq("id", report_id).execute()
+    report_response = supabase.table("reports").select("id, status, user_id, reviewed_by_id, farmer_name, visit_request_reason, visit_requested_at, visit_summary, visit_completed_at, visit_reschedule_reason, visit_rescheduled_at, visit_rescheduled_by").eq("id", report_id).execute()
     report_row = (getattr(report_response, "data", None) or [{}])[0] if getattr(report_response, "data", None) else {}
 
     chats_response = supabase.table("visit_chats").select("id, sender_id, message, created_at").eq("report_id", report_id).order("created_at", desc=False).execute()
@@ -582,7 +582,11 @@ def _fetch_visit_workflow_payload(report_id):
         schedule_title = "New Schedule Confirmed" if len(schedule_rows) > 1 else "Visit Scheduled"
 
     visit_images_response = supabase.table("visit_images").select("image_url").eq("report_id", report_id).execute()
-    visit_images = [row.get("image_url") for row in getattr(visit_images_response, "data", None) or [] if row.get("image_url")]
+    visit_images = [
+        resolve_report_image_url(row.get("image_url"))
+        for row in getattr(visit_images_response, "data", None) or []
+        if row.get("image_url")
+    ]
 
     return {
         "report": report_row,
@@ -623,8 +627,6 @@ REPORTS_TABLE_COLUMNS = {
     "visit_schedule_time",
     "visit_summary",
     "visit_completed_at",
-    "final_remarks",
-    "feedback",
     "visit_reschedule_reason",
     "visit_rescheduled_at",
     "visit_rescheduled_by",
@@ -1941,6 +1943,33 @@ def _fetch_report_supporting_images(report_ids):
     return grouped_images
 
 
+def _fetch_report_visit_images(report_ids):
+    report_ids = [str(report_id) for report_id in report_ids if report_id is not None]
+    if not report_ids:
+        return {}
+
+    try:
+        response = (
+            supabase.table("visit_images")
+            .select("report_id, image_url")
+            .in_("report_id", report_ids)
+            .order("uploaded_at", desc=False)
+            .execute()
+        )
+    except Exception as error:
+        logger.warning(f"Unable to load visit images: {str(error)}")
+        return {}
+
+    grouped_images = {}
+    for row in getattr(response, "data", None) or []:
+        report_id = str(row.get("report_id") or "").strip()
+        if not report_id:
+            continue
+        grouped_images.setdefault(report_id, []).append(resolve_report_image_url(row.get("image_url") or ""))
+
+    return grouped_images
+
+
 _WEATHER_CACHE = {}
 _WEATHER_CACHE_TTL = 600  # 10 minutes cache duration
 
@@ -2081,9 +2110,11 @@ def _enrich_reports_with_reviewer_info(reports):
     return reports
 
 
-def _build_report_modal_payload(item, *, supporting_images=None, weather=None, default_status="Under Review"):
+def _build_report_modal_payload(item, *, supporting_images=None, visit_images=None, weather=None, default_status="Under Review"):
     if supporting_images is None:
         supporting_images = []
+    if visit_images is None:
+        visit_images = []
     if weather is None:
         weather = {
             "location": "San Pablo City, Laguna",
@@ -2138,6 +2169,10 @@ def _build_report_modal_payload(item, *, supporting_images=None, weather=None, d
         "reviewer_name": item.get("reviewer_name") or "",
         "reviewer_position": item.get("reviewer_position") or "",
         "reviewer_office": item.get("reviewer_office") or "",
+        "visit_summary": item.get("visit_summary") or "",
+        "visit_images": [img for img in visit_images if img],
+        "visit_completed_at": item.get("visit_completed_at") or "",
+        "final_remarks": item.get("final_remarks") or "",
         "weather": weather,
         "weather_status": "down" if weather.get("is_down") else "ready",
     }
@@ -2389,12 +2424,16 @@ def farmer_reports():
             for idx, r in enumerate(report_rows[:3]):
                 logger.info(f"[FARMER_REPORTS]   [{idx}] ID={r.get('id')}, user_id={r.get('user_id')}, pest={r.get('pest_type')}")
             report_rows = _enrich_reports_with_reviewer_info(report_rows)
-            supporting_map = _fetch_report_supporting_images([item.get("id") for item in report_rows])
+            report_ids = [item.get("id") for item in report_rows]
+            supporting_map = _fetch_report_supporting_images(report_ids)
+            visit_images_map = _fetch_report_visit_images(report_ids)
 
             for item in report_rows:
+                item_id_str = str(item.get("id"))
                 payload = _build_report_modal_payload(
                     item,
-                    supporting_images=supporting_map.get(str(item.get("id")), []),
+                    supporting_images=supporting_map.get(item_id_str, []),
+                    visit_images=visit_images_map.get(item_id_str, []),
                     default_status="Pending Assessment",
                 )
 
@@ -2890,16 +2929,20 @@ def agri_resolved_reports():
             .execute()
             
         raw_reports = reports_response.data or []
-        supporting_map = _fetch_report_supporting_images([item.get("id") for item in raw_reports])
+        report_ids = [item.get("id") for item in raw_reports]
+        supporting_map = _fetch_report_supporting_images(report_ids)
+        visit_images_map = _fetch_report_visit_images(report_ids)
         raw_reports = _enrich_reports_with_reviewer_info(raw_reports)
         reviewed_reports_list = []
         
         for item in raw_reports:
             if not is_resolved_report_status(item.get("status")):
                 continue
+            item_id_str = str(item.get("id"))
             payload = _build_report_modal_payload(
                 item,
-                supporting_images=supporting_map.get(str(item.get("id")), []),
+                supporting_images=supporting_map.get(item_id_str, []),
+                visit_images=visit_images_map.get(item_id_str, []),
                 default_status="Resolved",
             )
 
@@ -3398,6 +3441,9 @@ def get_visit_discussion(report_id):
         'visit_rescheduled_at': report_row.get('visit_rescheduled_at') or '',
         'visit_rescheduled_by': report_row.get('visit_rescheduled_by') or '',
         'schedule_title': payload.get('schedule_title', 'Visit Scheduled'),
+        'visit_images': payload.get('visit_images', []),
+        'visit_summary': report_row.get('visit_summary') or '',
+        'report': report_row,
     })
 
 
@@ -3485,9 +3531,11 @@ def get_report_details_json(report_id):
         raw_reports = _enrich_reports_with_reviewer_info(raw_reports)
         item = raw_reports[0]
         supporting_map = _fetch_report_supporting_images([report_id])
+        visit_images_map = _fetch_report_visit_images([report_id])
         payload = _build_report_modal_payload(
             item,
             supporting_images=supporting_map.get(str(report_id), []),
+            visit_images=visit_images_map.get(str(report_id), []),
             default_status="Pending Assessment",
         )
         return jsonify({
@@ -4517,13 +4565,19 @@ def overview_reports():
         reports_response = supabase.table('reports').select('*, visit_chats(count)').order('created_at', desc=True).execute()
         reports = getattr(reports_response, 'data', []) or []
         reports = _enrich_reports_with_reviewer_info(reports)
+        report_ids = [item.get("id") for item in reports]
+        visit_images_map = _fetch_report_visit_images(report_ids)
+        supporting_map = _fetch_report_supporting_images(report_ids)
         
         # Format the date properly for the template
         for report in reports:
+            report_id_str = str(report.get("id"))
             report['formatted_date'] = format_report_date(report.get('created_at'))
             report['normalized_status'] = normalize_report_status(report.get('status'))
             report['formatted_location'] = _format_report_location(report)
             report['badge_style'] = _get_status_badge_style(report.get('status'))
+            report['visit_images'] = visit_images_map.get(report_id_str, [])
+            report['supporting_images'] = supporting_map.get(report_id_str, [])
             
         return render_template(
             'overview_reports.html',
@@ -4791,7 +4845,6 @@ def verify_2fa():
             security_service.log_audit(email, role, "2FA_VERIFIED", "User verified 2FA code successfully", _get_real_ip())
             security_service.log_audit(email, role, "LOGIN", "User successfully logged in", _get_real_ip())
             
-            flash("Two-factor authentication verified!", "success")
             return resp
         else:
             flash(msg, "error")
@@ -4924,6 +4977,11 @@ def admin_export_dataset_zip():
 @require_role('admin')
 def admin_storage_backups():
     """Dedicated Storage, Backups & Danger Zone admin page."""
+    if '_flashes' in session:
+        session['_flashes'] = [
+            (cat, msg) for cat, msg in session.get('_flashes', [])
+            if "two-factor authentication verified" not in str(msg).lower()
+        ]
     from app.backup_service import get_storage_metrics, list_backups, get_recent_reports_for_danger_zone
     metrics = get_storage_metrics(supabase)
     backups = list_backups()

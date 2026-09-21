@@ -320,13 +320,13 @@
     <div id="barangay-dropdown" class="filter-dropdown"
         style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
         <div class="filter-dropdown-panel"
-            style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:220px; max-height:320px; overflow:auto; pointer-events:auto;">
+            style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:220px; max-height:360px; overflow:auto; pointer-events:auto;">
         </div>
     </div>
     <div id="status-dropdown" class="filter-dropdown"
         style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
         <div class="filter-dropdown-panel"
-            style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:220px; max-height:240px; overflow:auto; pointer-events:auto;">
+            style="display:none; position:fixed; z-index:80; background:white; border:1px solid #e2e8f0; box-shadow:0 6px 18px rgba(0,0,0,0.08); border-radius:8px; padding:8px; min-width:220px; max-height:380px; overflow:auto; pointer-events:auto;">
         </div>
     </div>
 </div>
@@ -374,7 +374,41 @@
                 const searchStr = `${item.formatted_date || ""} ${item.formatted_location || ""} ${item.pest_type || ""} ${item.normalized_status || ""} ${item.barangay || ""} ${item.municipality || ""}`.toLowerCase();
                 const matchesSearch = !activeSearchQuery || searchStr.includes(activeSearchQuery);
                 const matchesBarangay = activeBarangayFilter === "all" || String(item.barangay || "").toLowerCase() === activeBarangayFilter.toLowerCase();
-                const matchesStatus = activeStatusFilter === "all" || String(item.status || "").toLowerCase() === activeStatusFilter.toLowerCase() || String(item.normalized_status || "").toLowerCase() === activeStatusFilter.toLowerCase();
+                
+                const itemStatus = String(item.status || "").toLowerCase().trim();
+                const itemNormalized = String(item.normalized_status || "").toLowerCase().trim();
+                const filterStatus = activeStatusFilter.toLowerCase().trim();
+
+                let matchesStatus = (activeStatusFilter === "all");
+                if (!matchesStatus) {
+                    if (filterStatus === "resolved") {
+                        matchesStatus = (
+                            itemStatus === "resolved" ||
+                            itemStatus === "final_remarks_issued" ||
+                            itemStatus === "closed" ||
+                            itemStatus === "completed" ||
+                            itemNormalized === "resolved"
+                        );
+                    } else if (filterStatus === "awaiting confirmed schedule" || filterStatus === "waiting for agriculturist confirmation") {
+                        matchesStatus = (
+                            itemStatus === "awaiting confirmed schedule" ||
+                            itemStatus === "awaiting_confirmed_schedule" ||
+                            itemStatus === "waiting for agriculturist confirmation" ||
+                            itemStatus === "waiting_for_agriculturist_confirmation" ||
+                            itemStatus === "waiting_agriculturist_confirmation" ||
+                            itemStatus === "visit requested" ||
+                            itemStatus === "visit_requested" ||
+                            itemNormalized === "waiting for agriculturist confirmation" ||
+                            itemNormalized === "awaiting confirmed schedule"
+                        );
+                    } else {
+                        matchesStatus = (
+                            itemStatus === filterStatus ||
+                            itemNormalized === filterStatus ||
+                            itemStatus.replace(/_/g, " ") === filterStatus.replace(/_/g, " ")
+                        );
+                    }
+                }
                 const matchesDate = !activeDateFilter || String(item.formatted_date || item.created_at || "").includes(activeDateFilter) || String(item.date || "").includes(activeDateFilter);
                 return matchesSearch && matchesBarangay && matchesStatus && matchesDate;
             });
@@ -403,6 +437,15 @@
             const calBtn = document.getElementById("filter-calendar-btn");
             if (calBtn) {
                 calBtn.classList.toggle("active-chip", Boolean(activeDateFilter));
+            }
+
+            const statusPanel = document.querySelector("#status-dropdown .filter-dropdown-panel");
+            if (statusPanel) {
+                statusPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activeStatusFilter));
+            }
+            const brgyPanel = document.querySelector("#barangay-dropdown .filter-dropdown-panel");
+            if (brgyPanel) {
+                brgyPanel.querySelectorAll(".dropdown-item").forEach(i => i.classList.toggle("selected", i.getAttribute("data-value") === activeBarangayFilter));
             }
         }
 
@@ -552,7 +595,7 @@
         // Build Status Dropdown
         const statusBtn = document.getElementById("filter-status-btn");
         const statusPanel = document.querySelector("#status-dropdown .filter-dropdown-panel");
-        const statusOptions = ["all", "Under Review", "Assessment Issued", "Recommendation Issued", "Visit Requested", "Visit Scheduled", "Visit Completed", "Resolved"];
+        const statusOptions = ["all", "Under Review", "Assessment Issued", "Awaiting Confirmed Schedule", "Recommendation Issued", "Visit Requested", "Visit Scheduled", "Visit Completed", "Resolved"];
         if (statusBtn && statusPanel) {
             let statusHtml = "";
             statusOptions.forEach(s => {

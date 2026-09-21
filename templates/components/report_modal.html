@@ -849,6 +849,16 @@
             <p id="expert-assessment-issuer-note" style="font-size:0.78rem; color:#64748b; font-style:italic; margin:14px 0 0; padding-top:10px; display:none; text-align:right;"></p>
         </div>
 
+        <div class="premium-form-card" id="report-visit-summary-card" style="display:none;">
+            <h4><i class="fa-solid fa-file-lines" style="color:#059669;"></i> <span data-i18n="modal.visit_summary_title">{{ t('modal.visit_summary_title', 'Visit Summary') }}</span></h4>
+            <div id="report-visit-summary-content"></div>
+        </div>
+
+        <div class="premium-form-card" id="report-resolution-details-card" style="display:none;">
+            <h4><i class="fa-solid fa-check-circle" style="color:#059669;"></i> <span data-i18n="modal.resolution_details_title">{{ t('modal.resolution_details_title', 'Resolution Details') }}</span></h4>
+            <div id="report-resolution-details-content"></div>
+        </div>
+
         <div class="premium-form-card" id="report-farmer-feedback-card" style="display:none;">
             <h4 data-i18n="modal.followup_section_title"><i class="fa-solid fa-calendar-check"></i> {{ t('modal.followup_section_title', 'Follow-up') }}</h4>
             <div id="report-farmer-feedback"></div>
@@ -873,6 +883,20 @@
             <button class="btn-control submit-primary" id="report-scan-submit-btn" type="button" onclick="submitReportPayload()" style="display:none;">
                 <i class="fa-solid fa-paper-plane"></i> <span data-i18n="modal.btn_submit_report">{{ t('modal.btn_submit_report', 'Submit Report') }}</span>
             </button>
+        </div>
+    </div>
+    <!-- Fullscreen Photo Viewer Lightbox -->
+    <div id="cocoscan-photo-lightbox" style="display:none; position:fixed; inset:0; z-index:999999; background:rgba(15,23,42,0.88); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); align-items:center; justify-content:center; flex-direction:column; padding:20px; box-sizing:border-box;">
+        <div style="position:absolute; top:20px; right:24px; display:flex; align-items:center; gap:12px; z-index:10;">
+            <a id="cocoscan-photo-download-btn" href="#" download="visit_image.jpg" target="_blank" style="display:inline-flex; align-items:center; gap:8px; background:rgba(255,255,255,0.18); color:#ffffff; border:1px solid rgba(255,255,255,0.35); padding:8px 16px; border-radius:10px; font-size:0.88rem; font-weight:600; text-decoration:none; backdrop-filter:blur(4px); transition:all 0.2s ease; cursor:pointer;" onmouseover="this.style.background='rgba(255,255,255,0.28)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
+                <i class="fa-solid fa-arrow-down-to-line"></i> <span>Download</span>
+            </a>
+            <button type="button" id="cocoscan-photo-close-btn" onclick="window.closeReportPhotoLightbox ? window.closeReportPhotoLightbox() : (document.getElementById('cocoscan-photo-lightbox').style.display='none')" aria-label="Close photo preview" style="background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.35); color:#ffffff; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:1.15rem; cursor:pointer; transition:all 0.2s ease;" onmouseover="this.style.background='rgba(239,68,68,0.85)'" onmouseout="this.style.background='rgba(255,255,255,0.18)'">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div id="cocoscan-photo-lightbox-inner" style="max-width:92vw; max-height:86vh; display:flex; align-items:center; justify-content:center; position:relative;" onclick="event.stopPropagation()">
+            <img id="cocoscan-photo-lightbox-img" src="" alt="Full view photo" style="max-width:92vw; max-height:86vh; object-fit:contain; border-radius:12px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.6); user-select:none;">
         </div>
     </div>
 </div>

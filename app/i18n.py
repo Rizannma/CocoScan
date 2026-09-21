@@ -94,7 +94,7 @@ def resolve_key(data: Dict[str, Any], key: str) -> Optional[Any]:
     return current
 
 
-def t(key: str, lang: Optional[str] = None, default: Optional[str] = None, **kwargs) -> str:
+def t(key: str, lang: Optional[str] = None, default: Optional[Any] = None, **kwargs) -> Any:
     """
     Translates a key for the given language.
     Falls back to English if the translation is missing in the target language.

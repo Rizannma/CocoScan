@@ -253,6 +253,8 @@ def test_initial_recommendations_translations():
     """Verify default recommendation checklist items are translated into Tagalog."""
     recos_en = t("recommendations.initial_items", lang="en")
     recos_tl = t("recommendations.initial_items", lang="tl")
+    assert isinstance(recos_tl, dict)
+    assert isinstance(recos_en, dict)
 
     # Brontispa recommendations
     assert recos_tl["Prune and safely dispose of infested leaves"] == "Putulin at ligtas na sunugin o ibaon ang mga apektadong dahon"
@@ -356,9 +358,12 @@ def test_report_modal_detail_fields_translations():
     assert t("modal.reschedule_btn_submit", lang="en") == "Submit Request"
     assert "Ipasa" in t("modal.reschedule_btn_submit", lang="tl")
 
-    # Resolution details component
     assert t("modal.resolution_details_title", lang="en") == "Resolution Details"
     assert t("modal.resolution_details_title", lang="tl") == "Mga Detalye ng Paglutas"
+    assert t("modal.resolution_expert_assessment_label", lang="en") == "Expert Assessment Given:"
+    assert t("modal.resolution_expert_assessment_label", lang="tl") == "Ibinigay na Pagsusuri ng Eksperto:"
+    assert t("modal.report_summary_resolution_title", lang="en") == "Report Summary Resolution"
+    assert t("modal.report_summary_resolution_title", lang="tl") == "Resolusyon ng Buod ng Ulat"
     assert t("modal.schedule_new_confirmed", lang="en") == "New Schedule Confirmed"
     assert t("modal.schedule_new_confirmed", lang="tl") == "Kumpirmado ang Bagong Iskedyul"
 

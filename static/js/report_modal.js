@@ -42,6 +42,7 @@
     let currentWorkflowDefaultSubmitAction = null;
     let visitDiscussionPollTimer = null;
     const VISIT_DISCUSSION_POLL_INTERVAL_MS = 2500;
+    let currentVisitUploadFiles = [];
 
     function getModalRoot() {
         return document.querySelector("[data-report-modal]");
@@ -297,7 +298,12 @@
     function normalizeList(value) {
         if (Array.isArray(value)) {
             return value
-                .map((item) => String(item ?? "").trim())
+                .map((item) => {
+                    if (typeof item === "object" && item !== null) {
+                        return String(item.image_url || item.url || item.src || "").trim();
+                    }
+                    return String(item ?? "").trim();
+                })
                 .filter(Boolean);
         }
 
@@ -399,6 +405,9 @@
         const rawNotes = reportData.notes || reportData.farmer_notes || reportData.field_notes || "";
         const cleanNotes = cleanFarmerNotes(rawNotes);
         const feedbackData = extractFarmerFeedback(rawNotes, reportData.status);
+        const visitCompletedMatch = String(rawNotes || "").match(/Visit completed:\s*([^\n]+)/i);
+        const extractedVisitSummary = visitCompletedMatch ? visitCompletedMatch[1].trim() : "";
+        const finalVisitSummary = reportData.visit_summary || reportData.visitSummary || extractedVisitSummary || "";
 
         return {
             id: reportData.id ?? null,
@@ -423,12 +432,21 @@
             reviewer_name: reportData.reviewer_name || reportData.reviewerName || "",
             reviewer_position: reportData.reviewer_position || reportData.position_title || "Agriculturist",
             reviewer_office: reportData.reviewer_office || reportData.agency_office || "",
-            farmerFeedbackReason: feedbackData.reason,
-            farmerFeedbackConfirmation: feedbackData.confirmation,
-            farmerSchedules: feedbackData.schedules,
+            farmerFeedbackReason: feedbackData.reason || reportData.farmerFeedbackReason || reportData.farmer_feedback_reason || "",
+            farmerFeedbackConfirmation: feedbackData.confirmation || reportData.farmerFeedbackConfirmation || reportData.farmer_feedback_confirmation || "",
+            farmerSchedules: feedbackData.schedules?.length ? feedbackData.schedules : (reportData.farmerSchedules || []),
             availabilitySlots: normalizeAvailabilitySlots(reportData.availability_slots || reportData.availability || reportData.availabilitySlots || reportData.farmer_availability || feedbackData.schedules?.map((item) => item.date ? `${item.date} ${item.time || "Morning"}`.trim() : "") || []),
             agriBookedSchedules: normalizeAvailabilitySlots(reportData.agri_booked_schedules || reportData.agri_booked_slots || reportData.booked_schedules || []),
             weather: reportData.weather || {},
+            visit_summary: finalVisitSummary,
+            visit_images: normalizeList(reportData.visit_images || reportData.visitImages).map(resolveReportImageUrl),
+            visitImages: normalizeList(reportData.visitImages || reportData.visit_images).map(resolveReportImageUrl),
+            visit_completed_at: reportData.visit_completed_at || reportData.visitCompletedAt || "",
+            final_remarks: reportData.final_remarks || reportData.finalRemarks || "",
+            visitScheduleStamp: reportData.visitScheduleStamp || reportData.schedule_stamp || "",
+            visitScheduleTitle: reportData.visitScheduleTitle || reportData.schedule_title || "",
+            visitChats: Array.isArray(reportData.visitChats) ? reportData.visitChats : (Array.isArray(reportData.visit_chats) ? reportData.visit_chats : []),
+            chat_count: reportData.chat_count ?? 0,
         };
     }
 
@@ -1405,8 +1423,15 @@
             report.schedule = data.schedule || null;
             report.visitScheduleStamp = data.schedule_stamp || "";
             report.visitArchived = Boolean(data.is_archived);
-            report.visitImages = Array.isArray(data.visit_images) ? data.visit_images : [];
-            report.visit_summary = data.report?.visit_summary || "";
+            const rawVisitImages = Array.isArray(data.visit_images) ? data.visit_images : [];
+            report.visitImages = rawVisitImages.map(item => {
+                const rawUrl = typeof item === "object" && item !== null ? (item.image_url || item.url || item.src || "") : item;
+                return resolveReportImageUrl(rawUrl);
+            }).filter(Boolean);
+            report.visit_images = report.visitImages;
+            report.visit_summary = data.visit_summary || data.report?.visit_summary || report.visit_summary || "";
+            report.visit_completed_at = data.report?.visit_completed_at || report.visit_completed_at || "";
+            report.final_remarks = data.report?.final_remarks || report.final_remarks || "";
             report.visitRescheduleReason = data.visit_reschedule_reason || "";
             report.visitRescheduledAt = data.visit_rescheduled_at || "";
             report.visitRescheduledBy = data.visit_rescheduled_by || "";
@@ -1430,6 +1455,10 @@
             return;
         }
         setDisplay(feedbackCard, true, "block");
+        const cardHeader = feedbackCard.querySelector('h4');
+        if (cardHeader) {
+            cardHeader.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
+        }
 
         const isArchived = Boolean(report?.visitArchived);
         const isAgriculturist = mode === "agriculturist";
@@ -1588,7 +1617,7 @@
 
         const h4 = feedbackCard.querySelector('h4');
         if (h4) {
-            if (isArchived || normalizedStatus === "resolved") {
+            if (normalizedStatus === "resolved") {
                 h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${escapeHtml(t('modal.resolution_details_title', 'Resolution Details'))}`;
             } else {
                 h4.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
@@ -2070,6 +2099,242 @@
         });
     }
 
+    function openReportPhotoLightbox(url, filename) {
+        const lightbox = document.getElementById("cocoscan-photo-lightbox");
+        const img = document.getElementById("cocoscan-photo-lightbox-img");
+        const downloadBtn = document.getElementById("cocoscan-photo-download-btn");
+        if (!lightbox || !img) {
+            window.open(url, "_blank");
+            return;
+        }
+
+        const resolvedUrl = resolveReportImageUrl(url);
+        img.src = resolvedUrl;
+        img.alt = filename || "Visit inspection photo";
+
+        if (downloadBtn) {
+            downloadBtn.href = resolvedUrl;
+            downloadBtn.setAttribute("download", filename || "visit_photo.jpg");
+            downloadBtn.onclick = async function (e) {
+                e.preventDefault();
+                try {
+                    const resp = await fetch(resolvedUrl);
+                    if (!resp.ok) throw new Error("Fetch failed");
+                    const blob = await resp.blob();
+                    const blobUrl = URL.createObjectURL(blob);
+                    const link = document.createElement("a");
+                    link.href = blobUrl;
+                    link.download = filename || "visit_photo.jpg";
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+                } catch (err) {
+                    window.open(resolvedUrl, "_blank");
+                }
+            };
+        }
+
+        lightbox.style.display = "flex";
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeReportPhotoLightbox() {
+        const lightbox = document.getElementById("cocoscan-photo-lightbox");
+        const img = document.getElementById("cocoscan-photo-lightbox-img");
+        if (lightbox) {
+            lightbox.style.display = "none";
+        }
+        if (img) {
+            img.src = "";
+        }
+        document.body.style.overflow = "";
+    }
+
+    window.openReportPhotoLightbox = openReportPhotoLightbox;
+    window.closeReportPhotoLightbox = closeReportPhotoLightbox;
+
+    window.handleVisitImageUploadSelection = function(input) {
+        if (!input || !input.files) return;
+        const newFiles = Array.from(input.files);
+        if (newFiles.length > 0) {
+            currentVisitUploadFiles = currentVisitUploadFiles.concat(newFiles);
+            renderVisitUploadPreviews();
+        }
+        input.value = "";
+    };
+
+    window.removeVisitUploadFile = function(index) {
+        if (index >= 0 && index < currentVisitUploadFiles.length) {
+            currentVisitUploadFiles.splice(index, 1);
+            renderVisitUploadPreviews();
+        }
+    };
+
+    function renderVisitUploadPreviews() {
+        const grid = document.getElementById("workflow-visit-preview-grid");
+        const statusText = document.getElementById("workflow-visit-upload-status-text");
+        if (statusText) {
+            statusText.textContent = currentVisitUploadFiles.length > 0
+                ? `${currentVisitUploadFiles.length} photo(s) selected (tap to add more)`
+                : "Tap to open your phone gallery directory";
+        }
+        if (!grid) return;
+        grid.innerHTML = "";
+
+        currentVisitUploadFiles.forEach((file, index) => {
+            const card = document.createElement("div");
+            card.style.cssText = "position:relative; border-radius:12px; overflow:hidden; aspect-ratio:1/1; background:#f8fafb; border:1px solid rgba(0,0,0,0.1); box-shadow:0 1px 3px rgba(0,0,0,0.06);";
+
+            const img = document.createElement("img");
+            try {
+                img.src = URL.createObjectURL(file);
+            } catch (e) {
+                img.src = "";
+            }
+            img.alt = file.name || `Visit image ${index + 1}`;
+            img.style.cssText = "width:100%; height:100%; object-fit:cover; display:block;";
+            card.appendChild(img);
+
+            const removeBtn = document.createElement("button");
+            removeBtn.type = "button";
+            removeBtn.title = "Remove image";
+            removeBtn.setAttribute("aria-label", "Remove image");
+            removeBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            removeBtn.style.cssText = "position:absolute; top:5px; right:5px; border:none; background:#ef4444; color:#ffffff; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:12px; box-shadow:0 2px 5px rgba(0,0,0,0.25); transition:transform 0.15s ease, background 0.15s ease;";
+            removeBtn.onmouseover = () => {
+                removeBtn.style.transform = "scale(1.12)";
+                removeBtn.style.background = "#dc2626";
+            };
+            removeBtn.onmouseout = () => {
+                removeBtn.style.transform = "scale(1)";
+                removeBtn.style.background = "#ef4444";
+            };
+            removeBtn.onclick = (e) => {
+                e.stopPropagation();
+                window.removeVisitUploadFile(index);
+            };
+            card.appendChild(removeBtn);
+
+            grid.appendChild(card);
+        });
+    }
+
+    if (typeof document !== "undefined") {
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") {
+                closeReportPhotoLightbox();
+            }
+        });
+        document.addEventListener("DOMContentLoaded", () => {
+            const lightbox = document.getElementById("cocoscan-photo-lightbox");
+            if (lightbox) {
+                lightbox.addEventListener("click", (e) => {
+                    if (e.target === lightbox) {
+                        closeReportPhotoLightbox();
+                    }
+                });
+            }
+        });
+    }
+
+    function renderVisitSummaryCard(report) {
+        const visitCard = document.getElementById("report-visit-summary-card");
+        const visitContent = document.getElementById("report-visit-summary-content");
+        if (!visitCard || !visitContent) return;
+
+        const visitSummary = String(report?.visit_summary || report?.visitSummary || "").trim();
+        const rawImages = Array.isArray(report?.visitImages) && report.visitImages.length
+            ? report.visitImages
+            : (Array.isArray(report?.visit_images) ? report.visit_images : []);
+        const visitImages = rawImages.map(item => {
+            const rawUrl = typeof item === "object" && item !== null ? (item.image_url || item.url || item.src || "") : item;
+            return resolveReportImageUrl(rawUrl);
+        }).filter(Boolean);
+        const hasVisitSummary = Boolean(visitSummary || visitImages.length > 0);
+
+        if (!hasVisitSummary) {
+            setDisplay(visitCard, false);
+            visitContent.innerHTML = "";
+            return;
+        }
+
+        let html = "";
+        if (visitSummary) {
+            html += `<p style="margin:0; font-size:0.95rem; color:#334155; line-height:1.6; white-space:pre-wrap;">${escapeHtml(visitSummary)}</p>`;
+        }
+        if (visitImages.length > 0) {
+            html += `
+                <div style="display:flex; flex-wrap:wrap; gap:10px; margin-top:${visitSummary ? '12px' : '0'};">
+                    ${visitImages.map((url, idx) => `
+                        <div style="position:relative; border-radius:10px; overflow:hidden; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.08); background:#f8fafc; cursor:pointer;" onclick="openReportPhotoLightbox('${escapeHtml(url)}', 'visit_photo_${idx + 1}.jpg')" title="Click to view full photo">
+                            <img src="${escapeHtml(url)}" alt="Visit photo ${idx + 1}" loading="lazy" style="height:90px; width:130px; object-fit:cover; display:block; transition:transform 0.2s ease;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        visitContent.innerHTML = html;
+        setDisplay(visitCard, true, "block");
+    }
+
+    function renderResolutionDetailsCard(report) {
+        const resolutionCard = document.getElementById("report-resolution-details-card");
+        const resolutionContent = document.getElementById("report-resolution-details-content");
+        if (!resolutionCard || !resolutionContent) return;
+
+        const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+        const normalizedStatus = getStatusKey(report?.status || "");
+        const isResolved = normalizedStatus === "resolved" || String(report?.status || "").toLowerCase() === "resolved";
+
+        if (!isResolved) {
+            setDisplay(resolutionCard, false);
+            resolutionContent.innerHTML = "";
+            return;
+        }
+
+        const hasCompletedVisit = Boolean(
+            report?.visit_summary ||
+            report?.visit_completed_at ||
+            (Array.isArray(report?.visitImages) && report.visitImages.length > 0) ||
+            (Array.isArray(report?.visit_images) && report.visit_images.length > 0)
+        );
+
+        let message = "";
+        if (hasCompletedVisit) {
+            message = `
+                <div style="font-size:0.92rem; color:#334155; line-height:1.5; display:flex; flex-direction:column; gap:8px;">
+                    <div><strong style="color:#1e293b;">${escapeHtml(t('modal.label_outcome', 'Outcome'))}:</strong> ${escapeHtml(t('modal.resolution_visit_completed_text', 'The agriculturist has completed the visit and marked the issue as resolved.'))}</div>
+                    <div style="padding-top:6px; border-top:1px dashed #e2e8f0; margin-top:2px;">
+                        <strong style="color:#1e293b;">${escapeHtml(t('modal.resolution_resolved_on', 'Resolved On:'))}</strong> 
+                        <span style="color:#475569;">${formatTimestamp(report.visit_completed_at || report.updated_at || report.timestamp)}</span>
+                    </div>
+                </div>`;
+        } else {
+            message = `
+                <div style="font-size:0.92rem; color:#334155; line-height:1.5; display:flex; flex-direction:column; gap:8px;">
+                    <div><strong style="color:#1e293b;">${escapeHtml(t('modal.label_outcome', 'Outcome'))}:</strong> ${escapeHtml(t('modal.resolution_outcome_text', 'Issue resolved by following expert assessment.'))}</div>
+                    <div style="padding-top:6px; border-top:1px dashed #e2e8f0; margin-top:2px;">
+                        <strong style="color:#1e293b;">${escapeHtml(t('modal.resolution_resolved_on', 'Resolved On:'))}</strong> 
+                        <span style="color:#475569;">${formatTimestamp(report.updated_at || report.timestamp)}</span>
+                    </div>
+                </div>`;
+        }
+
+        resolutionContent.innerHTML = `
+            <div style="margin-top:4px; display:grid; gap:12px;">
+                ${message}
+            </div>`;
+
+        setDisplay(resolutionCard, true, "block");
+    }
+
+    function renderResolvedDetailsCard(feedbackContainer, feedbackCard, report) {
+        renderVisitSummaryCard(report);
+        renderResolutionDetailsCard(report);
+    }
+
     function renderWorkflowActions(mode, report = currentReportModalRecord) {
         const workflowCard = document.getElementById("workflow-actions-card");
         const workflowHelp = document.getElementById("workflow-actions-help");
@@ -2114,6 +2379,16 @@
             feedbackContainer.innerHTML = "";
             const feedbackCard = document.getElementById('report-farmer-feedback-card');
             if (feedbackCard) setDisplay(feedbackCard, false, 'block');
+        }
+
+        if (normalizedStatus === "resolved") {
+            setDisplay(workflowCard, false, "block");
+            const feedbackCard = document.getElementById('report-farmer-feedback-card');
+            if (feedbackCard) setDisplay(feedbackCard, false, 'block');
+            if (feedbackContainer) feedbackContainer.innerHTML = "";
+            renderVisitSummaryCard(report);
+            renderResolutionDetailsCard(report);
+            return;
         }
 
         if (isVisitDiscussionState) {
@@ -2254,39 +2529,15 @@
                     workflowFormFields.innerHTML = `
                         <div style="display:grid; gap:10px;">
                             <label style="font-size:0.9rem; font-weight:600; color:#334155;">Visit Images</label>
-                            <div class="modern-micro-upload-zone" onclick="${isVisitTimePassed ? "this.querySelector('input').click()" : ""}" style="${isVisitTimePassed ? 'cursor:pointer;' : 'cursor:not-allowed; opacity:0.6;'}">
+                            <div class="modern-micro-upload-zone" onclick="${isVisitTimePassed ? "document.getElementById('workflow-visit-images').click()" : ""}" style="${isVisitTimePassed ? 'cursor:pointer;' : 'cursor:not-allowed; opacity:0.6;'}">
                                 <i class="fa-solid fa-cloud-arrow-up"></i>
                                 <span>Upload Visit Images</span>
-                                <p>Tap to open your phone gallery directory</p>
-                                <input id="workflow-visit-images" type="file" accept="image/*" multiple style="display:none;" ${!isVisitTimePassed ? 'disabled' : ''} onchange="
-                                    const files = this.files;
-                                    const txt = this.parentElement.querySelector('p');
-                                    if (files.length) txt.textContent = files.length + ' file(s) selected';
-                                    else txt.textContent = 'Tap to open your phone gallery directory';
-                                ">
+                                <p id="workflow-visit-upload-status-text">Tap to open your phone gallery directory</p>
+                                <input id="workflow-visit-images" type="file" accept="image/*" multiple style="display:none;" ${!isVisitTimePassed ? 'disabled' : ''} onchange="window.handleVisitImageUploadSelection ? window.handleVisitImageUploadSelection(this) : null">
                             </div>
+                            <div id="workflow-visit-preview-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(85px, 1fr)); gap:10px; margin-top:4px;"></div>
                         </div>`;
-                }
-            } else if (normalizedStatus === "resolved" && report.visit_summary) {
-                if (workflowHeader) {
-                    workflowHeader.innerHTML = '<i class="fa-solid fa-clipboard-check"></i> Visit Summary';
-                }
-                if (workflowInput) {
-                    setDisplay(workflowInput, false);
-                }
-                if (workflowFormFields) {
-                    const visitSummaryHtml = `
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-bottom:16px;">
-                            <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">Visit Summary</h5>
-                            <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(report.visit_summary)}</p>
-                            ${(report.visitImages && report.visitImages.length > 0) ? `
-                                <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
-                                    ${report.visitImages.map(url => `<img src="${url}" style="height:80px; width:120px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open('${url}', '_blank')">`).join('')}
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                    workflowFormFields.innerHTML = visitSummaryHtml;
+                    renderVisitUploadPreviews();
                 }
             }
         } else if (mode === "farmer") {
@@ -2354,55 +2605,27 @@
                         }
                     }
                 }
-            } else if (normalizedStatus === "visit_requested" || normalizedStatus === "resolved") {
+            } else if (normalizedStatus === "visit_requested") {
                 const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
                 if (workflowInput) {
                     setDisplay(workflowInput, false);
                 }
+                const feedbackCard = document.getElementById('report-farmer-feedback-card');
                 if (feedbackContainer) {
                     const reasonDisplay = report.farmerFeedbackReason ? `<p style="margin:0; font-size:0.95rem; color:#334155;"><strong>${escapeHtml(t('modal.label_reason', 'Reason'))}:</strong> ${escapeHtml(report.farmerFeedbackReason)}</p>` : "";
                     const scheduleDisplay = Array.isArray(report.farmerSchedules) && report.farmerSchedules.length
                         ? `<div style="display:grid; gap:6px; padding-top:8px;">${report.farmerSchedules.map(s => `<div style="font-size:0.95rem; color:#0f172a;">• ${escapeHtml(s.display)}</div>`).join("")}</div>`
                         : "";
-
-                    let visitSummaryBlock = "";
-                    if (normalizedStatus === "resolved" && report.visit_summary) {
-                        visitSummaryBlock = `
-                            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-top:12px;">
-                                <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}</h5>
-                                <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(report.visit_summary)}</p>
-                                ${(report.visitImages && report.visitImages.length > 0) ? `
-                                    <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
-                                        ${report.visitImages.map(url => `<img src="${url}" style="height:80px; width:120px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open('${url}', '_blank')">`).join('')}
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `;
-                    }
-
-                    const message = normalizedStatus === "visit_requested"
-                        ? `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.visit_requested_notice', 'Your visit request was submitted successfully. The agriculturist will review your preferred schedules.'))}</p>${reasonDisplay}${scheduleDisplay}`
-                        : (report.visit_summary
-                            ? `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.resolution_visit_completed_text', 'The agriculturist has completed the visit and marked the issue as resolved.'))}</p>${visitSummaryBlock}`
-                            : `
-                            <div style="font-size: 0.8rem; color: #64748b; line-height: 1.3; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-                                <div><strong style="color: #475569;">${escapeHtml(t('modal.label_outcome', 'Outcome'))}:</strong> ${escapeHtml(t('modal.resolution_outcome_text', 'Issue resolved by following expert assessment.'))}</div>
-                                <div><strong style="color: #475569;">${escapeHtml(t('modal.resolution_resolved_on', 'Resolved On:'))}</strong> ${formatTimestamp(report.updated_at || report.timestamp)}</div>
-                            </div>`);
+                    const message = `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.visit_requested_notice', 'Your visit request was submitted successfully. The agriculturist will review your preferred schedules.'))}</p>${reasonDisplay}${scheduleDisplay}`;
                     feedbackContainer.innerHTML = `
                         <div style="margin-top:10px; display:grid; gap:12px;">
                             ${message}
                         </div>`;
-                    const feedbackCard = document.getElementById('report-farmer-feedback-card');
                     if (feedbackCard) {
                         setDisplay(feedbackCard, true, 'block');
                         const h4 = feedbackCard.querySelector('h4');
                         if (h4) {
-                            if (normalizedStatus === "resolved") {
-                                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${escapeHtml(t('modal.resolution_details_title', 'Resolution Details'))}`;
-                            } else {
-                                h4.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
-                            }
+                            h4.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
                         }
                     }
                 }
@@ -2421,53 +2644,7 @@
         }
 
         if (actions.length === 0) {
-            if (normalizedStatus === "resolved") {
-                if (mode === "agriculturist" && report.visit_summary) {
-                    setDisplay(workflowCard, true, "block");
-                } else if (mode === "lgu" || mode === "admin") {
-                    setDisplay(workflowCard, false, "block");
-                    if (feedbackContainer) {
-                        let visitSummaryBlock = "";
-                        if (report.visit_summary) {
-                            visitSummaryBlock = `
-                                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:16px; margin-top:12px;">
-                                    <h5 style="margin:0 0 8px 0; font-size:0.95rem; color:#0f172a; font-weight:600;">${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}</h5>
-                                    <p style="margin:0; font-size:0.9rem; color:#475569; line-height:1.5;">${escapeHtml(report.visit_summary)}</p>
-                                    ${(report.visitImages && report.visitImages.length > 0) ? `
-                                        <div style="display:flex; gap:8px; overflow-x:auto; margin-top:12px; padding-bottom:4px;">
-                                            ${report.visitImages.map(url => `<img src="${url}" style="height:80px; width:120px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; cursor:pointer;" onclick="window.open('${url}', '_blank')">`).join('')}
-                                        </div>
-                                    ` : ''}
-                                </div>
-                            `;
-                        }
-
-                        const message = report.visit_summary
-                            ? `<p style="font-size:0.92rem; color:#334155; margin:0;">${escapeHtml(t('modal.resolution_visit_completed_text', 'The agriculturist has completed the visit and marked the issue as resolved.'))}</p>${visitSummaryBlock}`
-                            : `
-                                <div style="font-size: 0.8rem; color: #64748b; line-height: 1.3; display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-                                    <div><strong style="color: #475569;">${escapeHtml(t('modal.label_outcome', 'Outcome'))}:</strong> ${escapeHtml(t('modal.resolution_outcome_text', 'Issue resolved by following expert assessment.'))}</div>
-                                    <div><strong style="color: #475569;">${escapeHtml(t('modal.resolution_resolved_on', 'Resolved On:'))}</strong> ${formatTimestamp(report.updated_at || report.timestamp)}</div>
-                                </div>`;
-                        feedbackContainer.innerHTML = `
-                            <div style="margin-top:10px; display:grid; gap:12px;">
-                                ${message}
-                            </div>`;
-                        const feedbackCard = document.getElementById('report-farmer-feedback-card');
-                        if (feedbackCard) {
-                            setDisplay(feedbackCard, true, 'block');
-                            const h4 = feedbackCard.querySelector('h4');
-                            if (h4) {
-                                h4.innerHTML = `<i class="fa-solid fa-check-circle"></i> ${escapeHtml(t('modal.resolution_details_title', 'Resolution Details'))}`;
-                            }
-                        }
-                    }
-                } else {
-                    setDisplay(workflowCard, false, "block");
-                }
-            } else {
-                setDisplay(workflowCard, false, "block");
-            }
+            setDisplay(workflowCard, false, "block");
             return;
         }
 
@@ -2870,19 +3047,18 @@
 
         if (actionName === "complete-visit") {
             const detail = (workflowInput?.value || "").trim();
-            const visitImages = document.getElementById("workflow-visit-images")?.files || [];
             if (!detail) {
                 setButtonLoading(activeBtn, false);
                 alert("Please add a visit summary before submitting.");
                 return;
             }
-            if (!visitImages.length) {
+            if (!currentVisitUploadFiles || !currentVisitUploadFiles.length) {
                 setButtonLoading(activeBtn, false);
                 alert("Please upload at least one visit image before submitting.");
                 return;
             }
             formData.append("visit_summary", detail);
-            Array.from(visitImages).forEach((file) => formData.append("visit_images", file));
+            currentVisitUploadFiles.forEach((file) => formData.append("visit_images", file));
             try {
                 const response = await fetch("/agriculturist/complete-visit", { method: "POST", body: formData });
                 const data = await response.json().catch(() => ({}));
@@ -2971,6 +3147,10 @@
     function closeReportModal() {
         abortActiveReportModalSubmission();
         stopVisitDiscussionPoll();
+        currentVisitUploadFiles = [];
+        if (typeof closeReportPhotoLightbox === "function") {
+            closeReportPhotoLightbox();
+        }
 
         const modalRoot = getModalRoot();
         if (modalRoot) {
@@ -3255,6 +3435,8 @@
             applyStatusStyle(report);
             applyModeState(currentReportModalMode, report);
             renderWorkflowActions(currentReportModalMode, report);
+            renderVisitSummaryCard(report);
+            renderResolutionDetailsCard(report);
 
             // Expert card visibility and input controls depend on existing assessment state
             const isAgriMode = ["agriculturist", "agri", "agri_expert"].includes(currentReportModalMode);
@@ -3359,9 +3541,10 @@
                 "waiting_agriculturist_confirmation",
                 "visit_scheduled",
                 "visit_completed",
-                "final_remarks_issued"
+                "final_remarks_issued",
+                "resolved"
             ];
-            if (discussionStatuses.includes(statusKey) || report.chat_count > 0 || report.farmerFeedbackReason) {
+            if (discussionStatuses.includes(statusKey) || report.chat_count > 0 || report.farmerFeedbackReason || report.visit_summary) {
                 try {
                     await loadVisitDiscussion(report);
                     if (currentReportModalRecord?.id === report.id) {

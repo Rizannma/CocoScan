@@ -255,7 +255,7 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
             # Query reports with pest_type and images
             rep_resp = (
                 client.table("reports")
-                .select("id, pest_type, image_url, expert_recommendations, final_remarks, status, created_at, reviewed_by_id")
+                .select("id, pest_type, image_url, expert_recommendations, status, created_at, reviewed_by_id")
                 .order("created_at", desc=True)
                 .execute()
             )
