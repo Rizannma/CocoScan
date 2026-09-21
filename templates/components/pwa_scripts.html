@@ -225,6 +225,33 @@
     <span id="pwa-toast-msg">Notification</span>
 </div>
 
+<!-- iOS PWA Push Guidance Modal -->
+<div id="ios-push-guidance-modal" class="modal-screen-overlay" role="dialog" aria-modal="true" style="display:none; position:fixed; inset:0; z-index:999999; background:rgba(15,23,42,0.7); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#ffffff; border-radius:20px; max-width:380px; width:100%; padding:24px; box-shadow:0 20px 40px rgba(0,0,0,0.2); text-align:center; position:relative;">
+        <button type="button" onclick="document.getElementById('ios-push-guidance-modal').style.display='none'" style="position:absolute; top:14px; right:14px; background:#f1f5f9; border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; color:#64748b; font-size:1.1rem; display:flex; align-items:center; justify-content:center;">&times;</button>
+        <div style="width:56px; height:56px; border-radius:16px; background:#ecfdf5; color:#059669; font-size:1.6rem; display:inline-flex; align-items:center; justify-content:center; margin-bottom:14px;">
+            <i class="fa-solid fa-bell"></i>
+        </div>
+        <h3 style="font-size:1.2rem; font-weight:800; color:#0f172a; margin:0 0 8px 0;">Enable Notifications on iOS</h3>
+        <p style="font-size:0.88rem; color:#475569; line-height:1.5; margin:0 0 16px 0;">Apple requires CocoScan to be added to your Home Screen to deliver background notifications when closed:</p>
+        <div style="text-align:left; background:#f8fafc; border-radius:12px; padding:14px 16px; font-size:0.86rem; color:#1e293b; display:grid; gap:10px; margin-bottom:18px;">
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="background:#059669; color:#fff; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">1</span>
+                <span>Tap Safari's <strong>Share</strong> button (<i class="fa-solid fa-arrow-up-from-bracket"></i>)</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="background:#059669; color:#fff; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">2</span>
+                <span>Select <strong>'Add to Home Screen'</strong> (<i class="fa-solid fa-plus-square"></i>)</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <span style="background:#059669; color:#fff; width:22px; height:22px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">3</span>
+                <span>Open from Home Screen & enable alerts</span>
+            </div>
+        </div>
+        <button type="button" onclick="document.getElementById('ios-push-guidance-modal').style.display='none'" style="width:100%; padding:12px; border-radius:12px; background:#059669; color:#ffffff; font-weight:700; border:none; cursor:pointer;">Got it</button>
+    </div>
+</div>
+
 <script id="pwa-user-session-meta" type="application/json">
 {
     "role": {{ (session.get('user_role') or session.get('role') or (current_user.role if current_user is defined and current_user.is_authenticated else '')) | tojson }},
@@ -682,6 +709,27 @@
         return outputArray;
     }
 
+    function isIosDevice() {
+        return /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
+    function showIosPwaInstallGuidance() {
+        const modal = document.getElementById('ios-push-guidance-modal');
+        if (modal) modal.style.display = 'flex';
+    }
+    window.showIosPwaInstallGuidance = showIosPwaInstallGuidance;
+
+    // Listen for push notifications delivered via Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'COCOSCAN_PUSH_RECEIVED') {
+                console.log('[PWA] Realtime push received from SW:', event.data.payload);
+                window.dispatchEvent(new CustomEvent('cocoscan:pushreceived', { detail: event.data.payload }));
+            }
+        });
+    }
+
     async function initPushNotificationSubscription() {
         if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
             console.debug('[Push] Web Push not supported by this browser.');
@@ -713,15 +761,17 @@
             }
 
             if (subscription) {
+                const activeRole = (localStorage.getItem('cocoscan_user_role') || currentUserRole || '').toLowerCase();
                 await fetch('/api/push/subscribe', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         subscription: subscription.toJSON(),
-                        user_id: currentUserId || localStorage.getItem('cocoscan_user_id') || ''
+                        user_id: currentUserId || localStorage.getItem('cocoscan_user_id') || '',
+                        role: activeRole
                     })
                 });
-                console.info('[Push] Subscription registered with server.');
+                console.info('[Push] Subscription registered with server for role:', activeRole);
             }
         } catch (e) {
             console.debug('[Push] Subscription init note:', e);
@@ -729,6 +779,10 @@
     }
 
     window.requestPushNotificationPermission = async function() {
+        if (isIosDevice() && !isStandaloneMode()) {
+            showIosPwaInstallGuidance();
+            return false;
+        }
         if (!('Notification' in window) || !('serviceWorker' in navigator)) {
             alert('Push notifications are not supported on this browser.');
             return false;

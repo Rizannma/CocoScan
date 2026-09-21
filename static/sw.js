@@ -268,20 +268,39 @@ self.addEventListener('push', (event) => {
         }
     }
 
+    const reportId = payload.data?.report_id;
+    const tag = reportId ? `cocoscan-report-${reportId}` : `cocoscan-alert-${Date.now()}`;
+
     const options = {
         body: payload.body,
         icon: payload.icon || '/static/icons/icon-192x192.png',
         badge: payload.badge || '/static/icons/icon-72x72.png',
         vibrate: [100, 50, 100],
+        tag: tag,
+        renotify: true,
         data: payload.data || { url: '/farmer/reports' },
         actions: [
-            { action: 'open', title: 'View Report' }
+            { action: 'open', title: 'View Update' }
         ]
     };
 
-    event.waitUntil(
-        self.registration.showNotification(payload.title, options)
-    );
+    // Broadcast to active in-app windows so live notification centers update immediately
+    const broadcastPromise = self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+        clients.forEach((client) => {
+            try {
+                client.postMessage({
+                    type: 'COCOSCAN_PUSH_RECEIVED',
+                    payload: payload
+                });
+            } catch (e) {
+                console.debug('[SW] PostMessage error:', e);
+            }
+        });
+    });
+
+    const notifyPromise = self.registration.showNotification(payload.title, options);
+
+    event.waitUntil(Promise.all([notifyPromise, broadcastPromise]));
 });
 
 self.addEventListener('notificationclick', (event) => {
@@ -291,11 +310,9 @@ self.addEventListener('notificationclick', (event) => {
     event.waitUntil(
         self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
             for (let client of windowClients) {
-                if (client.url.includes(targetUrl) || client.url.includes('/farmer/reports')) {
-                    if ('focus' in client) {
-                        client.navigate(targetUrl);
-                        return client.focus();
-                    }
+                if ('focus' in client) {
+                    client.navigate(targetUrl);
+                    return client.focus();
                 }
             }
             if (self.clients.openWindow) {

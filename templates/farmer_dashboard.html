@@ -1134,6 +1134,16 @@
         const clearedIds = getClearedNotificationIds();
         const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
 
+        // Process real server-delivered Web Push notifications
+        try {
+            const pushInbox = JSON.parse(localStorage.getItem('cocoscan_push_inbox') || '[]');
+            pushInbox.forEach(pushItem => {
+                if (!clearedIds.includes(pushItem.id)) {
+                    list.push(pushItem);
+                }
+            });
+        } catch (e) {}
+
         // Process report records for notifications
         if (Array.isArray(rawDashboardReports)) {
             rawDashboardReports.forEach(report => {
@@ -1310,6 +1320,37 @@
         updateNotificationIconUI();
         showPwaToast(window.CocoScanI18n ? window.CocoScanI18n.t('dashboard.notif_toast_cleared', 'All notifications cleared') : 'All notifications cleared');
     }
+
+    // Dynamic update when background push arrives
+    window.addEventListener('cocoscan:pushreceived', (event) => {
+        const payload = event.detail;
+        if (!payload) return;
+        try {
+            const inbox = JSON.parse(localStorage.getItem('cocoscan_push_inbox') || '[]');
+            const pushItem = {
+                id: `push_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+                report_id: payload.data?.report_id || '',
+                type: 'push',
+                tag: 'Alert',
+                tagBg: '#e0f2fe',
+                tagColor: '#0369a1',
+                title: payload.title || 'New Notification',
+                desc: payload.body || '',
+                timestamp: payload.data?.timestamp || new Date().toISOString(),
+                icon: 'fa-bell',
+                iconBg: '#e0f2fe',
+                iconColor: '#0284c7',
+                isUnread: true,
+                url: payload.data?.url || '/farmer/reports'
+            };
+            inbox.unshift(pushItem);
+            if (inbox.length > 50) inbox.length = 50;
+            localStorage.setItem('cocoscan_push_inbox', JSON.stringify(inbox));
+            renderFarmerNotifications();
+        } catch (e) {
+            console.debug('Error saving push to inbox:', e);
+        }
+    });
 
     function escapeHtml(str) {
         if (!str) return '';

@@ -694,10 +694,27 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
             r_row = rows[0]
             target_user = r_row.get("user_id")
             pest = r_row.get("pest_type") or "Coconut Report"
+
+            if norm_status == 'visit_scheduled':
+                notif_title = "Farm Visit Scheduled"
+                notif_body = f"An agriculturist has confirmed a farm inspection schedule for your {pest} report."
+            elif norm_status == 'assessment_issued':
+                notif_title = "Expert Assessment Issued"
+                notif_body = f"Expert recommendations have been provided for your {pest} report."
+            elif norm_status == 'resolved':
+                notif_title = "Report Resolved"
+                notif_body = f"Your {pest} report treatment solution has been marked resolved."
+            elif norm_status == 'awaiting_confirmed_schedule':
+                notif_title = "Visit Discussion Update"
+                notif_body = f"New schedule discussion activity on your {pest} report."
+            else:
+                notif_title = "CocoScan Status Update"
+                notif_body = f"Your {pest} report status is now '{norm_status}'."
+
             send_push_notification(
                 user_id=target_user,
-                title="CocoScan Status Update",
-                body=f"Your {pest} report status is now '{norm_status}'.",
+                title=notif_title,
+                body=notif_body,
                 report_id=report_id,
                 url=f"/farmer/reports?report_id={report_id}"
             )
@@ -3412,9 +3429,27 @@ def farmer_submit_assessment_feedback():
                 except Exception as c_err:
                     logger.warning(f"Visit chat insert exception: {c_err}")
 
-        if getattr(update_response, 'error', None):
-            logger.error(f"Assessment feedback update failed: {update_response.error}")
-            return jsonify({'success': False, 'message': 'The response could not be saved.'}), 500
+        # Dispatch background push to agriculturists for farmer feedback
+        try:
+            from app.push_service import send_push_to_role
+            if confirmation == 'resolved' or confirmation == 'yes':
+                send_push_to_role(
+                    role="agri_expert",
+                    title=f"Report #{report_id} Resolved",
+                    body="Farmer confirmed the treatment resolved the infestation.",
+                    report_id=report_id,
+                    url=f"/agriculturist/reports"
+                )
+            else:
+                send_push_to_role(
+                    role="agri_expert",
+                    title=f"Visit Requested on Report #{report_id}",
+                    body=f"Farmer requested on-site visit: {reason[:60]}",
+                    report_id=report_id,
+                    url=f"/agriculturist/reports"
+                )
+        except Exception as fb_err:
+            logger.debug(f"Push to agri_expert feedback dispatch note: {fb_err}")
 
         return jsonify({'success': True, 'message': 'Your response has been saved.'})
     except Exception as e:
@@ -3493,7 +3528,7 @@ def save_visit_chat(report_id):
         _update_report_workflow(report_id, 'Awaiting Confirmed Schedule')
 
         try:
-            from app.push_service import send_push_notification
+            from app.push_service import send_push_notification, send_push_to_role
             target_user = report_row.get('user_id') or report_row.get('user_email')
             if user_role in {'agri_expert', 'admin', 'lgu'}:
                 send_push_notification(
@@ -3504,12 +3539,12 @@ def save_visit_chat(report_id):
                     url=f"/farmer/reports?report_id={report_id}"
                 )
             else:
-                send_push_notification(
-                    user_id=None,
-                    title="New Discussion Message",
-                    body=f"Farmer message on report #{report_id}: {message[:60]}",
+                send_push_to_role(
+                    role="agri_expert",
+                    title=f"New Message on Report #{report_id}",
+                    body=f"Farmer: {message[:60]}",
                     report_id=report_id,
-                    url=f"/farmer/reports?report_id={report_id}"
+                    url=f"/agriculturist/reports"
                 )
         except Exception as p_err:
             logger.debug(f"Push chat dispatch note: {p_err}")
@@ -3580,7 +3615,8 @@ def api_push_subscribe():
         payload = request.get_json(silent=True) or {}
         sub_data = payload.get('subscription') or payload
         user_id = payload.get('user_id') or _get_current_app_user_id()
-        saved = save_subscription(user_id, sub_data)
+        role = payload.get('role') or session.get('user_role')
+        saved = save_subscription(user_id, sub_data, role=role)
         if saved:
             return jsonify({'success': True, 'message': 'Subscription registered successfully.'})
         return jsonify({'success': False, 'message': 'Invalid subscription payload.'}), 400
@@ -3654,6 +3690,19 @@ def request_visit_reschedule(report_id):
                     logger.warning(f"Reschedule chat insert failed: {chat_insert_response.error}")
             except Exception as c_err:
                 logger.warning(f"Reschedule chat insert exception: {c_err}")
+
+        # Dispatch background push to agriculturists
+        try:
+            from app.push_service import send_push_to_role
+            send_push_to_role(
+                role="agri_expert",
+                title=f"Reschedule Requested on Report #{report_id}",
+                body=f"Farmer requested visit reschedule: {reason[:60]}",
+                report_id=report_id,
+                url=f"/agriculturist/reports"
+            )
+        except Exception as resched_err:
+            logger.debug(f"Push to agri_expert reschedule dispatch note: {resched_err}")
 
         return jsonify({
             'success': True,
@@ -4296,6 +4345,21 @@ def farmer_submit_report():
                 supabase.table('report_supporting_images').insert(supporting_rows).execute()
 
         logger.info(f"Pest report logged successfully for user {user_id}. Report ID: {report_id}")
+
+        # Dispatch background push notification to LGU officers
+        try:
+            from app.push_service import send_push_to_role
+            loc_label = barangay or municipality or 'Laguna'
+            send_push_to_role(
+                role="lgu",
+                title="New Coconut Pest Report",
+                body=f"A new {pest_type} report was submitted in {loc_label}.",
+                report_id=report_id,
+                url=f"/lgu/reports"
+            )
+        except Exception as push_err:
+            logger.debug(f"Push to LGU dispatch note: {push_err}")
+
         return jsonify({
             'success': True,
             'message': 'Report submitted and synchronized cleanly!',

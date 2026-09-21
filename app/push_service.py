@@ -1,10 +1,12 @@
 """
 Web Push Notification Service for CocoScan.
-Handles VAPID keys, browser push subscriptions, and push message dispatching.
+Handles VAPID keys, persistent database push subscriptions (Supabase + local SQLite fallback),
+and role-based push message dispatching.
 """
 
 import os
 import json
+import sqlite3
 import logging
 import threading
 from datetime import datetime, timezone
@@ -31,15 +33,53 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 _VAPID_FILE_PATH = Path(__file__).parent / "vapid_private.pem"
+_SQLITE_PATH = Path(__file__).parent / "cocoscan_push.db"
 _VAPID_CLAIM_EMAIL = os.environ.get("VAPID_CLAIM_EMAIL", "mailto:support@cocoscan.laguna.gov.ph")
 
 _lock = threading.Lock()
 _vapid_instance: Any = None
 _vapid_public_b64: Optional[str] = None
 _vapid_private_pem: Optional[str] = None
+_sqlite_initialized = False
 
-# In-memory subscription store: endpoint -> dict
-_subscriptions: Dict[str, Dict[str, Any]] = {}
+
+def _get_sqlite_conn():
+    conn = sqlite3.connect(str(_SQLITE_PATH), timeout=15)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _init_sqlite_db():
+    global _sqlite_initialized
+    if _sqlite_initialized:
+        return
+    try:
+        with _get_sqlite_conn() as conn:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS push_subscriptions (
+                    endpoint TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    role TEXT,
+                    p256dh TEXT NOT NULL,
+                    auth TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_push_user_id ON push_subscriptions(user_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_push_role ON push_subscriptions(role)")
+            conn.commit()
+        _sqlite_initialized = True
+    except Exception as e:
+        logger.warning(f"Error initializing SQLite push database: {e}")
+
+
+def _get_supabase_client():
+    try:
+        from main import supabase
+        return supabase
+    except Exception:
+        return None
 
 
 def _init_vapid_keys():
@@ -63,10 +103,12 @@ def _init_vapid_keys():
                     vapid = Vapid.from_raw(env_priv.encode("utf-8"))
                 _vapid_instance = vapid
                 _vapid_private_pem = vapid.private_pem().decode("utf-8")
-                raw_pub = vapid.public_key.public_bytes(
-                    serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
-                )
-                _vapid_public_b64 = b64urlencode(raw_pub)
+                pub_key = vapid.public_key
+                if pub_key is not None and serialization is not None and b64urlencode is not None:
+                    raw_pub = pub_key.public_bytes(
+                        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+                    )
+                    _vapid_public_b64 = b64urlencode(raw_pub)
                 logger.info("VAPID keys initialized from environment variable.")
                 return
             except Exception as e:
@@ -78,10 +120,12 @@ def _init_vapid_keys():
                 vapid = Vapid.from_pem(pem_data)
                 _vapid_instance = vapid
                 _vapid_private_pem = vapid.private_pem().decode("utf-8")
-                raw_pub = vapid.public_key.public_bytes(
-                    serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
-                )
-                _vapid_public_b64 = b64urlencode(raw_pub)
+                pub_key = vapid.public_key
+                if pub_key is not None and serialization is not None and b64urlencode is not None:
+                    raw_pub = pub_key.public_bytes(
+                        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+                    )
+                    _vapid_public_b64 = b64urlencode(raw_pub)
                 logger.info("VAPID keys loaded from disk.")
                 return
             except Exception as e:
@@ -93,10 +137,12 @@ def _init_vapid_keys():
             vapid.generate_keys()
             _vapid_instance = vapid
             _vapid_private_pem = vapid.private_pem().decode("utf-8")
-            raw_pub = vapid.public_key.public_bytes(
-                serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
-            )
-            _vapid_public_b64 = b64urlencode(raw_pub)
+            pub_key = vapid.public_key
+            if pub_key is not None and serialization is not None and b64urlencode is not None:
+                raw_pub = pub_key.public_bytes(
+                    serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint
+                )
+                _vapid_public_b64 = b64urlencode(raw_pub)
             _VAPID_FILE_PATH.write_bytes(vapid.private_pem())
             logger.info(f"New VAPID key pair generated and saved to {_VAPID_FILE_PATH}.")
         except Exception as e:
@@ -110,9 +156,9 @@ def get_public_key() -> str:
     return _vapid_public_b64 or ""
 
 
-def save_subscription(user_id: Any, subscription_data: Dict[str, Any]) -> bool:
+def save_subscription(user_id: Any, subscription_data: Dict[str, Any], role: Optional[str] = None) -> bool:
     """
-    Saves or updates a Web Push subscription for a user.
+    Saves or updates a Web Push subscription persistently in SQLite and Supabase.
     `subscription_data` must contain 'endpoint' and 'keys' ({'p256dh', 'auth'}).
     """
     if not isinstance(subscription_data, dict):
@@ -130,50 +176,140 @@ def save_subscription(user_id: Any, subscription_data: Dict[str, Any]) -> bool:
         return False
 
     user_str = str(user_id) if user_id is not None else "anonymous"
+    role_str = role.strip().lower() if role else None
+    now_iso = datetime.now(timezone.utc).isoformat()
 
+    _init_sqlite_db()
+
+    # 1. Persist to local SQLite
     with _lock:
-        _subscriptions[endpoint] = {
-            "user_id": user_str,
-            "endpoint": endpoint,
-            "p256dh": p256dh,
-            "auth": auth,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
+        try:
+            with _get_sqlite_conn() as conn:
+                conn.execute("""
+                    INSERT INTO push_subscriptions (endpoint, user_id, role, p256dh, auth, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(endpoint) DO UPDATE SET
+                        user_id = excluded.user_id,
+                        role = COALESCE(excluded.role, push_subscriptions.role),
+                        p256dh = excluded.p256dh,
+                        auth = excluded.auth,
+                        updated_at = excluded.updated_at
+                """, (endpoint, user_str, role_str, p256dh, auth, now_iso, now_iso))
+                conn.commit()
+        except Exception as sq_err:
+            logger.error(f"SQLite save subscription error: {sq_err}")
 
-    logger.info(f"Saved push subscription for user={user_str}, total_subscriptions={len(_subscriptions)}")
+    # 2. Persist to Supabase if connected
+    sb = _get_supabase_client()
+    if sb and hasattr(sb, "table"):
+        try:
+            sb.table("push_subscriptions").upsert({
+                "endpoint": endpoint,
+                "user_id": user_str,
+                "role": role_str,
+                "p256dh": p256dh,
+                "auth": auth,
+                "created_at": now_iso,
+                "updated_at": now_iso
+            }).execute()
+        except Exception as sb_err:
+            logger.debug(f"Supabase push_subscriptions upsert note: {sb_err}")
+
+    logger.info(f"Saved persistent push subscription for user={user_str}, role={role_str}")
     return True
 
 
 def remove_subscription(endpoint: str) -> None:
-    """Removes a push subscription by its endpoint."""
+    """Removes a push subscription by its endpoint from SQLite and Supabase."""
+    _init_sqlite_db()
     with _lock:
-        if endpoint in _subscriptions:
-            del _subscriptions[endpoint]
-            logger.info(f"Removed push subscription for endpoint: {endpoint[:30]}...")
+        try:
+            with _get_sqlite_conn() as conn:
+                conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+                conn.commit()
+        except Exception as sq_err:
+            logger.error(f"SQLite remove subscription error: {sq_err}")
+
+    sb = _get_supabase_client()
+    if sb and hasattr(sb, "table"):
+        try:
+            sb.table("push_subscriptions").delete().eq("endpoint", endpoint).execute()
+        except Exception as sb_err:
+            logger.debug(f"Supabase push_subscriptions delete note: {sb_err}")
+
+    logger.info(f"Removed push subscription for endpoint: {endpoint[:30]}...")
 
 
 def get_user_subscriptions(user_id: Optional[Any] = None) -> List[Dict[str, Any]]:
     """Returns all subscriptions for a specific user, or all if user_id is None."""
-    with _lock:
+    _init_sqlite_db()
+    
+    # Try Supabase if available
+    sb = _get_supabase_client()
+    if sb and hasattr(sb, "table"):
+        try:
+            query = sb.table("push_subscriptions").select("*")
+            if user_id is not None:
+                query = query.eq("user_id", str(user_id))
+            resp = query.execute()
+            rows = getattr(resp, "data", None)
+            if rows is not None and len(rows) > 0:
+                return rows
+        except Exception as sb_err:
+            logger.debug(f"Supabase get_user_subscriptions query note: {sb_err}")
+
+    # Fallback to local SQLite
+    with _get_sqlite_conn() as conn:
         if user_id is None:
-            return list(_subscriptions.values())
-        user_str = str(user_id)
-        return [sub for sub in _subscriptions.values() if sub.get("user_id") == user_str]
+            cur = conn.execute("SELECT * FROM push_subscriptions")
+        else:
+            cur = conn.execute("SELECT * FROM push_subscriptions WHERE user_id = ?", (str(user_id),))
+        return [dict(row) for row in cur.fetchall()]
 
 
-def send_push_notification(
-    user_id: Optional[Any] = None,
-    title: str = "CocoScan Update",
-    body: str = "",
+def get_role_subscriptions(role: str) -> List[Dict[str, Any]]:
+    """Returns all subscriptions for a specific role (e.g., 'lgu', 'agri_expert', 'farmer')."""
+    _init_sqlite_db()
+    norm_role = (role or "").strip().lower()
+    if norm_role in ["agri_expert", "agriculturist", "expert"]:
+        target_roles = ["agri_expert", "agriculturist", "expert"]
+    elif norm_role in ["lgu", "lgu_officer"]:
+        target_roles = ["lgu", "lgu_officer"]
+    elif norm_role in ["admin", "administrator"]:
+        target_roles = ["admin", "administrator"]
+    else:
+        target_roles = [norm_role]
+
+    # Try Supabase if available
+    sb = _get_supabase_client()
+    if sb and hasattr(sb, "table"):
+        try:
+            resp = sb.table("push_subscriptions").select("*").in_("role", target_roles).execute()
+            rows = getattr(resp, "data", None)
+            if rows is not None and len(rows) > 0:
+                return rows
+        except Exception as sb_err:
+            logger.debug(f"Supabase get_role_subscriptions query note: {sb_err}")
+
+    # Fallback to local SQLite
+    with _get_sqlite_conn() as conn:
+        placeholders = ",".join("?" for _ in target_roles)
+        cur = conn.execute(
+            f"SELECT * FROM push_subscriptions WHERE LOWER(role) IN ({placeholders})",
+            target_roles
+        )
+        return [dict(row) for row in cur.fetchall()]
+
+
+def _dispatch_payload_to_subscriptions(
+    subscriptions: List[Dict[str, Any]],
+    title: str,
+    body: str,
     report_id: Optional[Any] = None,
     url: Optional[str] = None,
     data: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Dispatches a Web Push notification to subscribers.
-    If user_id is provided, sends only to that user's subscriptions.
-    If user_id is None, broadcasts to all active subscriptions.
-    """
+    """Helper that dispatches webpush to a list of subscription records."""
     if _vapid_private_pem is None:
         _init_vapid_keys()
 
@@ -191,22 +327,21 @@ def send_push_notification(
         "data": {
             "report_id": report_id,
             "url": deep_link_url,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             **(data or {}),
         },
     }
     payload_json = json.dumps(payload_dict)
 
-    target_subs = get_user_subscriptions(user_id)
-    if not target_subs:
-        logger.debug(f"No push subscriptions found for user_id={user_id}")
-        return {"sent": 0, "failed": 0, "status": "no_subscribers"}
-
     sent_count = 0
     failed_count = 0
     endpoints_to_remove = []
 
-    for sub in target_subs:
+    for sub in subscriptions:
         endpoint = sub.get("endpoint")
+        if not endpoint or not isinstance(endpoint, str):
+            continue
+
         subscription_info = {
             "endpoint": endpoint,
             "keys": {
@@ -228,7 +363,7 @@ def send_push_notification(
         except WebPushException as ex:
             failed_count += 1
             logger.warning(f"WebPushException sending to {endpoint[:30]}...: {ex}")
-            # If the subscription is no longer valid (e.g., 404 or 410 Gone), remove it
+            # If the subscription is no longer valid (e.g., 404 or 410 Gone), mark for deletion
             if hasattr(ex, "response") and ex.response is not None:
                 if ex.response.status_code in (404, 410):
                     endpoints_to_remove.append(endpoint)
@@ -240,3 +375,48 @@ def send_push_notification(
         remove_subscription(ep)
 
     return {"sent": sent_count, "failed": failed_count, "status": "ok"}
+
+
+def send_push_notification(
+    user_id: Optional[Any] = None,
+    title: str = "CocoScan Update",
+    body: str = "",
+    report_id: Optional[Any] = None,
+    url: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Dispatches a Web Push notification to subscribers.
+    If user_id is provided, sends only to that user's subscriptions.
+    If user_id is None, broadcasts to all active subscriptions.
+    """
+    target_subs = get_user_subscriptions(user_id)
+    if not target_subs:
+        logger.debug(f"No push subscriptions found for user_id={user_id}")
+        return {"sent": 0, "failed": 0, "status": "no_subscribers"}
+
+    return _dispatch_payload_to_subscriptions(
+        target_subs, title=title, body=body, report_id=report_id, url=url, data=data
+    )
+
+
+def send_push_to_role(
+    role: str,
+    title: str = "CocoScan Alert",
+    body: str = "",
+    report_id: Optional[Any] = None,
+    url: Optional[str] = None,
+    data: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Dispatches a Web Push notification to all subscribers belonging to a specific role.
+    E.g., role='lgu', role='agri_expert', role='farmer'.
+    """
+    target_subs = get_role_subscriptions(role)
+    if not target_subs:
+        logger.debug(f"No push subscriptions found for role={role}")
+        return {"sent": 0, "failed": 0, "status": "no_subscribers"}
+
+    return _dispatch_payload_to_subscriptions(
+        target_subs, title=title, body=body, report_id=report_id, url=url, data=data
+    )

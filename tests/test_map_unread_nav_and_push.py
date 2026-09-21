@@ -228,3 +228,71 @@ def test_update_report_workflow_filters_unknown_columns(monkeypatch):
     assert captured_payload['status'] == 'Under Review'
 
 
+def test_role_based_push_subscriptions_and_dispatch(monkeypatch):
+    """Verify push subscriptions persist with roles and can be queried and targeted by role."""
+    from app import push_service
+    from unittest.mock import MagicMock
+
+    lgu_sub = {
+        'endpoint': 'https://fcm.googleapis.com/fcm/send/lgu-device-token-999',
+        'keys': {
+            'p256dh': 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QT9Q0A4APqOMZXbOU6VDDHXapQ53smTqdQhkkoEGCGvSu3iA',
+            'auth': 'tBHItJI5svbpez7KI4CCXg'
+        }
+    }
+    agri_sub = {
+        'endpoint': 'https://fcm.googleapis.com/fcm/send/agri-device-token-888',
+        'keys': {
+            'p256dh': 'BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QT9Q0A4APqOMZXbOU6VDDHXapQ53smTqdQhkkoEGCGvSu3iA',
+            'auth': 'tBHItJI5svbpez7KI4CCXg'
+        }
+    }
+
+    push_service.save_subscription('lgu-user-1', lgu_sub, role='lgu')
+    push_service.save_subscription('agri-user-1', agri_sub, role='agri_expert')
+
+    # Query by role
+    lgu_subs = push_service.get_role_subscriptions('lgu')
+    agri_subs = push_service.get_role_subscriptions('agri_expert')
+
+    assert any(s['endpoint'] == lgu_sub['endpoint'] for s in lgu_subs)
+    assert not any(s['endpoint'] == agri_sub['endpoint'] for s in lgu_subs)
+
+    assert any(s['endpoint'] == agri_sub['endpoint'] for s in agri_subs)
+    assert not any(s['endpoint'] == lgu_sub['endpoint'] for s in agri_subs)
+
+    # Mock webpush to verify dispatch
+    dispatched_endpoints = []
+    def mock_webpush(subscription_info, data, **kwargs):
+        dispatched_endpoints.append(subscription_info['endpoint'])
+
+    monkeypatch.setattr(push_service, 'webpush', mock_webpush)
+    monkeypatch.setattr(push_service, '_vapid_private_pem', 'fake-private-key')
+
+    # Dispatch to LGU
+    res_lgu = push_service.send_push_to_role('lgu', title='New Scan', body='Farmer submitted new report')
+    assert res_lgu['sent'] >= 1
+    assert lgu_sub['endpoint'] in dispatched_endpoints
+
+    # Dispatch to Agri Expert
+    dispatched_endpoints.clear()
+    res_agri = push_service.send_push_to_role('agri_expert', title='Farmer Feedback', body='Farmer requested visit')
+    assert res_agri['sent'] >= 1
+    assert agri_sub['endpoint'] in dispatched_endpoints
+
+    # Clean up
+    push_service.remove_subscription(lgu_sub['endpoint'])
+    push_service.remove_subscription(agri_sub['endpoint'])
+
+
+def test_ios_pwa_guidance_modal_rendered(client):
+    """Verify iOS PWA push guidance modal is rendered in the page for Safari users."""
+    resp = client.get('/farmer/dashboard')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'ios-push-guidance-modal' in html
+    assert 'Enable Notifications on iOS' in html
+    assert 'Add to Home Screen' in html
+
+
+
