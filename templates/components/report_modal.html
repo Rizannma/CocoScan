@@ -55,17 +55,35 @@
                 }
             }
             @media (max-width: 859px) {
+                .modal-screen-overlay {
+                    align-items: flex-end;
+                    padding: 0;
+                    padding-bottom: env(safe-area-inset-bottom, 0px);
+                }
                 .modal-sheet-sliding-card {
                     max-width: 100%;
                     border-bottom-left-radius: 0;
                     border-bottom-right-radius: 0;
-                    padding: 20px 16px calc(48px + env(safe-area-inset-bottom, 24px)) 16px;
+                    padding: 20px 16px calc(88px + env(safe-area-inset-bottom, 24px)) 16px;
                     max-height: 90vh;
+                    box-sizing: border-box;
+                    overflow-x: hidden;
                 }
                 .desktop-split-layout {
                     display: flex;
                     flex-direction: column;
                     gap: 0;
+                    width: 100%;
+                    min-width: 0;
+                    max-width: 100%;
+                    box-sizing: border-box;
+                }
+                .desktop-col-left,
+                .desktop-col-right {
+                    width: 100%;
+                    min-width: 0;
+                    max-width: 100%;
+                    box-sizing: border-box;
                 }
             }
             .status-row-bar {
@@ -293,10 +311,25 @@
                 box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
             }
             .premium-form-card#report-farmer-feedback-card {
-                padding: 24px 24px;
+                padding: 20px 20px;
+                min-width: 0;
+                max-width: 100%;
+                box-sizing: border-box;
+                overflow: hidden;
             }
             .premium-form-card#report-farmer-feedback-card h4 {
-                margin-bottom: 18px;
+                margin-bottom: 14px;
+            }
+            #report-farmer-feedback {
+                min-width: 0;
+                max-width: 100%;
+                box-sizing: border-box;
+            }
+            @media (max-width: 859px) {
+                .premium-form-card#report-farmer-feedback-card {
+                    padding: 16px 14px 18px 14px;
+                    margin-bottom: 20px;
+                }
             }
             .btn-control.is-disabled,
             .btn-control:disabled {
@@ -866,14 +899,6 @@
 
         <div class="premium-form-card" id="report-farmer-preferred-schedules" style="display:none;">
             <!-- Populated dynamically for agriculturists when farmer proposed schedules exist -->
-        </div>
-
-        <div class="premium-form-card" id="workflow-actions-card" style="display:none;">
-            <h4><i class="fa-solid fa-route"></i> Workflow Actions</h4>
-            <p id="workflow-actions-help" style="font-size:0.92rem; color:#64748b; margin-bottom:10px;">Advance the report to the next stage.</p>
-            <textarea id="workflow-detail-input" class="notes-input-box" placeholder="Add notes, a reason, availability, or the selected schedule..." style="min-height:90px;"></textarea>
-            <div id="workflow-form-fields" style="margin-top:12px;"></div>
-            <div id="workflow-actions-buttons" class="control-action-bar" style="justify-content:flex-start; margin-top:12px;"></div>
         </div>
 
             </div>

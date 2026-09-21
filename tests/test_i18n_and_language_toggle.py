@@ -29,6 +29,10 @@ def test_i18n_translation_lookup_and_fallback():
     assert t("navigation.lang_preference", lang="en") == "Language"
     assert t("navigation.lang_preference", lang="tl") == "Wika"
 
+    # Farmer profile role badge translations
+    assert t("navigation.profile_role_farmer", lang="en") == "Registered Farmer"
+    assert t("navigation.profile_role_farmer", lang="tl") == "Rehistradong Magsasaka"
+
     # Scan page upload instruction translations
     assert t("scanner.drop_zone_title", lang="en") == "Scan or upload your coconut leaf image"
     assert t("scanner.drop_zone_title", lang="tl") == "I-scan o i-upload ang dahon ng niyog"
@@ -305,9 +309,11 @@ def test_report_modal_detail_fields_translations():
     """Test all internal report modal fields and resolution details in English and Tagalog."""
     from main import _format_confirmed_schedule_label
 
-    # Initial recommendations
+    # Initial and verified recommendations
     assert t("modal.initial_reco_title", lang="en") == "Initial Recommendations"
     assert "Rekomendasyon" in t("modal.initial_reco_title", lang="tl")
+    assert t("modal.verified_reco_title", lang="en") == "Recommendations"
+    assert t("modal.verified_reco_title", lang="tl") == "Mga Rekomendasyon"
     assert t("modal.initial_reco_subtext", lang="en") == "Tap the question mark icon for more details."
     assert "question mark" in t("modal.initial_reco_subtext", lang="tl")
     assert t("modal.initial_reco_empty", lang="en") == "No initial recommendations available."

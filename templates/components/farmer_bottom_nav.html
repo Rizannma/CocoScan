@@ -369,76 +369,11 @@
         font-size: 1rem;
     }
 
-    .profile-status-card {
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 14px;
-        padding: 12px 16px;
-    }
-
-    .status-row {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        margin-bottom: 6px;
-    }
-
-    .status-indicator-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: #22c55e;
-    }
-
-    .status-state-text {
-        font-size: 0.85rem;
-        font-weight: 700;
-        color: #15803d;
-    }
-
-    .status-subrow {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 0.8rem;
-        color: #64748b;
-        padding-top: 6px;
-        border-top: 1px dashed #e2e8f0;
-    }
-
-    .status-val-strong {
-        color: #0f172a;
-        font-size: 0.92rem;
-        font-weight: 800;
-    }
-
     .profile-actions-container {
         display: flex;
         flex-direction: column;
         gap: 10px;
         margin-top: 20px;
-    }
-
-    .btn-profile-refresh {
-        background: #f1f5f9;
-        color: #334155;
-        border: 1px solid #cbd5e1;
-        padding: 13px;
-        border-radius: 14px;
-        font-size: 0.9rem;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        min-height: 48px;
-    }
-
-    .btn-profile-refresh:hover {
-        background: #e2e8f0;
-        color: #0f172a;
     }
 
     .btn-profile-logout {
@@ -578,7 +513,7 @@
                     <h4 id="farmer-sheet-user-name">{{ user_name or 'Farmer' }}</h4>
                     <div class="profile-role-badge">
                         <i class="fa-solid fa-shield-halved"></i>
-                        <span data-i18n="navigation.profile_role_farmer">{{ t('navigation.profile_role_farmer', 'Registered Coconut Farmer') }}</span>
+                        <span data-i18n="navigation.profile_role_farmer">{{ t('navigation.profile_role_farmer', 'Registered Farmer') }}</span>
                     </div>
                     <p id="farmer-sheet-user-email" class="profile-sub-text">{{ session.get('user_email', '') or 'Field Operator' }}</p>
                 </div>
@@ -604,30 +539,8 @@
                 </div>
             </div>
 
-            <!-- Device & Connection Status -->
-            <div class="profile-section-block">
-                <div class="profile-section-label">
-                    <i class="fa-solid fa-tower-broadcast"></i>
-                    <span data-i18n="navigation.profile_sec_status">{{ t('navigation.profile_sec_status', 'Device & Sync Status') }}</span>
-                </div>
-                <div class="profile-status-card">
-                    <div class="status-row">
-                        <div class="status-indicator-dot" id="modal-conn-dot"></div>
-                        <span id="modal-conn-text" class="status-state-text" data-i18n="navigation.profile_status_online">{{ t('navigation.profile_status_online', 'Online & Synchronized') }}</span>
-                    </div>
-                    <div class="status-subrow">
-                        <span class="status-label-sub" data-i18n="navigation.profile_drafts_count">{{ t('navigation.profile_drafts_count', 'Saved Field Drafts') }}:</span>
-                        <strong id="modal-drafts-count" class="status-val-strong">0</strong>
-                    </div>
-                </div>
-            </div>
-
             <!-- Account Logout & Actions -->
             <div class="profile-actions-container">
-                <button type="button" class="btn-profile-refresh" onclick="refreshFarmerData(this)">
-                    <i class="fa-solid fa-arrows-rotate"></i>
-                    <span data-i18n="navigation.profile_btn_refresh">{{ t('navigation.profile_btn_refresh', 'Refresh App Data') }}</span>
-                </button>
                 <a href="/logout" class="btn-profile-logout" onclick="return confirmFarmerLogout(event)">
                     <i class="fa-solid fa-right-from-bracket"></i>
                     <span data-i18n="navigation.profile_btn_logout">{{ t('navigation.profile_btn_logout', 'Log Out Account') }}</span>
