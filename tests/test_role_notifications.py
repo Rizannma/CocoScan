@@ -113,6 +113,51 @@ def test_agri_dashboard_has_notification_bell_and_modal(client, monkeypatch):
     assert 'notif-clear-all-btn' in html
 
 
+def test_admin_dashboard_has_no_notification_bell_or_modal(client, monkeypatch):
+    """Verify that Admin dashboard does NOT render the notification bell, counter badge, or drawer modals."""
+    import main
+
+    def mock_table(table_name):
+        tbl = MagicMock()
+        tbl.select.return_value = tbl
+        tbl.execute.return_value = MagicMock(data=[])
+        return tbl
+
+    monkeypatch.setattr(main, 'supabase', MagicMock(table=mock_table))
+
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'test-admin-user'
+        sess['user_role'] = 'admin'
+        sess['user_email'] = 'admin@cocoscan.local'
+
+    resp = client.get('/admin/dashboard')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # Verify notification bell button, icon, and badge are NOT present
+    assert 'farmer-notification-btn' not in html
+    assert 'farmer-notification-bell-icon' not in html
+    assert 'farmer-notification-badge' not in html
+
+    # Verify notification drawer modal and push consent modal are NOT present
+    assert 'farmer-notification-center-modal' not in html
+    assert 'farmer-push-consent-modal' not in html
+
+
+def test_api_notifications_admin_returns_empty(client):
+    """Verify that /api/notifications returns empty list for admin sessions."""
+    with client.session_transaction() as sess:
+        sess['user_id'] = 'test-admin-user'
+        sess['user_role'] = 'admin'
+
+    resp = client.get('/api/notifications')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['success'] is True
+    assert data['role'] == 'admin'
+    assert data['notifications'] == []
+
+
 def test_api_notifications_unauthenticated(client):
     """Verify that /api/notifications returns 401 when not logged in."""
     resp = client.get('/api/notifications')

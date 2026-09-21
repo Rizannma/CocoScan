@@ -1029,7 +1029,7 @@
                     style="font-size: 1.15rem; font-weight: 700; color: #164630; margin: 0; line-height: 1.2;"></p>
                 {% block greeting_right_action %}
                 {% set auth_role = ((session.get('user_role', '') if session is defined and session else '') ~ ' ' ~ (user_role if user_role is defined and user_role else '') ~ ' ' ~ (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
-                {% if 'farmer' in auth_role or 'agri' in auth_role or 'expert' in auth_role or 'lgu' in auth_role or 'admin' in auth_role or (not session.get('user_role') and not user_role and not sidebar_role) %}
+                {% if 'admin' not in auth_role and ('farmer' in auth_role or 'agri' in auth_role or 'expert' in auth_role or 'lgu' in auth_role or (not session.get('user_role') and not user_role and not sidebar_role)) %}
                 <div class="dashboard-notif-control-box" style="position: relative; display: flex; align-items: center;">
                     <button type="button" id="farmer-notification-btn" class="farmer-notification-bell-btn" onclick="handleNotificationIconClick(event)" aria-label="{{ t('dashboard.notif_center_title', 'Notifications') }}" title="{{ t('dashboard.notif_center_title', 'Notifications') }}">
                         <i class="fa-solid fa-bell" id="farmer-notification-bell-icon"></i>
@@ -1630,7 +1630,10 @@
         })();
     </script>
     {% block extra_scripts %}{% endblock %}
+    {% set auth_role_lower = ((session.get('user_role', '') if session is defined and session else '') ~ ' ' ~ (user_role if user_role is defined and user_role else '') ~ ' ' ~ (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
+    {% if 'admin' not in auth_role_lower %}
     {% include 'components/notification_center.html' %}
+    {% endif %}
     {% include 'components/pwa_scripts.html' %}
 </body>
 

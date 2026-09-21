@@ -1718,6 +1718,9 @@ def get_user_notifications():
     if not user_id:
         return jsonify({"success": False, "notifications": [], "role": user_role}), 401
 
+    if user_role in ['admin', 'administrator']:
+        return jsonify({"success": True, "notifications": [], "role": user_role}), 200
+
     try:
         query = supabase.table("reports").select("*, visit_chats(count)").order("created_at", desc=True).limit(30)
         if user_role == 'farmer':
@@ -1843,8 +1846,8 @@ def get_user_notifications():
                         "isUnread": True
                     })
 
-            elif user_role in ['lgu', 'lgu_officer', 'admin', 'administrator']:
-                # LGU & Admin alerts
+            elif user_role in ['lgu', 'lgu_officer']:
+                # LGU alerts
                 if is_resolved_report_status(status):
                     notifications.append({
                         "id": f"lgu_res_{rep_id}",

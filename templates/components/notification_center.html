@@ -585,6 +585,28 @@
 
 <script>
 (function() {
+    function isAdminUser() {
+        try {
+            const p = ((window.location && window.location.pathname) || "").toLowerCase();
+            if (p.startsWith('/admin') || p.includes('/admin')) return true;
+            const bodyRole = ((document.body && (document.body.getAttribute('data-user-role') || document.body.dataset.userRole)) || '').toLowerCase();
+            if (bodyRole.includes('admin')) return true;
+            const localRole = (localStorage.getItem('cocoscan_user_role') || '').toLowerCase();
+            if (localRole.includes('admin')) return true;
+        } catch (e) {}
+        return false;
+    }
+
+    if (isAdminUser()) {
+        const bell = document.getElementById('farmer-notification-btn');
+        if (bell) bell.remove();
+        const modal = document.getElementById('farmer-notification-center-modal');
+        if (modal) modal.remove();
+        const consentModal = document.getElementById('farmer-push-consent-modal');
+        if (consentModal) consentModal.remove();
+        return;
+    }
+
     let cachedApiNotifications = [];
 
     function isStaffDashboardView() {
