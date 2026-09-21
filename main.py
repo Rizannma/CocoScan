@@ -2327,7 +2327,8 @@ def farmer_predict():
             # Downscale large uploaded photos to safe max dimensions (1024px) right at the route
             image = process_and_compress_image(image_bytes, max_dimension=1024)
         except (InvalidImageFormatError, ValueError, OSError, Exception) as e:
-            logger.error(f"Image preprocessing/decoding error: {str(e)}")
+            inner_cause = getattr(e, '__cause__', None)
+            logger.error(f"Image preprocessing/decoding error: {e} (inner cause: {repr(inner_cause)})")
             return jsonify({"error": INVALID_IMAGE_ERROR_MESSAGE}), 400
         
         pest_model_path = resolve_model_path(
