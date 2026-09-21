@@ -899,10 +899,6 @@
                         <div class="legend-dot" style="background-color: #d97706;"></div>
                         <span>Brontispa</span>
                     </div>
-                    <div class="legend-item">
-                        <div class="legend-dot" style="background-color: #10b981;"></div>
-                        <span>Healthy Leaf</span>
-                    </div>
                 </div>
             </section>
 
@@ -954,6 +950,11 @@
             if (!geoReportsDataset || !Array.isArray(geoReportsDataset)) {
                 geoReportsDataset = [];
             }
+            // Ensure healthy leaf records are never included in map view
+            geoReportsDataset = geoReportsDataset.filter(item => {
+                const p = String(item.pest_type || "").toLowerCase();
+                return !p.includes("healthy") && !p.includes("malusog");
+            });
         } catch (e) {
             console.error("Error parsing map reports:", e);
             geoReportsDataset = [];
@@ -977,8 +978,11 @@
 
         function getCurrentFilteredRecords() {
             return geoReportsDataset.filter(item => {
-                const locationString = `${item.barangay || ''} ${item.municipality || ''} ${item.province || ''}`.toLowerCase();
                 const pestString = String(item.pest_type || "").toLowerCase();
+                if (pestString.includes("healthy") || pestString.includes("malusog")) {
+                    return false;
+                }
+                const locationString = `${item.barangay || ''} ${item.municipality || ''} ${item.province || ''}`.toLowerCase();
                 
                 const matchesSearch = !searchPhrase || locationString.includes(searchPhrase) || pestString.includes(searchPhrase);
                 const matchesPest = (activePestFilter === "all" || item.pest_type === activePestFilter);
@@ -1109,8 +1113,11 @@
                 clearBtn.addEventListener("click", clearAllActiveFilters);
             }
 
-            // Build Pest Dropdown
-            const uniquePests = ["all", ...new Set(geoReportsDataset.map(r => r.pest_type).filter(Boolean))];
+            // Build Pest Dropdown (excluding healthy leaf)
+            const uniquePests = ["all", ...new Set(geoReportsDataset.map(r => r.pest_type).filter(p => {
+                const lp = String(p || "").toLowerCase();
+                return p && !lp.includes("healthy") && !lp.includes("malusog");
+            }))];
             if (pestBtn && pestPanel) {
                 let pestHtml = "";
                 uniquePests.forEach(p => {
@@ -1210,7 +1217,6 @@
             const p = String(pestName || "").toLowerCase();
             if (p.includes("brontispa")) return "#d97706";         // Orange/Amber
             if (p.includes("rhino") || p.includes("beetle")) return "#164630"; // Deep Green
-            if (p.includes("healthy") || p.includes("malusog")) return "#10b981"; // Emerald Green
             return "#64748b";                                       // Fallback gray
         }
 

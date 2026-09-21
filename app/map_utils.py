@@ -2,13 +2,22 @@ def _normalize_text(value) -> str:
     return str(value or "").strip().lower()
 
 
+def is_healthy_leaf(pest_type) -> bool:
+    """Check if the given pest type represents a healthy leaf."""
+    s = _normalize_text(pest_type)
+    return "healthy" in s or "malusog" in s
+
+
 def filter_map_reports(reports, search_query="", pest_filter="all", *args, **kwargs):
-    """Filter map reports by location text and pest type."""
+    """Filter map reports by location text and pest type, excluding healthy leaf records."""
     search_phrase = _normalize_text(search_query)
     pest_filter_value = _normalize_text(pest_filter or "all")
 
     filtered_reports = []
     for report in reports:
+        if is_healthy_leaf(report.get("pest_type")):
+            continue
+
         location_text = " ".join(
             [
                 str(report.get("barangay") or ""),

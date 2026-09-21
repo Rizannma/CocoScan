@@ -54,7 +54,7 @@ from app.report_storage import (
 )
 from app.dashboard_data import build_dashboard_chart_payload, normalize_pest_type, _parse_datetime
 from app.model_paths import resolve_model_path
-from app.map_utils import filter_map_reports, limit_recent_records
+from app.map_utils import filter_map_reports, limit_recent_records, is_healthy_leaf
 from app.recommendations import recommend_actions
 from app.session_utils import (
     RoleBasedSessionInterface,
@@ -3323,6 +3323,9 @@ def render_map_view(required_role):
 
         map_reports_list = []
         for item in raw_reports:
+            if is_healthy_leaf(item.get("pest_type")):
+                continue
+
             try:
                 lat = float(item.get("latitude"))
                 lng = float(item.get("longitude"))
