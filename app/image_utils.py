@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # Safely register pillow_heif for HEIC/HEIF decoding if installed
 try:
     import pillow_heif
-    pillow_heif.register_heif_opener()
+    pillow_heif.register_heif_opener(aux_images=False, depth_images=False)
 except Exception as _heif_init_err:
     logger.warning(f"pillow_heif opener registration failed (HEIC support unavailable): {_heif_init_err}")
 
@@ -23,7 +23,7 @@ INVALID_IMAGE_ERROR_MESSAGE = (
 STORAGE_LIMIT_ERROR_MESSAGE = (
     "Storage limit reached. Unable to save the image at this time. Please contact the administrator."
 )
-ALLOWED_IMAGE_FORMATS: Set[str] = {"JPEG", "JPG", "PNG", "HEIC", "HEIF"}
+ALLOWED_IMAGE_FORMATS: Set[str] = {"JPEG", "JPG", "PNG", "HEIC", "HEIF", "MPO", "WEBP"}
 
 
 class InvalidImageFormatError(ValueError):
@@ -161,21 +161,18 @@ def process_and_compress_image(
             else:
                 raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
 
-           # Format validation
+            # Force load image data to detect truncation or stream corruption early
+            img.load()
+
+            # Format validation
             detected_format = (img.format or "").upper()
-            
-            # Allow empty detected formats if pillow_heif successfully loaded the stream, 
-            # or check against allowed variants
             if detected_format and valid_formats:
-                # Normalize HEIF to HEIC or vice-versa
                 normalized_format = "HEIC" if detected_format in ("HEIF", "HEIC") else detected_format
                 normalized_allowed = {("HEIC" if f in ("HEIF", "HEIC") else f) for f in valid_formats}
                 
                 if normalized_format not in normalized_allowed:
                     raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
 
-            # Force load image data to detect truncation or stream corruption early
-            img.load()
         except InvalidImageFormatError:
             raise
         except (UnidentifiedImageError, OSError, IOError, ValueError, SyntaxError, Exception) as e:
@@ -206,80 +203,15 @@ def process_and_compress_image(
 
     return img
 
-def process_and_compress_image(
-    image_input: Union[bytes, bytearray, io.BytesIO, Image.Image],
+
+def compress_image_to_bytes(
+    image: Image.Image,
     max_dimension: int = SAFE_MAX_DIMENSION,
     quality: int = DEFAULT_JPEG_QUALITY,
-    allowed_formats: Optional[Union[set, list, tuple]] = None,
-) -> Image.Image:
-    if allowed_formats is None:
-        valid_formats = ALLOWED_IMAGE_FORMATS
-    else:
-        valid_formats = {f.upper() for f in allowed_formats}
-
-    if isinstance(image_input, Image.Image):
-        img = image_input
-        try:
-            img.load()
-        except Exception as e:
-            raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE) from e
-    else:
-        try:
-            if isinstance(image_input, (bytes, bytearray)):
-                if not image_input:
-                    raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
-                stream = io.BytesIO(image_input)
-                img = Image.open(stream)
-            elif hasattr(image_input, "read"):
-                stream_content = image_input.read()
-                if not stream_content:
-                    raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
-                if hasattr(image_input, "seek"):
-                    try:
-                        image_input.seek(0)
-                    except Exception:
-                        pass
-                img = Image.open(io.BytesIO(stream_content))
-            else:
-                raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
-
-            # FORCE LOAD: Ito ang magti-trigger sa pillow_heif para basahin ang HEIC stream
-            img.load()
-
-            # Format validation (Flexible for HEIC/HEIF or mobile streams)
-            detected_format = (img.format or "").upper()
-            if detected_format and valid_formats:
-                normalized_format = "HEIC" if detected_format in ("HEIF", "HEIC") else detected_format
-                normalized_allowed = {("HEIC" if f in ("HEIF", "HEIC") else f) for f in valid_formats}
-                
-                if normalized_format not in normalized_allowed:
-                    raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
-
-        except InvalidImageFormatError:
-            raise
-        except (UnidentifiedImageError, OSError, IOError, ValueError, SyntaxError, Exception) as e:
-            logger.warning(f"Failed to decode image input: {e}")
-            raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE) from e
-
-    # Correct EXIF orientation tag if present
-    try:
-        img = ImageOps.exif_transpose(img)
-    except Exception:
-        pass
-
-    # Ensure RGB color mode
-    try:
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-    except Exception as e:
-        raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE) from e
-
-    # Downscale large uploaded photos
-    w, h = img.size
-    if w > max_dimension or h > max_dimension:
-        scale = min(max_dimension / w, max_dimension / h)
-        new_w = max(1, round(w * scale))
-        new_h = max(1, round(h * scale))
-        img = img.resize((new_w, new_h), Image.Resampling.BILINEAR)
-
-    return img
+    format: str = "JPEG",
+) -> bytes:
+    """Compress a PIL Image to JPEG bytes with dimension capping and quality optimization."""
+    processed = process_and_compress_image(image, max_dimension=max_dimension, quality=quality)
+    buffer = io.BytesIO()
+    processed.save(buffer, format=format, quality=quality, optimize=True)
+    return buffer.getvalue()

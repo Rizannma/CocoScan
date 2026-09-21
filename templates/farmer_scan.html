@@ -1488,7 +1488,6 @@
             const input = event.target;
             if (input.files && input.files[0]) {
                 processImageFile(input.files[0], source);
-                input.value = '';
             }
         }
 
@@ -1990,10 +1989,10 @@
             }
 
             const formData = new FormData();
-            if (globalActiveImageFile) {
+            if (globalActiveImageFile && globalActiveImageFile.size > 0) {
                 formData.append('image_file', globalActiveImageFile);
             } else if (globalActiveImagePayload) {
-                const file = dataURLToFile(globalActiveImagePayload, 'capture.jpg');
+                const file = dataURLToFile(globalActiveImagePayload, globalActiveImageFile?.name || 'capture.jpg');
                 formData.append('image_file', file);
             }
 
@@ -2348,7 +2347,10 @@
                 scanSubmitBtn.onclick = () => submitReportPayload();
             }
 
-            document.getElementById('hidden-camera-input').value = "";
+            const camInp = document.getElementById('hidden-camera-input');
+            if (camInp) camInp.value = "";
+            const uploadInp = document.getElementById('hidden-upload-input');
+            if (uploadInp) uploadInp.value = "";
             document.getElementById('field-notes-capture').value = "";
             document.getElementById('supporting-photos-input').value = "";
             document.getElementById('supporting-preview-grid').innerHTML = '';
