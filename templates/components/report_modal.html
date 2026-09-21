@@ -1,4 +1,18 @@
-<div class="modal-screen-overlay" id="report-summary-modal" data-report-modal data-user-role="{{ (session.get('user_role') or session.get('role') or '') | lower }}" aria-hidden="true">
+{% set modal_role = (session.get('user_role') or session.get('role') or (sidebar_role if sidebar_role is defined else '') or (user_role if user_role is defined else '') or '') | lower %}
+{% if not modal_role or modal_role == 'none' %}
+  {% if request.path.startswith('/agri') or request.path.startswith('/agriculturist') %}
+    {% set modal_role = 'agriculturist' %}
+  {% elif request.path.startswith('/admin') or request.path.startswith('/overview') or request.path.startswith('/reports') %}
+    {% set modal_role = 'admin' %}
+  {% elif request.path.startswith('/lgu') %}
+    {% set modal_role = 'lgu' %}
+  {% elif request.path.startswith('/farmer') %}
+    {% set modal_role = 'farmer' %}
+  {% else %}
+    {% set modal_role = 'staff' %}
+  {% endif %}
+{% endif %}
+<div class="modal-screen-overlay" id="report-summary-modal" data-report-modal data-user-role="{{ modal_role }}" aria-hidden="true">
     <div class="modal-sheet-sliding-card" data-report-sheet>
         <style>
             .modal-screen-overlay {

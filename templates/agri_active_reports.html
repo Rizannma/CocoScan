@@ -906,6 +906,9 @@
             activeStatusFilter = 'all';
             if (dateInput) {
                 dateInput.value = "";
+                dateInput.blur();
+                dateInput.disabled = true;
+                setTimeout(() => { dateInput.disabled = false; }, 20);
                 dateInput.style.display = 'none';
             }
             const searchInput = document.getElementById("report-search");

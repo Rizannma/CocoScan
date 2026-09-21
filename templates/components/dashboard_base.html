@@ -12,7 +12,7 @@
         rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/weather_widget.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-    <script src="{{ url_for('static', filename='js/i18n.js') }}?v=33"></script>
+    <script src="{{ url_for('static', filename='js/i18n.js') }}?v=42"></script>
 
     <style>
         /* ==========================================================================
@@ -928,10 +928,10 @@
     {% block extra_head %}{% endblock %}
 </head>
 
-<body>
-
     {% set role_str = ((session.get('user_role', '') if session is defined and session else '') ~ ' ' ~ (user_role if user_role is defined and user_role else '') ~ ' ' ~ (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
-    {% set is_farmer_role = 'farmer' in role_str or (not session.get('user_role') and not user_role and not sidebar_role) %}
+    {% set is_staff_route = request.path.startswith('/agri') or request.path.startswith('/agriculturist') or request.path.startswith('/lgu') or request.path.startswith('/admin') or request.path.startswith('/overview') or request.path.startswith('/reports') %}
+    {% set is_farmer_role = ('farmer' in role_str) and not is_staff_route and request.path.startswith('/farmer') %}
+<body data-user-role="{{ 'farmer' if is_farmer_role else 'staff' }}">
     {% if 'lgu' in role_str or 'admin' in role_str %}
     {% block mobile_restriction_overlay %}{% endblock %}
     {% endif %}
@@ -1028,7 +1028,8 @@
                 <p id="greeting-banner"
                     style="font-size: 1.15rem; font-weight: 700; color: #164630; margin: 0; line-height: 1.2;"></p>
                 {% block greeting_right_action %}
-                {% if session.get('user_role') == 'farmer' or sidebar_role == 'Farmer' %}
+                {% set auth_role = ((session.get('user_role', '') if session is defined and session else '') ~ ' ' ~ (user_role if user_role is defined and user_role else '') ~ ' ' ~ (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
+                {% if 'farmer' in auth_role or 'agri' in auth_role or 'expert' in auth_role or 'lgu' in auth_role or 'admin' in auth_role or (not session.get('user_role') and not user_role and not sidebar_role) %}
                 <div class="dashboard-notif-control-box" style="position: relative; display: flex; align-items: center;">
                     <button type="button" id="farmer-notification-btn" class="farmer-notification-bell-btn" onclick="handleNotificationIconClick(event)" aria-label="{{ t('dashboard.notif_center_title', 'Notifications') }}" title="{{ t('dashboard.notif_center_title', 'Notifications') }}">
                         <i class="fa-solid fa-bell" id="farmer-notification-bell-icon"></i>
@@ -1092,7 +1093,7 @@
 
         </main>
     </div>
-    <script src="{{ url_for('static', filename='js/report_modal.js') }}?v=34"></script>
+    <script src="{{ url_for('static', filename='js/report_modal.js') }}?v=42"></script>
 
     <script id="chart-data" type="application/json">
         {{ (chart_data if chart_data is defined and chart_data else {}) | tojson }}
@@ -1168,9 +1169,18 @@
                 sidebarNameEl.textContent = fullName;
             }
 
-            const isTagalog = (window.CocoScanI18n && typeof window.CocoScanI18n.getLanguage === 'function')
+            const isFarmerUser = Boolean(
+                document.body &&
+                document.body.getAttribute('data-user-role') === 'farmer' &&
+                !window.location.pathname.startsWith('/agri') &&
+                !window.location.pathname.startsWith('/lgu') &&
+                !window.location.pathname.startsWith('/admin') &&
+                !window.location.pathname.startsWith('/overview') &&
+                !window.location.pathname.startsWith('/reports')
+            );
+            const isTagalog = isFarmerUser && ((window.CocoScanI18n && typeof window.CocoScanI18n.getLanguage === 'function')
                 ? (window.CocoScanI18n.getLanguage() === 'tl')
-                : (localStorage.getItem('cocoscan_lang') === 'tl' || document.documentElement.getAttribute('lang') === 'tl');
+                : (localStorage.getItem('cocoscan_lang') === 'tl' || document.documentElement.getAttribute('lang') === 'tl'));
 
             function formatGreeting(name) {
                 if (isTagalog) {
@@ -1620,6 +1630,7 @@
         })();
     </script>
     {% block extra_scripts %}{% endblock %}
+    {% include 'components/notification_center.html' %}
     {% include 'components/pwa_scripts.html' %}
 </body>
 

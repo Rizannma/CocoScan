@@ -35,17 +35,19 @@
         document.head.appendChild(style);
     })();
 
-    const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+    const t = (k, def) => {
+        if (currentReportModalMode !== "farmer") {
+            return def !== undefined ? def : k;
+        }
+        return (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
+    };
 
     function isTagalogActive() {
+        if (currentReportModalMode !== "farmer") return false;
         if (window.CocoScanI18n && typeof window.CocoScanI18n.getLanguage === 'function') {
             return window.CocoScanI18n.getLanguage() === 'tl';
         }
-        const docLang = document.documentElement.getAttribute('lang') || document.documentElement.lang;
-        if (docLang === 'tl') return true;
-        const cookieVal = (document.cookie || '').split('; ').find(row => row.startsWith('cocoscan_lang='));
-        if (cookieVal && cookieVal.split('=')[1] === 'tl') return true;
-        return localStorage.getItem('cocoscan_lang') === 'tl';
+        return false;
     }
 
     function getInitialRecoTitle() {
@@ -86,27 +88,49 @@
         const modalRoot = getModalRoot();
         const dataRole = (modalRoot?.getAttribute("data-user-role") || "").trim().toLowerCase();
         if (["agriculturist", "agri", "agri_expert"].includes(dataRole)) return "agriculturist";
-        if (["admin", "lgu", "farmer"].includes(dataRole)) return dataRole;
+        if (["admin", "lgu"].includes(dataRole)) return dataRole;
+
+        const bodyRole = ((document.body && (document.body.getAttribute("data-user-role") || document.body.dataset.userRole)) || "").toLowerCase();
+        if (bodyRole === "staff" || bodyRole === "admin" || bodyRole.includes("agri") || bodyRole.includes("lgu")) {
+            if (["agriculturist", "agri", "agri_expert"].includes(bodyRole)) return "agriculturist";
+            if (["admin", "lgu"].includes(bodyRole)) return bodyRole;
+        }
+
+        const path = (window.location.pathname || "").toLowerCase();
+        if (path.includes("/agriculturist") || path.includes("/agri")) return "agriculturist";
+        if (path.includes("/admin")) return "admin";
+        if (path.includes("/lgu")) return "lgu";
+        if (path.includes("/reports") || path.includes("/overview")) {
+            const clientRole = (window.currentUserRole || localStorage.getItem('cocoscan_user_role') || "").trim().toLowerCase();
+            if (clientRole === "admin" || clientRole === "lgu") return clientRole;
+            const dataElem = document.getElementById("reports-data");
+            const elemRole = (dataElem?.getAttribute("data-role") || "").toLowerCase();
+            if (elemRole && ["admin", "lgu", "agriculturist"].includes(elemRole)) return elemRole;
+            return "admin";
+        }
+        if (path.startsWith("/farmer")) return "farmer";
 
         const clientRole = (window.currentUserRole || localStorage.getItem('cocoscan_user_role') || "").trim().toLowerCase();
         if (["agriculturist", "agri", "agri_expert"].includes(clientRole)) return "agriculturist";
-        if (["admin", "lgu", "farmer"].includes(clientRole)) return clientRole;
+        if (["admin", "lgu"].includes(clientRole)) return clientRole;
+        if (clientRole === "farmer" && path.startsWith("/farmer")) return "farmer";
 
-        const path = (window.location.pathname || "").toLowerCase();
-        if (path.includes("/agriculturist/") || path.includes("/agri/")) return "agriculturist";
-        if (path.includes("/farmer/")) return "farmer";
-        if (path.includes("/admin/")) return "admin";
-        if (path.includes("/lgu/")) return "lgu";
-
-        return "farmer";
+        return "admin";
     }
 
     function shouldPollVisitDiscussion(report) {
         if (!report || !report.id) return false;
+        if (currentReportModalMode === "lgu" || currentReportModalMode === "admin") return false;
         if (report.visitArchived) return false;
         const statusKey = getStatusKey(report.status || "");
-        const closedStatuses = ["resolved", "closed", "rejected"];
-        if (closedStatuses.includes(statusKey) && !report.visitRescheduleReason) {
+        const activeDiscussionStatuses = [
+            "awaiting_confirmed_schedule",
+            "visit_requested",
+            "waiting_for_agriculturist_confirmation",
+            "waiting_agriculturist_confirmation",
+            "visit_scheduled"
+        ];
+        if (!activeDiscussionStatuses.includes(statusKey) && !report.visitRescheduleReason) {
             return false;
         }
         return true;
@@ -121,6 +145,7 @@
 
     function updateVisitDiscussionMessages(report = currentReportModalRecord) {
         if (!report) return;
+        if (currentReportModalMode === "lgu" || currentReportModalMode === "admin") return;
         const feedbackContainer = document.getElementById("report-farmer-feedback");
         if (!feedbackContainer) return;
 
@@ -639,7 +664,7 @@
             "ready_to_submit": "Ready to Submit",
         };
         const defaultLabel = labels[normalized] || normalized || "Pending";
-        if (window.CocoScanI18n && typeof window.CocoScanI18n.t === "function") {
+        if (currentReportModalMode === "farmer" && window.CocoScanI18n && typeof window.CocoScanI18n.t === "function") {
             return window.CocoScanI18n.t(`workflow_statuses.${normalized}`, defaultLabel);
         }
         return defaultLabel;
@@ -952,8 +977,9 @@
 
         if (!images || images.length === 0) {
             if (currentReportModalMode !== "scan") {
-                const t = (k, def) => (window.CocoScanI18n ? window.CocoScanI18n.t(k, def) : def);
-                const emptyText = t("modal.additional_images_empty", "No additional images uploaded.");
+                const emptyText = (currentReportModalMode === "farmer" && window.CocoScanI18n)
+                    ? window.CocoScanI18n.t("modal.additional_images_empty", "No additional images uploaded.")
+                    : "No additional images uploaded.";
                 node.innerHTML = `<div style="width:100%;"><p style="font-size: 0.82rem; color: var(--text-muted); margin: 0; text-align: left;">${escapeHtml(emptyText)}</p></div>`;
             }
             return;
@@ -1372,7 +1398,9 @@
             renderList(document.getElementById("report-initial-list"), report.officialRecommendations, t("modal.initial_reco_empty", "No recommendations available."), true, true);
 
             // 3. Update Expert Assessment List & hide input controls
-            const expertEmptyText = window.CocoScanI18n ? window.CocoScanI18n.t("modal.expert_assessment_empty", "No expert assessment available yet.") : "No expert assessment available yet.";
+            const expertEmptyText = (currentReportModalMode === "farmer" && window.CocoScanI18n)
+                ? window.CocoScanI18n.t("modal.expert_assessment_empty", "No expert assessment available yet.")
+                : "No expert assessment available yet.";
             renderList(document.getElementById("report-expert-list"), report.expertRecommendations, expertEmptyText, false);
 
             const issuedNote = document.getElementById("expert-assessment-issued-note");
@@ -1487,16 +1515,41 @@
         if (!feedbackContainer || !feedbackCard) {
             return;
         }
-        setDisplay(feedbackCard, true, "block");
-        const cardHeader = feedbackCard.querySelector('h4');
-        if (cardHeader) {
-            cardHeader.innerHTML = `<i class="fa-solid fa-calendar-check"></i> ${escapeHtml(t('modal.followup_section_title', 'Follow-up'))}`;
-        }
 
         const isArchived = Boolean(report?.visitArchived);
         const isAgriculturist = mode === "agriculturist";
+        const isLguOrAdmin = (mode === "lgu" || mode === "admin");
         const chats = Array.isArray(report?.visitChats) ? report.visitChats : [];
         const normalizedStatus = getStatusKey(report?.status || "");
+        const hasScheduleStamp = Boolean(report?.visitScheduleStamp);
+        const hasVisitSummary = Boolean(report?.visit_summary);
+        const hasPendingReschedule = Boolean(report?.visitRescheduleReason);
+        const activeDiscussionStatuses = [
+            "awaiting_confirmed_schedule",
+            "visit_requested",
+            "waiting_for_agriculturist_confirmation",
+            "waiting_agriculturist_confirmation",
+            "visit_scheduled"
+        ];
+        const isDiscussionStatus = activeDiscussionStatuses.includes(normalizedStatus);
+
+        // In LGU or Admin mode: Follow-up card is only shown when there's an actual scheduled stamp or visit summary
+        if (isLguOrAdmin) {
+            if (!hasScheduleStamp && !hasVisitSummary) {
+                feedbackContainer.innerHTML = "";
+                setDisplay(feedbackCard, false);
+                return;
+            }
+        } else {
+            // For Farmer / Agriculturist: only show when there is an active discussion, existing chats, schedule, reschedule, or archived state
+            const hasActionableContent = isDiscussionStatus || chats.length > 0 || hasScheduleStamp || hasPendingReschedule || isArchived;
+            if (!hasActionableContent) {
+                feedbackContainer.innerHTML = "";
+                setDisplay(feedbackCard, false);
+                return;
+            }
+        }
+
         const statusLabel = getWorkflowStatusDisplayLabel(report?.status || "");
         const rawScheduleTitle = report?.visitScheduleTitle || (report?.visitRescheduleReason ? "Reschedule Requested" : "Visit Scheduled");
         let localizedScheduleTitle = rawScheduleTitle;
@@ -1517,7 +1570,6 @@
         }
         const isExpanded = report?.visitDiscussionExpanded !== false;
 
-        const hasPendingReschedule = Boolean(report?.visitRescheduleReason);
         const bannerStyle = hasPendingReschedule
             ? "background:#fffbeb; color:#b45309;" // Yellow/Orange
             : "background:#ecfdf5; color:#065f46;"; // Green
@@ -1649,6 +1701,15 @@
                 ${(isArchived && mode !== "lgu" && mode !== "admin") ? `<button type="button" id="request-reschedule-btn" class="btn-control submit-primary" style="width:100%; max-width:100%; box-sizing:border-box; margin-top:6px; margin-bottom:4px;" onclick="window.openRequestRescheduleModal ? window.openRequestRescheduleModal() : null">${escapeHtml(t('modal.btn_request_reschedule', 'Request Reschedule'))}</button>` : ""}
                 ${(report?.visit_summary && (mode === "lgu" || mode === "admin")) ? `<div style="font-size:0.95rem; color:#334155; line-height:1.6; background:#f8fafc; padding:14px; border-radius:12px; border:1px solid #e2e8f0; margin-top:10px; width:100%; max-width:100%; box-sizing:border-box;"><strong>${escapeHtml(t('modal.visit_summary_title', 'Visit Summary'))}:</strong><br>${escapeHtml(report.visit_summary)}</div>` : ""}
             </div>`;
+
+        // If no visible text content was generated, keep card hidden
+        if (!feedbackContainer.textContent.trim()) {
+            feedbackContainer.innerHTML = "";
+            setDisplay(feedbackCard, false);
+            return;
+        }
+
+        setDisplay(feedbackCard, true, "block");
 
         const h4 = feedbackCard.querySelector('h4');
         if (h4) {
@@ -3021,6 +3082,13 @@
 
         const activeUserRole = getCurrentUserRole();
         let resolvedMode = mode;
+        const currentPath = ((window.location && window.location.pathname) || "").toLowerCase();
+        const isFarmerPath = currentPath.startsWith("/farmer");
+
+        if (!isFarmerPath && (resolvedMode === "farmer" || !resolvedMode)) {
+            resolvedMode = activeUserRole !== "farmer" ? activeUserRole : "admin";
+        }
+
         if (resolvedMode === "scan" || reportData?.mode === "scan") {
             resolvedMode = "scan";
         } else if (resolvedMode && ["agriculturist", "agri", "agri_expert"].includes(String(resolvedMode).toLowerCase())) {
@@ -3030,7 +3098,11 @@
         } else if (resolvedMode && ["farmer", "admin", "lgu"].includes(String(resolvedMode).toLowerCase())) {
             resolvedMode = String(resolvedMode).toLowerCase();
         } else {
-            resolvedMode = activeUserRole || "farmer";
+            resolvedMode = activeUserRole || "admin";
+        }
+
+        if (!isFarmerPath && resolvedMode === "farmer") {
+            resolvedMode = activeUserRole !== "farmer" ? activeUserRole : "admin";
         }
 
         currentReportModalMode = resolvedMode;
@@ -3058,6 +3130,65 @@
             }
         }
         initResizableImageContainer();
+
+        if (currentReportModalMode !== "farmer" || !isFarmerPath) {
+            const englishLabels = {
+                "modal.summary_title": "Report Summary",
+                "modal.btn_close": "Close",
+                "modal.btn_print": "Print report",
+                "modal.status_label": "Status:",
+                "modal.possible_pest_eyebrow": "POSSIBLE PEST",
+                "modal.detected_pest_eyebrow": "DETECTED PEST",
+                "modal.confidence_label": "Confidence:",
+                "modal.pending_validation_notice": "This is not a final result and will be validated by the agriculturist.",
+                "modal.farmer_notes_title": "Farmer Notes",
+                "modal.farmer_notes_placeholder": "Describe what you observed on your coconut tree...",
+                "modal.notes_empty": "No notes logged.",
+                "modal.additional_images_title": "Additional Images",
+                "modal.additional_images_empty": "No additional images uploaded.",
+                "modal.expert_assessment_title": "Expert Assessment",
+                "modal.expert_assessment_empty": "No expert assessment available yet.",
+                "modal.farmer_label": "Farmer:",
+                "modal.location_label": "Location:",
+                "modal.scanned_label": "Scanned:",
+                "modal.followup_section_title": "Follow-up",
+                "modal.resolution_details_title": "Resolution Details",
+                "modal.discussion_toggle_title": "Visit Request Discussion",
+                "modal.tip_label": "Tip:",
+                "modal.btn_request_reschedule": "Request Reschedule",
+                "modal.discussion_closed": "The scheduling discussion has been closed.",
+                "modal.visit_summary_title": "Visit Summary",
+                "modal.btn_validate_correct": "Mark as Verified",
+                "modal.btn_correct_result": "Re-verify Result",
+                "modal.agri_verification_title": "Expert Assessment & AI Verification",
+                "modal.initial_reco_title": "Initial Recommendations",
+                "modal.verified_reco_title": "Recommendations",
+                "modal.safe_actions_title": "Safe Precautionary Actions",
+                "modal.safe_actions_notice": "You may proceed with these safe precautionary steps while waiting for final confirmation from the agriculturist.",
+                "modal.initial_reco_desc": "These are general precautionary recommendations for the detected pest to help your initial decision while awaiting agriculturist verification.",
+                "modal.initial_reco_subtext": "Tap the question mark icon for more details.",
+                "modal.supporting_photos_title": "Supporting Photos (optional)",
+                "modal.supporting_photos_prompt": "Add Extra Field Images",
+                "modal.supporting_photos_subtext": "Tap to open your phone gallery directory",
+                "modal.supporting_photos_error": "You can upload a maximum of 3 supporting photos only.",
+                "modal.expert_assessment_issued": "Expert assessment issued.",
+                "modal.initial_reco_empty": "No initial recommendations available."
+            };
+            modalRoot.querySelectorAll("[data-i18n]").forEach(el => {
+                const key = el.getAttribute("data-i18n");
+                if (englishLabels[key]) {
+                    const icon = el.querySelector("i, svg, img");
+                    if (icon) {
+                        const iconClone = icon.cloneNode(true);
+                        el.innerHTML = "";
+                        el.appendChild(iconClone);
+                        el.appendChild(document.createTextNode(" " + englishLabels[key]));
+                    } else {
+                        el.textContent = englishLabels[key];
+                    }
+                }
+            });
+        }
 
         const renderModalFields = () => {
             const pestTitle = document.getElementById("report-pest-title");

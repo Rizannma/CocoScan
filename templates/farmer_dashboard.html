@@ -86,83 +86,6 @@
     </div>
 </div>
 
-<!-- Farmer Notification Center Modal -->
-<div id="farmer-notification-center-modal" class="modal-screen-overlay" role="dialog" aria-modal="true" aria-labelledby="notif-modal-title" onclick="if(event.target === this) closeNotificationCenter();" style="z-index: 100000;">
-    <div class="modal-sheet-sliding-card notif-sheet-card">
-        <div class="notif-sheet-handle-bar"></div>
-        <div class="notif-modal-header">
-            <div class="notif-header-left">
-                <div class="notif-header-icon-box">
-                    <i class="fa-solid fa-bell"></i>
-                </div>
-                <div class="notif-header-title-box">
-                    <h3 id="notif-modal-title" data-i18n="dashboard.notif_center_title">{{ t('dashboard.notif_center_title', 'Notifications') }}</h3>
-                    <span id="notif-unread-count-text" class="notif-count-pill">0 updates</span>
-                </div>
-            </div>
-            <div class="notif-header-actions">
-                <button type="button" id="notif-mute-toggle-btn" class="notif-action-pill-btn" onclick="toggleNotificationMuteState()" title="Toggle Mute / Unmute">
-                    <i class="fa-solid fa-bell" id="notif-mute-btn-icon"></i> <span id="notif-mute-btn-text">{{ t('dashboard.notif_btn_mute', 'Mute') }}</span>
-                </button>
-                <button type="button" id="notif-clear-all-btn" class="notif-action-pill-btn danger" onclick="clearAllNotifications()" title="Clear all notifications">
-                    <i class="fa-solid fa-trash-can"></i> <span data-i18n="dashboard.notif_btn_clear_all">{{ t('dashboard.notif_btn_clear_all', 'Clear All') }}</span>
-                </button>
-                <button type="button" class="notif-close-btn" onclick="closeNotificationCenter()" aria-label="Close" title="Close">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-        </div>
-
-        <div id="farmer-notifications-list" class="notif-items-scroll-area">
-            <!-- Populated dynamically via JS -->
-        </div>
-
-        <div id="farmer-notifications-empty" class="notif-empty-state" style="display: none;">
-            <div class="notif-empty-icon-box">
-                <i class="fa-solid fa-bell-slash"></i>
-            </div>
-            <h4 data-i18n="dashboard.notif_empty_title" style="font-size: 1.05rem; font-weight: 800; color: #1e293b; margin: 0 0 6px 0;">{{ t('dashboard.notif_empty_title', 'No New Notifications') }}</h4>
-            <p data-i18n="dashboard.notif_empty_desc" style="font-size: 0.85rem; color: #64748b; margin: 0; line-height: 1.45; max-width: 320px;">{{ t('dashboard.notif_empty_desc', 'All your coconut pest reports and visit schedules are up to date.') }}</p>
-        </div>
-    </div>
-</div>
-
-<!-- Push Notification Permission & Consent Prompt Modal -->
-<div id="farmer-push-consent-modal" class="modal-screen-overlay" role="dialog" aria-modal="true" aria-labelledby="push-consent-title" style="z-index: 100001;" onclick="if(event.target === this) dismissPushConsent(true);">
-    <div class="modal-sheet-sliding-card push-consent-card">
-        <div class="notif-sheet-handle-bar"></div>
-        <div class="push-consent-icon-box">
-            <i class="fa-solid fa-bell"></i>
-        </div>
-        <h3 id="push-consent-title" style="font-size: 1.25rem; font-weight: 800; color: #0b251a; margin-bottom: 0.5rem;" data-i18n="dashboard.push_consent_title">{{ t('dashboard.push_consent_title', 'Enable Push Notifications?') }}</h3>
-        <p style="font-size: 0.88rem; color: #475569; line-height: 1.5; margin-bottom: 1.25rem;" data-i18n="dashboard.push_consent_desc">{{ t('dashboard.push_consent_desc', 'Receive immediate alerts on your device for expert pest diagnoses, confirmed visit dates, and discussion updates.') }}</p>
-
-        <div class="push-features-list">
-            <div class="push-feature-row">
-                <i class="fa-solid fa-circle-check" style="color: #2A7B4C; font-size: 1.05rem;"></i>
-                <span data-i18n="dashboard.push_consent_feature_reco">{{ t('dashboard.push_consent_feature_reco', 'Expert diagnosis & treatment recommendations') }}</span>
-            </div>
-            <div class="push-feature-row">
-                <i class="fa-solid fa-circle-check" style="color: #2A7B4C; font-size: 1.05rem;"></i>
-                <span data-i18n="dashboard.push_consent_feature_visit">{{ t('dashboard.push_consent_feature_visit', 'Farm visit schedules & appointment reminders') }}</span>
-            </div>
-            <div class="push-feature-row">
-                <i class="fa-solid fa-circle-check" style="color: #2A7B4C; font-size: 1.05rem;"></i>
-                <span data-i18n="dashboard.push_consent_feature_chat">{{ t('dashboard.push_consent_feature_chat', 'Real-time responses to your questions') }}</span>
-            </div>
-        </div>
-
-        <div style="display: flex; flex-direction: column; gap: 8px; width: 100%; margin-top: 1.25rem;">
-            <button type="button" class="btn-enable-push" onclick="confirmEnablePushNotifications()">
-                <i class="fa-solid fa-bell"></i> <span data-i18n="dashboard.push_consent_btn_enable">{{ t('dashboard.push_consent_btn_enable', 'Yes, Enable Notifications') }}</span>
-            </button>
-            <button type="button" class="btn-not-now-push" onclick="dismissPushConsent(true)">
-                <span data-i18n="dashboard.push_consent_btn_mute">{{ t('dashboard.push_consent_btn_mute', 'Keep Muted / Not Now') }}</span>
-            </button>
-        </div>
-    </div>
-</div>
-
 <style>
     .farmer-offline-banner {
         background: #fef3c7;
@@ -937,6 +860,7 @@
             return [];
         }
     })();
+    window.rawDashboardReports = rawDashboardReports;
 
     function isPushNotificationsMuted() {
         return localStorage.getItem('cocoscan_push_muted') === 'true';

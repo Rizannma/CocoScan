@@ -109,11 +109,27 @@ except Exception as _startup_exc:
 
 def _get_current_language():
     try:
-        current_lang = session.get("lang")
-        if not current_lang:
-            current_lang = request.cookies.get("cocoscan_lang", "en")
-        if current_lang in ["en", "tl"]:
-            return current_lang
+        req_path = (request.path or "").lower() if request else ""
+        user_role = normalize_role(session.get("user_role") or session.get("role") or "")
+
+        # Strict rule: Tagalog is ONLY permitted for farmers on farmer-facing routes/APIs.
+        # Any staff, admin, lgu, agriculturist, overview, or report routes are strictly English.
+        if (
+            req_path.startswith(('/agri', '/agriculturist', '/lgu', '/admin', '/overview', '/reports')) or
+            user_role in ['agri_expert', 'lgu', 'admin']
+        ):
+            return "en"
+
+        is_farmer_request = (
+            req_path.startswith('/farmer') or
+            (user_role == 'farmer' and not req_path.startswith(('/agri', '/agriculturist', '/lgu', '/admin', '/overview', '/reports')))
+        )
+        if not is_farmer_request:
+            return "en"
+
+        current_lang = session.get("lang") or request.cookies.get("cocoscan_lang")
+        if current_lang == "tl":
+            return "tl"
     except Exception:
         pass
     return "en"
@@ -695,21 +711,22 @@ def _update_report_workflow(report_id, status, *, note=None, extra_updates=None)
             target_user = r_row.get("user_id")
             pest = r_row.get("pest_type") or "Coconut Report"
 
+            # Push notification to the farmer is in Tagalog
             if norm_status == 'visit_scheduled':
-                notif_title = "Farm Visit Scheduled"
-                notif_body = f"An agriculturist has confirmed a farm inspection schedule for your {pest} report."
+                notif_title = "Kumpirmadong Pagbisita sa Sakahan"
+                notif_body = f"Kinumpirma ng agrikultor ang iskedyul ng pagbisita para sa iyong ulat ukol sa {pest}."
             elif norm_status == 'assessment_issued':
-                notif_title = "Expert Assessment Issued"
-                notif_body = f"Expert recommendations have been provided for your {pest} report."
+                notif_title = "Pagsusuri ng Eksperto"
+                notif_body = f"Naglabas ang eksperto ng mga rekomendasyon para sa iyong ulat ukol sa {pest}."
             elif norm_status == 'resolved':
-                notif_title = "Report Resolved"
-                notif_body = f"Your {pest} report treatment solution has been marked resolved."
+                notif_title = "Naresolba ang Ulat"
+                notif_body = f"Ang lunas para sa iyong ulat ukol sa {pest} ay nakumpirma at naresolba na."
             elif norm_status == 'awaiting_confirmed_schedule':
-                notif_title = "Visit Discussion Update"
-                notif_body = f"New schedule discussion activity on your {pest} report."
+                notif_title = "Aktibidad sa Iskedyul ng Pagbisita"
+                notif_body = f"May bagong talakayan ukol sa iskedyul para sa iyong ulat ukol sa {pest}."
             else:
-                notif_title = "CocoScan Status Update"
-                notif_body = f"Your {pest} report status is now '{norm_status}'."
+                notif_title = "Balita sa Ulat ng CocoScan"
+                notif_body = f"Ang katayuan ng iyong ulat ukol sa {pest} ay '{norm_status}'."
 
             send_push_notification(
                 user_id=target_user,
@@ -1392,9 +1409,10 @@ def login():
             resp.set_cookie('cocoscan_user_role', user_role, max_age=86400, samesite='Lax')
             resp.set_cookie('cocoscan_user_email', email, max_age=86400, samesite='Lax')
             
-            # Non-farmers never have remember cookies; clean up any legacy cookie
+            # Non-farmers never have remember cookies; clean up any legacy cookie and enforce English
             if not is_farmer:
                 resp.delete_cookie(REMEMBER_COOKIE_NAME)
+                resp.set_cookie('cocoscan_lang', 'en', max_age=86400, samesite='Lax')
                 
             security_service.log_audit(email, user_role, "LOGIN", "User successfully logged in", _get_real_ip())
             logger.info(f"User {email} successfully logged in with role: {session['user_role']}")
@@ -1690,6 +1708,290 @@ def get_recent_activity():
     except Exception as e:
         logger.error(f"Error fetching recent activity: {e}")
         return jsonify({"pending_count": 0, "updated_count": 0, "total": 0}), 200
+
+
+@app.route('/api/notifications', methods=['GET'])
+def get_user_notifications():
+    """Returns role-tailored notifications for the authenticated user session."""
+    user_id = session.get('user_id')
+    user_role = normalize_role(session.get('user_role'))
+    if not user_id:
+        return jsonify({"success": False, "notifications": [], "role": user_role}), 401
+
+    try:
+        query = supabase.table("reports").select("*, visit_chats(count)").order("created_at", desc=True).limit(30)
+        if user_role == 'farmer':
+            query = query.eq("user_id", user_id)
+
+        reports_res = query.execute()
+        reports_data = getattr(reports_res, 'data', []) or []
+        notifications = []
+
+        for r in reports_data:
+            rep_id = r.get("id")
+            pest = r.get("pest_detected") or r.get("pest_type") or "Coconut Pest"
+            status = str(r.get("status") or "").strip()
+            barangay = str(r.get("barangay") or "").strip()
+            municipality = str(r.get("municipality") or "").strip()
+            location = f"{barangay}, {municipality}".strip(", ") or "Laguna"
+            c_ts = r.get("created_at") or ""
+            u_ts = r.get("updated_at") or c_ts
+            chats_count = 0
+            if r.get("visit_chats") and isinstance(r["visit_chats"], list) and len(r["visit_chats"]) > 0:
+                chats_count = r["visit_chats"][0].get("count") or 0
+            elif r.get("chat_count"):
+                chats_count = r.get("chat_count") or 0
+
+            resched_reason = str(r.get("visit_reschedule_reason") or "").strip()
+            treatment_fb = str(r.get("treatment_feedback") or "").strip()
+            norm_status = status.lower()
+
+            if user_role in ['agri_expert', 'agriculturist', 'expert']:
+                # 1. Reschedule requested by farmer
+                if resched_reason or norm_status == 'awaiting confirmed schedule':
+                    reason_snippet = f": {resched_reason[:60]}" if resched_reason else ""
+                    notifications.append({
+                        "id": f"agri_resched_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "reschedule",
+                        "tag": "Reschedule",
+                        "tagBg": "#fee2e2",
+                        "tagColor": "#b91c1c",
+                        "title": f"Reschedule Requested: Report #{rep_id}",
+                        "desc": f"Farmer requested visit reschedule{reason_snippet}.",
+                        "timestamp": u_ts,
+                        "icon": "fa-calendar-xmark",
+                        "iconBg": "#fee2e2",
+                        "iconColor": "#dc2626",
+                        "url": "/agriculturist/pending",
+                        "isUnread": True
+                    })
+
+                # 2. Visit requested from farmer feedback
+                elif 'visit' in treatment_fb.lower() or 'not resolved' in treatment_fb.lower():
+                    notifications.append({
+                        "id": f"agri_fb_visit_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "visit_request",
+                        "tag": "Visit Request",
+                        "tagBg": "#fef3c7",
+                        "tagColor": "#b45309",
+                        "title": f"Visit Requested: Report #{rep_id}",
+                        "desc": f"Farmer requested an on-site visit for {pest}.",
+                        "timestamp": u_ts,
+                        "icon": "fa-person-walking",
+                        "iconBg": "#fef3c7",
+                        "iconColor": "#d97706",
+                        "url": "/agriculturist/pending",
+                        "isUnread": True
+                    })
+
+                # 3. Farmer confirmed treatment resolved
+                elif 'resolved' in treatment_fb.lower() or is_resolved_report_status(status):
+                    notifications.append({
+                        "id": f"agri_resolved_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "resolved",
+                        "tag": "Resolved",
+                        "tagBg": "#dcfce7",
+                        "tagColor": "#15803d",
+                        "title": f"Report #{rep_id} Resolved",
+                        "desc": f"Treatment confirmed resolved for {pest} in {location}.",
+                        "timestamp": u_ts,
+                        "icon": "fa-circle-check",
+                        "iconBg": "#dcfce7",
+                        "iconColor": "#16a34a",
+                        "url": "/agriculturist/reviewed",
+                        "isUnread": True
+                    })
+
+                # 4. Pending expert diagnosis
+                elif is_pending_report_status(status):
+                    notifications.append({
+                        "id": f"agri_pending_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "pending_review",
+                        "tag": "Pending Review",
+                        "tagBg": "#e0f2fe",
+                        "tagColor": "#0369a1",
+                        "title": f"Review Needed: {pest}",
+                        "desc": f"New scan in {location} awaits diagnosis and recommendation.",
+                        "timestamp": c_ts,
+                        "icon": "fa-microscope",
+                        "iconBg": "#e0f2fe",
+                        "iconColor": "#0284c7",
+                        "url": "/agriculturist/pending",
+                        "isUnread": True
+                    })
+
+                # 5. Chat messages
+                if chats_count > 0:
+                    notifications.append({
+                        "id": f"agri_chat_{rep_id}_{chats_count}",
+                        "report_id": rep_id,
+                        "type": "chat",
+                        "tag": "Chat",
+                        "tagBg": "#ccfbf1",
+                        "tagColor": "#0f766e",
+                        "title": f"Discussion Message: #{rep_id}",
+                        "desc": f"{chats_count} message(s) on farm visit discussion thread.",
+                        "timestamp": u_ts,
+                        "icon": "fa-comments",
+                        "iconBg": "#ccfbf1",
+                        "iconColor": "#0d9488",
+                        "url": "/agriculturist/pending",
+                        "isUnread": True
+                    })
+
+            elif user_role in ['lgu', 'lgu_officer', 'admin', 'administrator']:
+                # LGU & Admin alerts
+                if is_resolved_report_status(status):
+                    notifications.append({
+                        "id": f"lgu_res_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "resolved",
+                        "tag": "Resolved",
+                        "tagBg": "#dcfce7",
+                        "tagColor": "#15803d",
+                        "title": f"Resolved: {pest}",
+                        "desc": f"Report #{rep_id} in {location} has been marked resolved.",
+                        "timestamp": u_ts,
+                        "icon": "fa-circle-check",
+                        "iconBg": "#dcfce7",
+                        "iconColor": "#16a34a",
+                        "url": "/overview/reports",
+                        "isUnread": True
+                    })
+                elif is_pending_report_status(status):
+                    notifications.append({
+                        "id": f"lgu_new_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "new_report",
+                        "tag": "Active Case",
+                        "tagBg": "#ecfdf5",
+                        "tagColor": "#047857",
+                        "title": f"New {pest} Case",
+                        "desc": f"Report #{rep_id} submitted in {location}. Pending action.",
+                        "timestamp": c_ts,
+                        "icon": "fa-bug",
+                        "iconBg": "#ecfdf5",
+                        "iconColor": "#059669",
+                        "url": "/overview/reports",
+                        "isUnread": True
+                    })
+                else:
+                    notifications.append({
+                        "id": f"lgu_update_{rep_id}",
+                        "report_id": rep_id,
+                        "type": "update",
+                        "tag": "Update",
+                        "tagBg": "#e0f2fe",
+                        "tagColor": "#0369a1",
+                        "title": f"Case Update: {pest}",
+                        "desc": f"Report #{rep_id} in {location} updated to '{status}'.",
+                        "timestamp": u_ts,
+                        "icon": "fa-clipboard-check",
+                        "iconBg": "#e0f2fe",
+                        "iconColor": "#0284c7",
+                        "url": "/overview/reports",
+                        "isUnread": True
+                    })
+
+            else:
+                # Farmer notifications (support Tagalog translation strictly for farmers)
+                farmer_lang = _get_current_language()
+                is_tl = (farmer_lang == 'tl') or (request.cookies.get('cocoscan_lang') == 'tl')
+
+                if norm_status in ['recommendation issued', 'final_remarks_issued', 'resolved']:
+                    is_res = is_resolved_report_status(status)
+                    if is_tl:
+                        tag_str = "Naresolba" if is_res else "Pagsusuri"
+                        title_str = f"Naresolbang Ulat: {pest}" if is_res else f"Pagsusuri ng Eksperto: {pest}"
+                        desc_str = "Nakumpirma ang lunas at naisara na ang ulat." if is_res else "Naglabas ang eksperto ng mga rekomendasyon para sa iyong pananim."
+                    else:
+                        tag_str = "Resolved" if is_res else "Diagnosis"
+                        title_str = f"Report Resolved: {pest}" if is_res else f"Expert Assessment: {pest}"
+                        desc_str = "Treatment solution confirmed and report closed." if is_res else "Expert management recommendations have been issued for your scan."
+
+                    notifications.append({
+                        "id": f"farmer_reco_{rep_id}_{status}",
+                        "report_id": rep_id,
+                        "type": "resolved" if is_res else "recommendation",
+                        "tag": tag_str,
+                        "tagBg": "#dcfce7" if is_res else "#ecfdf5",
+                        "tagColor": "#15803d" if is_res else "#047857",
+                        "title": title_str,
+                        "desc": desc_str,
+                        "timestamp": u_ts,
+                        "icon": "fa-circle-check" if is_res else "fa-user-shield",
+                        "iconBg": "#dcfce7" if is_res else "#e6f4ea",
+                        "iconColor": "#16a34a" if is_res else "#2A7B4C",
+                        "url": f"/farmer/reports?report_id={rep_id}",
+                        "isUnread": True
+                    })
+                elif norm_status in ['visit scheduled', 'visit_scheduled', 'awaiting confirmed schedule']:
+                    is_conf = norm_status in ['visit scheduled', 'visit_scheduled']
+                    if is_tl:
+                        tag_str = "Pagbisita"
+                        title_str = f"Kumpirmadong Pagbisita: #{rep_id}" if is_conf else f"Naiskedyul na Pagbisita: #{rep_id}"
+                        desc_str = "Kinumpirma ng agriculturist ang iskedyul ng pagbisita sa iyong sakahan." if is_conf else "May bagong aktibidad sa talakayan ng iskedyul para sa iyong ulat."
+                    else:
+                        tag_str = "Visit"
+                        title_str = f"Farm Visit Confirmed: #{rep_id}" if is_conf else f"Visit Scheduled: #{rep_id}"
+                        desc_str = "An agriculturist has confirmed a farm inspection schedule." if is_conf else "New schedule discussion activity on your report."
+
+                    notifications.append({
+                        "id": f"farmer_visit_{rep_id}_{status}",
+                        "report_id": rep_id,
+                        "type": "visit",
+                        "tag": tag_str,
+                        "tagBg": "#e0f2fe",
+                        "tagColor": "#0369a1",
+                        "title": title_str,
+                        "desc": desc_str,
+                        "timestamp": u_ts,
+                        "icon": "fa-calendar-check",
+                        "iconBg": "#e0f2fe",
+                        "iconColor": "#0284c7",
+                        "url": f"/farmer/reports?report_id={rep_id}",
+                        "isUnread": True
+                    })
+
+                if chats_count > 0:
+                    if is_tl:
+                        tag_str = "Usapan"
+                        title_str = f"Bagong Mensahe: #{rep_id}"
+                        desc_str = f"{chats_count} mensahe sa iyong usapan sa pagbisita."
+                    else:
+                        tag_str = "Chat"
+                        title_str = f"New Discussion Message: #{rep_id}"
+                        desc_str = f"{chats_count} message(s) on your visit scheduling thread."
+
+                    notifications.append({
+                        "id": f"farmer_chat_{rep_id}_{chats_count}",
+                        "report_id": rep_id,
+                        "type": "chat",
+                        "tag": tag_str,
+                        "tagBg": "#ccfbf1",
+                        "tagColor": "#0f766e",
+                        "title": title_str,
+                        "desc": desc_str,
+                        "timestamp": u_ts,
+                        "icon": "fa-comments",
+                        "iconBg": "#ccfbf1",
+                        "iconColor": "#0d9488",
+                        "url": f"/farmer/reports?report_id={rep_id}",
+                        "isUnread": True
+                    })
+
+        # Sort newest first
+        notifications.sort(key=lambda x: str(x.get("timestamp") or ""), reverse=True)
+        return jsonify({"success": True, "role": user_role, "notifications": notifications[:25]}), 200
+
+    except Exception as e:
+        logger.error(f"Error generating role notifications: {e}")
+        return jsonify({"success": False, "notifications": [], "role": user_role, "error": str(e)}), 500
+
 
 def _format_risk_text(level, text):
     if not text:
@@ -3533,8 +3835,8 @@ def save_visit_chat(report_id):
             if user_role in {'agri_expert', 'admin', 'lgu'}:
                 send_push_notification(
                     user_id=target_user,
-                    title="New Visit Discussion Message",
-                    body=f"Agriculturist: {message[:60]}",
+                    title="Bagong Mensahe sa Usapan",
+                    body=f"Agrikultor: {message[:60]}",
                     report_id=report_id,
                     url=f"/farmer/reports?report_id={report_id}"
                 )

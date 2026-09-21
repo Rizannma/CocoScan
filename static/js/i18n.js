@@ -1110,6 +1110,30 @@
     dictionaries: TRANSLATIONS,
 
     getLanguage: function () {
+      // Translations are STRICTLY for farmers only. Staff and officer roles must always be English.
+      try {
+        const path = ((window.location && window.location.pathname) || "").toLowerCase();
+        
+        // Strict guard: If NOT on a farmer path, Tagalog is NEVER permitted.
+        if (!path.startsWith("/farmer")) {
+          if (localStorage.getItem("cocoscan_lang") === "tl") {
+            try { localStorage.setItem("cocoscan_lang", "en"); } catch (e) {}
+            try { setCookie("cocoscan_lang", "en", 365); } catch (e) {}
+          }
+          return "en";
+        }
+
+        const bodyRole = ((document.body && (document.body.getAttribute("data-user-role") || document.body.dataset.userRole)) || "").toLowerCase();
+        if (bodyRole && bodyRole !== "farmer") {
+          return "en";
+        }
+
+        const localRole = (localStorage.getItem("cocoscan_user_role") || "").toLowerCase();
+        if (localRole && localRole !== "farmer") {
+          return "en";
+        }
+      } catch (e) {}
+
       const stored = localStorage.getItem("cocoscan_lang");
       if (stored === "en" || stored === "tl") return stored;
       const cookieVal = getCookie("cocoscan_lang");
