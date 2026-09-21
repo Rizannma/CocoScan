@@ -161,10 +161,17 @@ def process_and_compress_image(
             else:
                 raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
 
-            # Format validation
+           # Format validation
             detected_format = (img.format or "").upper()
+            
+            # Allow empty detected formats if pillow_heif successfully loaded the stream, 
+            # or check against allowed variants
             if detected_format and valid_formats:
-                if detected_format not in valid_formats:
+                # Normalize HEIF to HEIC or vice-versa
+                normalized_format = "HEIC" if detected_format in ("HEIF", "HEIC") else detected_format
+                normalized_allowed = {("HEIC" if f in ("HEIF", "HEIC") else f) for f in valid_formats}
+                
+                if normalized_format not in normalized_allowed:
                     raise InvalidImageFormatError(INVALID_IMAGE_ERROR_MESSAGE)
 
             # Force load image data to detect truncation or stream corruption early

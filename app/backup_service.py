@@ -11,7 +11,7 @@ import logging
 import os
 from pathlib import Path
 import shutil
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
@@ -496,8 +496,8 @@ def delete_report_cascading(
 
 
 def count_reports_by_date_range(
-    year: int,
-    month: Optional[int] = None,
+    year: Union[int, str],
+    month: Optional[Union[int, str]] = None,
     supabase_client: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """Calculate the count of reports matching the given year and optional month."""
@@ -554,8 +554,8 @@ def count_reports_by_date_range(
 
 
 def bulk_delete_reports_by_date_range(
-    year: int,
-    month: Optional[int] = None,
+    year: Union[int, str],
+    month: Optional[Union[int, str]] = None,
     admin_id: str = "",
     admin_name: str = "",
     admin_email: str = "",
