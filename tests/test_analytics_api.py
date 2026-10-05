@@ -306,4 +306,83 @@ class AnalyticsApiTests(unittest.TestCase):
         self.assertIn("Jul 01, 2026 to Jul 31, 2026", html)
         self.assertNotIn("This report covers all historical data across all active regions.", html)
 
+    def test_api_analytics_and_report_summary_track_in_progress_status(self):
+        class FakeResponse:
+            def __init__(self, data):
+                self.data = data
+
+        class FakeQuery:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def select(self, *args, **kwargs):
+                return self
+
+            def order(self, *args, **kwargs):
+                return self
+
+            def execute(self):
+                return FakeResponse(self.rows)
+
+        class FakeSupabaseClient:
+            def table(self, _table_name):
+                return FakeQuery([
+                    {
+                        "id": "report-1",
+                        "created_at": "2026-07-01T10:00:00Z",
+                        "pest_type": "Rhinoceros Beetle",
+                        "status": "Under Review",
+                        "barangay": "Barangay 1",
+                    },
+                    {
+                        "id": "report-2",
+                        "created_at": "2026-07-02T10:00:00Z",
+                        "pest_type": "Rhinoceros Beetle",
+                        "status": "Assessment Issued",
+                        "barangay": "Barangay 2",
+                    },
+                    {
+                        "id": "report-3",
+                        "created_at": "2026-07-03T10:00:00Z",
+                        "pest_type": "Brontispa",
+                        "status": "Awaiting Confirmed Schedule",
+                        "barangay": "Barangay 3",
+                    },
+                    {
+                        "id": "report-4",
+                        "created_at": "2026-07-04T10:00:00Z",
+                        "pest_type": "Brontispa",
+                        "status": "Resolved",
+                        "barangay": "Barangay 4",
+                    },
+                ])
+
+        original_supabase = main.supabase
+        main.supabase = cast(Any, FakeSupabaseClient())
+        self.addCleanup(setattr, main, "supabase", original_supabase)
+
+        with self.client.session_transaction() as session:
+            session["user_id"] = "user-1"
+            session["user_role"] = "lgu"
+
+        # Verify /api/analytics
+        response = self.client.get("/api/analytics?month=2026-07")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["success"])
+        status_bd = payload["status_breakdown"]
+        self.assertEqual(status_bd["total"]["pending"], 1)
+        self.assertEqual(status_bd["total"]["in_progress"], 2)
+        self.assertEqual(status_bd["total"]["resolved"], 1)
+        self.assertEqual(status_bd["rhinoceros beetle"]["in_progress"], 1)
+        self.assertEqual(status_bd["brontispa"]["in_progress"], 1)
+
+        # Verify /report_summary
+        summary_res = self.client.get("/report_summary?month=2026-07")
+        self.assertEqual(summary_res.status_code, 200)
+        html = summary_res.get_data(as_text=True)
+        # Verify in_progress is passed to the table and chart script
+        self.assertIn("in_progress: Number(\"2\")", html)
+
+
 

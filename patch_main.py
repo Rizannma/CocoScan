@@ -55,11 +55,12 @@ def api_analytics():
             pest_raw = str(r.get('pest_type') or '').strip().lower()
             status = str(r.get('status') or '').strip().lower()
             
-            mapped_status = 'in_progress'
-            if is_pending_report_status(status):
-                mapped_status = 'pending'
-            elif is_resolved_report_status(status):
+            if is_resolved_report_status(status):
                 mapped_status = 'resolved'
+            elif is_under_review_report_status(status):
+                mapped_status = 'pending'
+            else:
+                mapped_status = 'in_progress'
             if pest_raw in status_breakdown:
                 status_breakdown[pest_raw][mapped_status] += 1
                 
@@ -126,9 +127,9 @@ def report_summary():
         rhino_count = sum(1 for r in pest_reports if str(r.get('pest_type') or '').strip().lower() == 'rhinoceros beetle')
         brontispa_count = sum(1 for r in pest_reports if str(r.get('pest_type') or '').strip().lower() == 'brontispa')
 
-        pending_count = sum(1 for r in pest_reports if is_pending_report_status(str(r.get('status') or '').strip().lower()))
-        resolved_count = sum(1 for r in pest_reports if is_resolved_report_status(str(r.get('status') or '').strip().lower()))
-        in_progress_count = len(pest_reports) - (pending_count + resolved_count)
+        pending_count = sum(1 for r in pest_reports if is_under_review_report_status(r.get('status')))
+        resolved_count = sum(1 for r in pest_reports if is_resolved_report_status(r.get('status')))
+        in_progress_count = sum(1 for r in pest_reports if is_in_progress_report_status(r.get('status')))
 
         location_counts = {}
         for r in pest_reports:

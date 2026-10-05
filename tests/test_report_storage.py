@@ -4,9 +4,11 @@ from app.report_storage import (
     build_report_payload,
     format_report_date,
     format_report_timestamp,
+    is_in_progress_report_status,
     is_pending_report_status,
     is_resolved_report_status,
     is_reviewed_report_status,
+    is_under_review_report_status,
     normalize_report_status,
     resolve_farmer_notes,
     resolve_field_notes,
@@ -69,6 +71,21 @@ class ReportStorageTests(unittest.TestCase):
         self.assertTrue(is_resolved_report_status("Resolved"))
         self.assertTrue(is_resolved_report_status("Closed"))
         self.assertFalse(is_resolved_report_status("Under Review"))
+
+        self.assertTrue(is_under_review_report_status("Under Review"))
+        self.assertTrue(is_under_review_report_status("pending review"))
+        self.assertTrue(is_under_review_report_status("Submitted"))
+        self.assertFalse(is_under_review_report_status("assessment_issued"))
+        self.assertFalse(is_under_review_report_status("Resolved"))
+
+        self.assertTrue(is_in_progress_report_status("assessment_issued"))
+        self.assertTrue(is_in_progress_report_status("Assessment Issued"))
+        self.assertTrue(is_in_progress_report_status("Awaiting Confirmed Schedule"))
+        self.assertTrue(is_in_progress_report_status("waiting_agriculturist_confirmation"))
+        self.assertTrue(is_in_progress_report_status("visit_scheduled"))
+        self.assertTrue(is_in_progress_report_status("visit_completed"))
+        self.assertFalse(is_in_progress_report_status("Under Review"))
+        self.assertFalse(is_in_progress_report_status("Resolved"))
 
     def test_resolve_report_image_url_handles_storage_keys_and_public_urls(self):
         base_url = "https://utvltqgxqnpcqrphuojc.supabase.co/storage/v1/object/public/reports/"

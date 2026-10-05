@@ -41,6 +41,9 @@ def normalize_report_status(value: Any, *, default: str = "Under Review") -> str
         "under review": "Under Review",
         "reviewed": "Under Review",
         "submitted": "Under Review",
+        "awaiting confirmed schedule": "Waiting for Agriculturist Confirmation",
+        "in progress": "In Progress",
+        "in_progress": "In Progress",
         "assessment issued": "Assessment Issued",
         "assessment": "Assessment Issued",
         "on site visit requested": "Waiting for Agriculturist Confirmation",
@@ -59,6 +62,17 @@ def normalize_report_status(value: Any, *, default: str = "Under Review") -> str
     }
 
     return status_map.get(key, normalized)
+
+
+def is_under_review_report_status(value: Any) -> bool:
+    """Return True if the status represents an initial report awaiting review."""
+    return normalize_report_status(value, default="Under Review") == "Under Review"
+
+
+def is_in_progress_report_status(value: Any) -> bool:
+    """Return True if the status represents an active report that has been reviewed or is in progress."""
+    normalized = normalize_report_status(value, default="Under Review")
+    return normalized not in ("Under Review", "Resolved")
 
 
 def is_pending_report_status(value: Any) -> bool:
