@@ -7,7 +7,7 @@ import traceback
 import logging
 import json
 from datetime import datetime, UTC
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, make_response
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, send_from_directory, send_file, make_response, has_request_context
 from app.route_utils import require_role, fetch_user_reports, resolve_user_fullname
 import base64
 from io import BytesIO
@@ -1047,6 +1047,19 @@ def send_status_email(user_email, user_name, status):
     </svg>
     """
 
+    # Resolve dynamic base URL for action buttons (environment variable -> request context -> production fallback)
+    env_base = (os.getenv("APP_BASE_URL") or os.getenv("PUBLIC_APP_URL") or os.getenv("BASE_URL") or "").strip().rstrip("/")
+    if env_base:
+        if not env_base.startswith(("http://", "https://")):
+            env_base = f"https://{env_base}"
+        base_url = env_base
+    elif has_request_context():
+        base_url = request.host_url.rstrip("/")
+    else:
+        base_url = "https://cocoscan-ai.up.railway.app"
+
+    login_url = f"{base_url}/login"
+
     if status == "Approved":
         status_title = "APPLICATION APPROVED"
         status_color = "#059669"
@@ -1054,7 +1067,7 @@ def send_status_email(user_email, user_name, status):
         <p style="margin-bottom: 16px;">Great news! Your account application for <strong>CocoScan</strong> has been reviewed and approved by our administration team.</p>
         <p style="margin-bottom: 24px;">You can now log in to access your custom dashboard, review coconut metrics, and utilize our pest scanning system features.</p>
         <div style="margin: 32px 0; text-align: center;">
-            <a href="http://127.0.0.1:5000/login" style="background-color: {status_color}; color: #ffffff; padding: 14px 32px; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px; display: inline-block;">Log In To Dashboard</a>
+            <a href="{login_url}" style="background-color: {status_color}; color: #ffffff; padding: 14px 32px; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px; display: inline-block;">Log In To Dashboard</a>
         </div>
         """
     else:
