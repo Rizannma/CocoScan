@@ -4,6 +4,7 @@ import sys
 import sqlite3
 import time
 import gc
+from unittest.mock import patch
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app import security_service
 
@@ -58,7 +59,7 @@ class TestSecurityService(unittest.TestCase):
         security_service.record_2fa_verification(email)
         self.assertFalse(security_service.requires_2fa(email, days=7))
 
-    def test_generate_and_send_otp_uses_45_second_expiry(self):
+    def test_generate_and_send_otp_uses_90_second_expiry(self):
         email = "otp@example.com"
         security_service.generate_and_send_otp(email, purpose="Password Reset")
 
@@ -77,6 +78,72 @@ class TestSecurityService(unittest.TestCase):
         self.assertIn("delivery_available", result)
         self.assertIn("delivery_message", result)
         self.assertIsInstance(result["delivery_available"], bool)
+        self.assertFalse(result["fallback_allowed"])
+        self.assertNotIn("code", result)
+
+    @patch('app.security_service._send_email_brevo', return_value=True)
+    def test_otp_requests_are_limited_to_three_per_hour(self, _mock_send):
+        email = "otp-limit@example.com"
+        with patch('app.security_service.time.time', return_value=1000):
+            for _ in range(3):
+                result = security_service.generate_and_send_otp(email, "Password Reset")
+                self.assertTrue(result["sent"])
+
+            limited = security_service.generate_and_send_otp(email, "Password Reset")
+            self.assertTrue(limited["rate_limited"])
+            self.assertEqual(limited["retry_after_seconds"], 3600)
+
+        with patch('app.security_service.time.time', return_value=4600):
+            allowed = security_service.generate_and_send_otp(email, "Password Reset")
+            self.assertTrue(allowed["sent"])
+
+    @patch('app.security_service._send_email_brevo', return_value=True)
+    @patch('app.security_service.secrets.randbelow', return_value=123456)
+    def test_three_incorrect_otp_entries_lock_verification_for_one_hour(self, _mock_random, _mock_send):
+        email = "otp-verify-limit@example.com"
+        purpose = "Password Reset"
+        with patch('app.security_service.time.time', return_value=1000):
+            security_service.generate_and_send_otp(email, purpose)
+            with security_service._get_db() as conn:
+                stored_code = conn.execute(
+                    "SELECT code FROM otp_codes WHERE email = ? AND purpose = ? ORDER BY id DESC LIMIT 1",
+                    (email, purpose)
+                ).fetchone()["code"]
+
+            self.assertNotEqual(stored_code, "123456")
+            wrong_code = "000000"
+            for _ in range(3):
+                success, message = security_service.verify_otp(email, wrong_code, purpose)
+                self.assertFalse(success)
+
+            self.assertIn("60 minutes", message)
+            success, message = security_service.verify_otp(email, "123456", purpose)
+            self.assertFalse(success)
+            self.assertIn("try again", message)
+
+        with patch('app.security_service.time.time', return_value=4601):
+            security_service.generate_and_send_otp(email, purpose)
+            success, _message = security_service.verify_otp(email, "123456", purpose)
+            self.assertTrue(success)
+
+    @patch('app.security_service._send_email_brevo', return_value=True)
+    @patch('app.security_service.secrets.randbelow', return_value=123456)
+    def test_correct_otp_is_single_use_and_not_returned(self, _mock_random, _mock_send):
+        email = "otp-single-use@example.com"
+        result = security_service.generate_and_send_otp(email, "2FA Verification")
+
+        self.assertNotIn("code", result)
+        with security_service._get_db() as conn:
+            stored_code = conn.execute(
+                "SELECT code FROM otp_codes WHERE email = ? AND purpose = ? ORDER BY id DESC LIMIT 1",
+                (email, "2FA Verification")
+            ).fetchone()["code"]
+        self.assertNotEqual(stored_code, "123456")
+        success, _message = security_service.verify_otp(email, "123456", "2FA Verification")
+        self.assertTrue(success)
+        success, message = security_service.verify_otp(email, "123456", "2FA Verification")
+        self.assertFalse(success)
+        self.assertIn("No active verification code", message)
 
     def test_audit_logs(self):
         security_service.log_audit("admin@example.com", "admin", "LOGIN", "Test audit log", "127.0.0.1")

@@ -590,6 +590,290 @@
         box-shadow: 0 6px 16px rgba(220, 38, 38, 0.3);
     }
 
+    /* Reports List Selection Component in Danger Zone */
+    .danger-reports-table-container {
+        background: #ffffff;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        overflow-x: auto;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+        max-height: 420px;
+        overflow-y: auto;
+    }
+
+    .danger-reports-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 580px;
+        font-size: 0.88rem;
+    }
+
+    .danger-reports-table thead th {
+        background: #f8fafc;
+        padding: 12px 14px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1.5px solid #e2e8f0;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        text-align: left;
+    }
+
+    .danger-reports-table tbody tr {
+        border-bottom: 1px solid #f1f5f9;
+        transition: background-color 0.15s ease;
+        cursor: pointer;
+    }
+
+    .danger-reports-table tbody tr:hover {
+        background-color: #f8fafc;
+    }
+
+    .danger-reports-table tbody tr.selected-row {
+        background-color: #fff1f2 !important;
+    }
+
+    .danger-reports-table tbody td {
+        padding: 12px 14px;
+        color: #1e293b;
+        vertical-align: middle;
+    }
+
+    .modern-checkbox {
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+        accent-color: #dc2626;
+        border-radius: 4px;
+        vertical-align: middle;
+    }
+
+    .report-id-badge {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.82rem;
+        font-weight: 700;
+        background: #fee2e2;
+        color: #991b1b;
+        padding: 3px 8px;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .selection-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+    }
+
+    .btn-clear-selection {
+        background: #ffffff;
+        border: 1px solid #cbd5e1;
+        color: #64748b;
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        transition: all 0.15s;
+    }
+
+    .btn-clear-selection:hover {
+        background: #f1f5f9;
+        color: #1e293b;
+    }
+
+    .btn-row-delete-single {
+        background: transparent;
+        border: none;
+        color: #94a3b8;
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.15s;
+        font-size: 0.85rem;
+    }
+
+    .btn-row-delete-single:hover {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .report-mini-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+
+    .report-mini-status.status-review {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde68a;
+    }
+
+    .report-mini-status.status-progress {
+        background: #e0f2fe;
+        color: #0369a1;
+        border: 1px solid #bae6fd;
+    }
+
+    .report-mini-status.status-resolved {
+        background: #dcfce7;
+        color: #15803d;
+        border: 1px solid #bbf7d0;
+    }
+
+    /* Pre-Confirmation Mini Modal */
+    .preconfirm-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(15, 23, 42, 0.55);
+        backdrop-filter: blur(3px);
+        -webkit-backdrop-filter: blur(3px);
+        z-index: 100000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+        box-sizing: border-box;
+    }
+    .preconfirm-card {
+        background: #fff;
+        border-radius: 18px;
+        box-shadow: 0 24px 64px rgba(15,23,42,0.22), 0 4px 16px rgba(220,38,38,0.10);
+        padding: 32px 28px 24px;
+        max-width: 460px;
+        width: 100%;
+        animation: preconfirmPop 0.22s cubic-bezier(0.34,1.56,0.64,1);
+        text-align: center;
+    }
+    @keyframes preconfirmPop {
+        from { transform: scale(0.88); opacity: 0; }
+        to   { transform: scale(1);    opacity: 1; }
+    }
+    .preconfirm-icon-wrap {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: #fff1f2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+        border: 2px solid #fecdd3;
+    }
+    .preconfirm-icon-wrap i {
+        font-size: 1.6rem;
+        color: #dc2626;
+    }
+    .preconfirm-card h4 {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: #0f172a;
+        margin: 0 0 8px;
+    }
+    .preconfirm-card p {
+        font-size: 0.85rem;
+        color: #64748b;
+        margin: 0 0 22px;
+        line-height: 1.55;
+    }
+    .preconfirm-report-badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: #dc2626;
+        background: #fff1f2;
+        border: 1px solid #fecdd3;
+        border-radius: 20px;
+        padding: 5px 14px;
+        margin: 0 auto 16px;
+        max-width: 100%;
+        overflow: hidden;
+    }
+    .preconfirm-report-badge i {
+        flex-shrink: 0;
+    }
+    .preconfirm-report-badge span {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        min-width: 0;
+    }
+    .preconfirm-actions {
+        display: flex;
+        gap: 10px;
+        justify-content: center;
+    }
+    .btn-preconfirm-cancel {
+        flex: 1;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: 1.5px solid #e2e8f0;
+        background: #f8fafc;
+        color: #475569;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-preconfirm-cancel:hover {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+    }
+    .btn-preconfirm-proceed {
+        flex: 1;
+        padding: 10px 16px;
+        border-radius: 10px;
+        border: none;
+        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+        color: #fff;
+        font-size: 0.88rem;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        transition: opacity 0.15s, transform 0.12s;
+        box-shadow: 0 2px 8px rgba(220,38,38,0.25);
+    }
+    .btn-preconfirm-proceed:hover {
+        opacity: 0.92;
+        transform: translateY(-1px);
+    }
+
+    .search-highlight {
+        background: rgba(74, 198, 143, 0.28);
+        color: #0b1315;
+        padding: 0 2px;
+        border-radius: 4px;
+        font-weight: 700;
+    }
+
     /* Confirmation Modal */
     .danger-modal-overlay {
         position: fixed;
@@ -1065,38 +1349,122 @@
     <div style="background: #fafafa; border: 1.5px solid #f1f5f9; border-radius: 14px; padding: 20px;">
         <!-- Tab 1: By Specific Report -->
         <div id="panel-single-delete" style="display: block;">
-            <div style="margin-bottom: 14px;">
-                <h4 style="font-size: 0.95rem; font-weight: 700; color: #0b1315; margin: 0 0 4px 0;">Target Single Report Deletion</h4>
-                <p style="font-size: 0.82rem; color: #64748b; margin: 0;">Select a recent report from the dropdown or enter an ID to remove the record and permanently delete its images from Cloud Storage.</p>
-            </div>
-            <div class="danger-control-grid">
-                <div class="danger-input-group">
-                    <label for="recent-reports-dropdown" style="display: block; font-size: 0.8rem; font-weight: 700; color: #334155; margin-bottom: 6px;">
-                        Select Report to Delete
-                    </label>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <div class="modern-select-container" style="flex: 2; min-width: 260px;">
-                            <select id="recent-reports-dropdown" class="modern-select" onchange="handleRecentReportChange(this.value)">
-                                <option value="">-- Choose from recent reports --</option>
-                                {% for r in recent_reports %}
-                                <option value="{{ r.id }}" data-label="{{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}">
-                                    {{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}
-                                </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div style="flex: 1; min-width: 140px; max-width: 170px;">
-                            <input type="number" id="target-report-id-input" class="modern-input-text" placeholder="Or enter ID..." oninput="handleIdInputChange(this.value)">
-                        </div>
-                    </div>
+            <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+                <div>
+                    <h4 style="font-size: 0.95rem; font-weight: 700; color: #0b1315; margin: 0 0 4px 0;">Target Specific Reports Deletion</h4>
+                    <p style="font-size: 0.82rem; color: #64748b; margin: 0;">Select reports from the list below using checkboxes, or specify a Report ID to permanently delete records and cloud images.</p>
                 </div>
-                <div style="display: flex; align-items: flex-end;">
-                    <button type="button" class="btn-trigger-danger" onclick="openSingleReportDeleteModal()">
-                        <i class="fa-solid fa-trash-can"></i>
-                        <span>Trigger Report Deletion...</span>
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <div id="selection-status-badge" class="selection-pill" style="display: none;">
+                        <i class="fa-solid fa-check-double"></i>
+                        <span id="selected-reports-counter">0 reports selected</span>
+                    </div>
+                    <button type="button" id="btn-clear-selection" class="btn-clear-selection" style="display: none;" onclick="clearReportSelection()">
+                        <i class="fa-solid fa-xmark"></i>
+                        <span>Clear Selection</span>
                     </button>
                 </div>
             </div>
+
+            <!-- Toolbar & Actions -->
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center;">
+                <div style="flex: 2; min-width: 220px; position: relative;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.82rem;"></i>
+                    <input type="text" id="reports-search-input" class="modern-input-text" style="padding-left: 36px;" placeholder="Search reports by ID, pest, or status..." oninput="handleReportTableSearch(this.value)">
+                </div>
+                <div style="flex: 1; min-width: 140px; max-width: 170px;">
+                    <input type="number" id="target-report-id-input" class="modern-input-text" placeholder="Or enter ID..." oninput="handleIdInputChange(this.value)">
+                </div>
+                <div style="min-width: 200px;">
+                    <button type="button" class="btn-trigger-danger" id="btn-trigger-danger-action" onclick="openSingleReportDeleteModal()">
+                        <i class="fa-solid fa-trash-can"></i>
+                        <span id="btn-trigger-danger-text">Trigger Report Deletion...</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Reports List Component with Selection State -->
+            <div class="danger-reports-table-container">
+                <table class="danger-reports-table" id="danger-reports-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 130px; white-space: nowrap;">
+                                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-size: 0.78rem; font-weight: 700; color: #475569; user-select: none; white-space: nowrap;">
+                                    <input type="checkbox" id="reports-master-checkbox" class="modern-checkbox" title="Select All Reports" aria-label="Select All Reports" onchange="toggleSelectAllReports(this.checked)">
+                                    <span>Select All</span>
+                                </label>
+                            </th>
+                            <th style="width: 15%;">Report ID</th>
+                            <th style="width: 30%;">Pest</th>
+                            <th style="width: 23%;">Date Created</th>
+                            <th style="width: 20%;">Status</th>
+                            <th style="width: 12%; text-align: center;">Quick Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="danger-reports-tbody">
+                        {% if recent_reports and recent_reports|length > 0 %}
+                            {% for r in recent_reports %}
+                            <tr class="report-row-item" data-report-id="{{ r.id }}" data-search="{{ (r.id ~ ' ' ~ (r.pest_type or '') ~ ' ' ~ (r.formatted_date or '') ~ ' ' ~ (r.status or ''))|lower }}" onclick="handleRowClick(event, '{{ r.id }}')">
+                                <td onclick="event.stopPropagation()">
+                                    <label style="display: inline-flex; align-items: center; cursor: pointer; margin: 0;">
+                                        <input type="checkbox" class="report-row-checkbox modern-checkbox" value="{{ r.id }}" data-report-id="{{ r.id }}" data-label="{{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}" onchange="handleRowCheckboxChange(this)">
+                                    </label>
+                                </td>
+                                <td>
+                                    <span class="report-id-badge">
+                                        <i class="fa-solid fa-hashtag" style="font-size: 0.72rem; color: #dc2626;"></i>{{ r.id }}
+                                    </span>
+                                </td>
+                                <td style="font-weight: 600; color: #0f172a;">
+                                    <span style="display: inline-flex; align-items: center; gap: 6px;">
+                                        <i class="fa-solid fa-bug" style="color: #64748b; font-size: 0.8rem;"></i>
+                                        <span>{{ r.pest_type or 'General' }}</span>
+                                    </span>
+                                </td>
+                                <td style="color: #475569; font-size: 0.86rem;">
+                                    <i class="fa-regular fa-calendar" style="color: #94a3b8; margin-right: 4px; font-size: 0.8rem;"></i>
+                                    {{ r.formatted_date or 'Recent' }}
+                                </td>
+                                <td>
+                                    {% set s = (r.status or 'Under Review')|lower %}
+                                    <span class="report-mini-status {% if 'resolved' in s %}status-resolved{% elif 'progress' in s or 'schedule' in s %}status-progress{% else %}status-review{% endif %}">
+                                        {{ r.status or 'Under Review' }}
+                                    </span>
+                                </td>
+                                <td style="text-align: center;" onclick="event.stopPropagation()">
+                                    <button type="button" class="btn-row-delete-single" title="Delete Report #{{ r.id }}" onclick="openPreconfirmModal('{{ r.id }}')">
+                                        <i class="fa-solid fa-trash-can"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr id="empty-reports-row">
+                                <td colspan="6" style="text-align: center; padding: 32px 14px; color: #64748b;">
+                                    <i class="fa-solid fa-inbox" style="font-size: 1.8rem; color: #cbd5e1; display: block; margin-bottom: 6px;"></i>
+                                    No recent reports found in database. You can still enter a Report ID in the input above.
+                                </td>
+                            </tr>
+                        {% endif %}
+                        <tr id="no-search-results-row" style="display: none;">
+                            <td colspan="6" style="text-align: center; padding: 24px 14px; color: #64748b;">
+                                <i class="fa-solid fa-magnifying-glass" style="font-size: 1.4rem; color: #cbd5e1; display: block; margin-bottom: 6px;"></i>
+                                No reports match your search query.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Hidden native select retained for backward compatibility -->
+            <select id="recent-reports-dropdown" style="display: none;">
+                <option value="">-- Choose from recent reports --</option>
+                {% for r in recent_reports %}
+                <option value="{{ r.id }}" data-label="{{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}">
+                    {{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}
+                </option>
+                {% endfor %}
+            </select>
         </div>
 
         <!-- Tab 2: By Date Range / Bulk -->
@@ -1150,6 +1518,28 @@
 </div>
 
 <!-- Modal: Secure Confirmation for Cascading Report Deletion (Single & Bulk) -->
+<!-- Step 1: Pre-Confirmation Mini Modal -->
+<div id="preconfirm-delete-modal" class="preconfirm-overlay" onclick="handlePreconfirmBackdropClick(event)">
+    <div class="preconfirm-card" id="preconfirm-card-inner">
+        <div class="preconfirm-icon-wrap">
+            <i class="fa-solid fa-trash-can"></i>
+        </div>
+        <h4>Delete this report?</h4>
+        <div id="preconfirm-report-badge" class="preconfirm-report-badge">
+            <i class="fa-solid fa-hashtag" style="font-size: 0.72rem;"></i>
+            <span id="preconfirm-report-label">Report</span>
+        </div>
+        <p>This action is <strong>irreversible</strong>. You will be asked to type a confirmation phrase in the next step before anything is permanently deleted.</p>
+        <div class="preconfirm-actions">
+            <button type="button" class="btn-preconfirm-cancel" id="btn-preconfirm-cancel" onclick="closePreconfirmModal()">Cancel</button>
+            <button type="button" class="btn-preconfirm-proceed" id="btn-preconfirm-proceed" onclick="proceedToFullConfirmation()">
+                <i class="fa-solid fa-arrow-right"></i>
+                Yes, Proceed
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="danger-zone-delete-modal" class="danger-modal-overlay" onclick="handleModalBackdropClick(event)">
     <div class="danger-modal-content">
         <div class="modal-danger-header">
@@ -1177,6 +1567,7 @@
 
         <form method="POST" action="{{ url_for('admin_danger_delete_report') }}" id="danger-delete-form" data-loading-initialized="true" onsubmit="handleReportDeleteSubmit(event)">
             <input type="hidden" name="report_id" id="hidden-delete-report-id" value="">
+            <input type="hidden" name="report_ids" id="hidden-delete-report-ids" value="">
             <input type="hidden" name="year" id="hidden-delete-year" value="">
             <input type="hidden" name="month" id="hidden-delete-month" value="">
 
@@ -1296,11 +1687,222 @@
         }
     }
 
+    // Selection state management for reports list component
+    const selectedReportIds = new Set();
+
+    function toggleSelectAllReports(isChecked) {
+        const table = document.getElementById("danger-reports-tbody");
+        if (!table) return;
+        const rows = table.querySelectorAll("tr.report-row-item");
+        rows.forEach(row => {
+            if (row.style.display !== "none") {
+                const cb = row.querySelector(".report-row-checkbox");
+                if (cb) {
+                    cb.checked = isChecked;
+                    const id = String(cb.value);
+                    if (isChecked) {
+                        selectedReportIds.add(id);
+                        row.classList.add("selected-row");
+                    } else {
+                        selectedReportIds.delete(id);
+                        row.classList.remove("selected-row");
+                    }
+                }
+            }
+        });
+        updateMasterCheckboxState();
+        updateSelectionUI();
+    }
+
+    function handleRowCheckboxChange(cb) {
+        const id = String(cb.value);
+        const row = cb.closest("tr");
+        if (cb.checked) {
+            selectedReportIds.add(id);
+            if (row) row.classList.add("selected-row");
+        } else {
+            selectedReportIds.delete(id);
+            if (row) row.classList.remove("selected-row");
+        }
+        updateMasterCheckboxState();
+        updateSelectionUI();
+    }
+
+    function handleRowClick(event, id) {
+        if (event.target.closest("input") || event.target.closest("button") || event.target.closest("a")) {
+            return;
+        }
+        const row = event.currentTarget;
+        const cb = row ? row.querySelector(".report-row-checkbox") : null;
+        if (cb) {
+            cb.checked = !cb.checked;
+            handleRowCheckboxChange(cb);
+        }
+    }
+
+    function updateMasterCheckboxState() {
+        const master = document.getElementById("reports-master-checkbox");
+        if (!master) return;
+        const table = document.getElementById("danger-reports-tbody");
+        if (!table) return;
+        const visibleCheckboxes = Array.from(table.querySelectorAll("tr.report-row-item"))
+            .filter(row => row.style.display !== "none")
+            .map(row => row.querySelector(".report-row-checkbox"))
+            .filter(Boolean);
+
+        if (visibleCheckboxes.length === 0) {
+            master.checked = false;
+            master.indeterminate = false;
+            return;
+        }
+
+        const checkedCount = visibleCheckboxes.filter(cb => cb.checked).length;
+        if (checkedCount === 0) {
+            master.checked = false;
+            master.indeterminate = false;
+        } else if (checkedCount === visibleCheckboxes.length) {
+            master.checked = true;
+            master.indeterminate = false;
+        } else {
+            master.checked = false;
+            master.indeterminate = true;
+        }
+    }
+
+    function updateSelectionUI() {
+        const count = selectedReportIds.size;
+        const badge = document.getElementById("selection-status-badge");
+        const countText = document.getElementById("selected-reports-counter");
+        const clearBtn = document.getElementById("btn-clear-selection");
+        const triggerText = document.getElementById("btn-trigger-danger-text");
+        const manualInput = document.getElementById("target-report-id-input");
+        const manualVal = manualInput ? manualInput.value.trim() : "";
+
+        if (badge && countText && clearBtn) {
+            if (count > 0) {
+                badge.style.display = "inline-flex";
+                countText.textContent = `${count} report${count === 1 ? "" : "s"} selected`;
+                clearBtn.style.display = "inline-flex";
+            } else {
+                badge.style.display = "none";
+                clearBtn.style.display = "none";
+            }
+        }
+
+        if (triggerText) {
+            if (count > 1) {
+                triggerText.textContent = `Trigger Deletion (${count} Reports)...`;
+            } else if (count === 1) {
+                const singleId = Array.from(selectedReportIds)[0];
+                triggerText.textContent = `Trigger Deletion (Report #${singleId})...`;
+            } else if (manualVal) {
+                triggerText.textContent = `Trigger Deletion (ID #${manualVal})...`;
+            } else {
+                triggerText.textContent = "Trigger Report Deletion...";
+            }
+        }
+    }
+
+    function clearReportSelection() {
+        selectedReportIds.clear();
+        const table = document.getElementById("danger-reports-tbody");
+        if (table) {
+            table.querySelectorAll(".report-row-checkbox").forEach(cb => {
+                cb.checked = false;
+            });
+            table.querySelectorAll("tr.report-row-item").forEach(tr => {
+                tr.classList.remove("selected-row");
+            });
+        }
+        const master = document.getElementById("reports-master-checkbox");
+        if (master) {
+            master.checked = false;
+            master.indeterminate = false;
+        }
+        updateSelectionUI();
+    }
+
+    function escapeHtml(str) {
+        return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function highlightSearchText(text, query) {
+        if (!query) return escapeHtml(text);
+        const escapedText = escapeHtml(text);
+        const regex = new RegExp(`(${query.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'ig');
+        return escapedText.replace(regex, '<span class="search-highlight">$1</span>');
+    }
+
+    function handleReportTableSearch(query) {
+        const q = (query || "").toLowerCase().trim();
+        const table = document.getElementById("danger-reports-tbody");
+        if (!table) return;
+        const rows = table.querySelectorAll("tr.report-row-item");
+        let matchCount = 0;
+        rows.forEach(row => {
+            const text = row.getAttribute("data-search") || "";
+            const matches = !q || text.includes(q);
+            row.style.display = matches ? "" : "none";
+            if (matches) {
+                matchCount++;
+                // Highlight: pest cell (td index 2), id cell (td index 1), date (td index 3), status (td index 4)
+                const cells = row.querySelectorAll('td');
+                // td[1] = Report ID badge
+                const idBadge = cells[1]?.querySelector('.report-id-badge');
+                if (idBadge) {
+                    if (!idBadge.dataset.origText) idBadge.dataset.origText = idBadge.textContent.trim();
+                    idBadge.innerHTML = '<i class="fa-solid fa-hashtag" style="font-size:0.72rem;color:#dc2626;"></i>' + highlightSearchText(idBadge.dataset.origText, q);
+                }
+                // td[2] = Pest
+                const pestSpan = cells[2]?.querySelector('span span');
+                if (pestSpan) {
+                    if (!pestSpan.dataset.origText) pestSpan.dataset.origText = pestSpan.textContent.trim();
+                    pestSpan.innerHTML = highlightSearchText(pestSpan.dataset.origText, q);
+                }
+                // td[3] = Date text node
+                const dateTd = cells[3];
+                if (dateTd) {
+                    let dateText = dateTd.dataset.origText;
+                    if (!dateText) {
+                        dateText = dateTd.textContent.trim();
+                        dateTd.dataset.origText = dateText;
+                    }
+                    dateTd.innerHTML = '<i class="fa-regular fa-calendar" style="color:#94a3b8;margin-right:4px;font-size:0.8rem;"></i>' + highlightSearchText(dateText, q);
+                }
+                // td[4] = Status badge
+                const statusBadge = cells[4]?.querySelector('.report-mini-status');
+                if (statusBadge) {
+                    if (!statusBadge.dataset.origText) statusBadge.dataset.origText = statusBadge.textContent.trim();
+                    statusBadge.textContent = statusBadge.dataset.origText; // reset first
+                    statusBadge.innerHTML = highlightSearchText(statusBadge.dataset.origText, q);
+                }
+            } else {
+                // Restore original text when hidden/no query
+                const cells = row.querySelectorAll('td');
+                const idBadge = cells[1]?.querySelector('.report-id-badge');
+                if (idBadge?.dataset.origText) idBadge.innerHTML = '<i class="fa-solid fa-hashtag" style="font-size:0.72rem;color:#dc2626;"></i>' + escapeHtml(idBadge.dataset.origText);
+                const pestSpan = cells[2]?.querySelector('span span');
+                if (pestSpan?.dataset.origText) pestSpan.textContent = pestSpan.dataset.origText;
+                const dateTd = cells[3];
+                if (dateTd?.dataset.origText) dateTd.innerHTML = '<i class="fa-regular fa-calendar" style="color:#94a3b8;margin-right:4px;font-size:0.8rem;"></i>' + escapeHtml(dateTd.dataset.origText);
+                const statusBadge = cells[4]?.querySelector('.report-mini-status');
+                if (statusBadge?.dataset.origText) statusBadge.textContent = statusBadge.dataset.origText;
+            }
+        });
+
+        const noResultsRow = document.getElementById("no-search-results-row");
+        if (noResultsRow) {
+            noResultsRow.style.display = (q && matchCount === 0) ? "" : "none";
+        }
+
+        updateMasterCheckboxState();
+    }
+
     function handleRecentReportChange(value) {
         const targetInput = document.getElementById("target-report-id-input");
         if (targetInput) {
             targetInput.value = value;
         }
+        updateSelectionUI();
     }
 
     function handleIdInputChange(value) {
@@ -1308,6 +1910,7 @@
         if (dropdown) {
             dropdown.value = value || "";
         }
+        updateSelectionUI();
     }
 
     function setConfirmationPhraseVisibility(visible) {
@@ -1330,38 +1933,68 @@
     }
 
     function openSingleReportDeleteModal(reportId) {
-        const idToUse = reportId || (document.getElementById("target-report-id-input") ? document.getElementById("target-report-id-input").value.trim() : "");
-        if (!idToUse) {
-            alert("Please enter or select a valid Report ID to delete.");
-            return;
+        let idsToDelete = [];
+        if (reportId) {
+            idsToDelete = [String(reportId).trim()];
+        } else if (selectedReportIds.size > 0) {
+            idsToDelete = Array.from(selectedReportIds);
+        } else {
+            const inputVal = document.getElementById("target-report-id-input") ? document.getElementById("target-report-id-input").value.trim() : "";
+            if (inputVal) {
+                idsToDelete = [inputVal];
+            }
         }
 
-        const dropdown = document.getElementById("recent-reports-dropdown");
-        let contextLabel = "Report #" + idToUse;
-        if (dropdown && dropdown.value === idToUse && dropdown.selectedIndex >= 0) {
-            const selectedOpt = dropdown.options[dropdown.selectedIndex];
-            if (selectedOpt && selectedOpt.getAttribute("data-label")) {
-                contextLabel = selectedOpt.getAttribute("data-label");
-            }
+        if (idsToDelete.length === 0) {
+            alert("Please select one or more reports or enter a valid Report ID to delete.");
+            return;
         }
 
         const form = document.getElementById("danger-delete-form");
         form.action = singleDeleteUrl;
-        document.getElementById("hidden-delete-report-id").value = idToUse;
+        document.getElementById("hidden-delete-report-id").value = idsToDelete[0];
+        const idsHidden = document.getElementById("hidden-delete-report-ids");
+        if (idsHidden) idsHidden.value = idsToDelete.join(",");
         document.getElementById("hidden-delete-year").value = "";
         document.getElementById("hidden-delete-month").value = "";
 
-        // Hide bulk count box for single report deletion and ensure phrase is shown
+        // Hide bulk count box for reports deletion and ensure phrase is shown
         const bulkBox = document.getElementById("modal-bulk-count-box");
         if (bulkBox) bulkBox.style.display = "none";
         setConfirmationPhraseVisibility(true);
 
-        document.getElementById("modal-danger-title").textContent = "Confirm Permanent Report Deletion";
-        document.getElementById("modal-danger-subtitle").textContent = "Cascading delete for Report #" + idToUse;
-        document.getElementById("modal-warning-description").innerHTML = "This will permanently delete <strong>" + contextLabel + "</strong>, all associated visit schedules, chat threads, and delete all corresponding image files from Supabase Storage.";
-        document.getElementById("modal-submit-btn-text").textContent = "Permanently Delete Report";
+        if (idsToDelete.length === 1) {
+            const singleId = idsToDelete[0];
+            let contextLabel = "Report #" + singleId;
+            const rowCb = document.querySelector(`.report-row-checkbox[value="${singleId}"]`);
+            if (rowCb && rowCb.getAttribute("data-label")) {
+                contextLabel = rowCb.getAttribute("data-label");
+            } else {
+                const dropdown = document.getElementById("recent-reports-dropdown");
+                if (dropdown && dropdown.value === singleId && dropdown.selectedIndex >= 0) {
+                    const selectedOpt = dropdown.options[dropdown.selectedIndex];
+                    if (selectedOpt && selectedOpt.getAttribute("data-label")) {
+                        contextLabel = selectedOpt.getAttribute("data-label");
+                    }
+                }
+            }
 
-        resetAndShowModal();
+            document.getElementById("modal-danger-title").textContent = "Confirm Permanent Report Deletion";
+            document.getElementById("modal-danger-subtitle").textContent = "Cascading delete for Report #" + singleId;
+            document.getElementById("modal-warning-description").innerHTML = "This will permanently delete <strong>" + contextLabel + "</strong>, all associated visit schedules, chat threads, and delete all corresponding image files from Supabase Storage.";
+            resetAndShowModal();
+            document.getElementById("modal-submit-btn-text").textContent = "Permanently Delete Report";
+        } else {
+            const count = idsToDelete.length;
+            const previewIds = idsToDelete.slice(0, 5).map(id => "#" + id).join(", ");
+            const displayStr = count > 5 ? `${previewIds}, ... (+${count - 5} more)` : previewIds;
+
+            document.getElementById("modal-danger-title").textContent = `Confirm Permanent Deletion of ${count} Reports`;
+            document.getElementById("modal-danger-subtitle").textContent = `Cascading batch cleanup for ${count} selected reports`;
+            document.getElementById("modal-warning-description").innerHTML = `This will permanently delete <strong>${count} selected reports (${displayStr})</strong>, all associated visit schedules, chat threads, and permanently purge all corresponding image files from Supabase Storage.`;
+            resetAndShowModal();
+            document.getElementById("modal-submit-btn-text").textContent = `Permanently Delete ${count} Reports`;
+        }
     }
 
     function openBulkDeleteModal() {
@@ -1436,6 +2069,44 @@
     }
 
     window.openReportDeleteModal = openSingleReportDeleteModal;
+
+    // ── Pre-Confirmation Modal (Step 1) ────────────────────────────────────
+    let _preconfirmPendingReportId = null;
+
+    window.openPreconfirmModal = function(reportId) {
+        _preconfirmPendingReportId = reportId ? String(reportId).trim() : null;
+
+        // Build label from row checkbox data-label if available
+        let label = _preconfirmPendingReportId ? 'Report #' + _preconfirmPendingReportId : 'Selected Reports';
+        if (_preconfirmPendingReportId) {
+            const rowCb = document.querySelector(`.report-row-checkbox[value="${_preconfirmPendingReportId}"]`);
+            if (rowCb && rowCb.getAttribute('data-label')) {
+                label = rowCb.getAttribute('data-label');
+            }
+        }
+
+        document.getElementById('preconfirm-report-label').textContent = label;
+        document.getElementById('preconfirm-delete-modal').style.display = 'flex';
+    };
+
+    window.closePreconfirmModal = function() {
+        document.getElementById('preconfirm-delete-modal').style.display = 'none';
+        _preconfirmPendingReportId = null;
+    };
+
+    window.proceedToFullConfirmation = function() {
+        const id = _preconfirmPendingReportId;
+        closePreconfirmModal();
+        // Slight delay so the close animation feels smooth before Step 2 opens
+        setTimeout(() => openSingleReportDeleteModal(id), 120);
+    };
+
+    window.handlePreconfirmBackdropClick = function(event) {
+        if (event.target.id === 'preconfirm-delete-modal') {
+            closePreconfirmModal();
+        }
+    };
+    // ── End Pre-Confirmation Modal ─────────────────────────────────────────
 
     let reportProgressTimer = null;
     let backupProgressTimer = null;

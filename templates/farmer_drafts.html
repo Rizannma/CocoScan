@@ -80,33 +80,6 @@
             margin-top: 4px;
         }
 
-        .btn-icon-refresh {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background-color: #ffffff;
-            border: 1px solid var(--border-light);
-            color: var(--primary-green);
-            font-size: 1.05rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .btn-icon-refresh:hover {
-            background-color: var(--primary-green);
-            color: #ffffff;
-            transform: rotate(45deg);
-            box-shadow: 0 6px 14px rgba(82, 130, 101, 0.15);
-        }
-
-        .btn-icon-refresh:active {
-            transform: rotate(90deg) scale(0.95);
-        }
-
         /* ==========================================================================
            5. DRAFTS GRID & CARDS (OPTIMIZED & ENHANCED)
            ========================================================================== */
@@ -436,10 +409,6 @@
                     <h1 data-i18n="drafts.page_title">{{ t('drafts.page_title', 'Saved Drafts') }}</h1>
                     <p data-i18n="drafts.page_subtitle">{{ t('drafts.page_subtitle', 'Resume, submit, or remove your saved field scan reports.') }}</p>
                 </div>
-                <div>
-                    <button class="btn-icon-refresh" onclick="spinAndLoadDrafts(this)" title="{{ t('drafts.btn_refresh', 'Refresh Layout') }}"><i
-                            class="fa-solid fa-arrows-rotate"></i></button>
-                </div>
             </header>
 
             <!-- Dito ipapasok ang grid at empty view module layouts -->
@@ -457,10 +426,6 @@
             </div>
 {% endblock %}
 
-{% block extra_scripts %}
-<script>
-        function spinAndLoadDrafts(btn) {
-            const icon = btn.querySelector('i');
             if (icon) {
                 icon.classList.add('fa-spin');
                 setTimeout(() => icon.classList.remove('fa-spin'), 500);

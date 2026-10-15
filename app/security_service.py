@@ -1,12 +1,13 @@
 import sqlite3
 import time
-import random
 import os
 import traceback
 import logging
 import requests
 import secrets
 import hashlib
+import hmac
+from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -15,9 +16,17 @@ logger = logging.getLogger(__name__)
 DB_PATH = os.path.join(os.path.dirname(__file__), "cocoscan_security.db")
 OTP_EXPIRY_SECONDS = 90
 OTP_RESEND_COOLDOWN_SECONDS = 45
+OTP_REQUEST_LIMIT = 3
+OTP_REQUEST_WINDOW_SECONDS = 3600
+OTP_VERIFICATION_ATTEMPT_LIMIT = 3
+OTP_VERIFICATION_LOCK_SECONDS = 3600
+_otp_code_pepper = (
+    os.getenv("OTP_CODE_PEPPER") or os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
+).encode("utf-8")
 
 _db_initialized = False
 
+@contextmanager
 def _get_db():
     global _db_initialized
     conn = sqlite3.connect(DB_PATH, timeout=15)
@@ -28,7 +37,10 @@ def _get_db():
             init_security_db()
         except Exception:
             pass
-    return conn
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def init_security_db():
     """Initializes the SQLite schema for security tracking and audit logs."""
@@ -58,21 +70,25 @@ def init_security_db():
                 is_used INTEGER DEFAULT 0
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS otp_rate_limits (
+                email TEXT NOT NULL,
+                purpose TEXT NOT NULL,
+                request_count INTEGER NOT NULL DEFAULT 0,
+                request_window_started_at REAL,
+                failed_attempt_count INTEGER NOT NULL DEFAULT 0,
+                failed_window_started_at REAL,
+                locked_until REAL,
+                PRIMARY KEY (email, purpose)
+            )
+        """)
         
         # Table for 2FA 7-day expiration tracking
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS two_factor_auth (
                 email TEXT PRIMARY KEY,
                 last_verified_at REAL
-            )
-        """)
-        
-        # Table for Forgot Password 3-attempt limits
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS forgot_pass_attempts (
-                email TEXT PRIMARY KEY,
-                attempt_count INTEGER DEFAULT 0,
-                last_attempt_at REAL
             )
         """)
         
@@ -196,57 +212,58 @@ def reset_login_failures(email: str):
 
 # --- FORGOT PASSWORD LIMITS ---
 
-def can_request_forgot_password(email: str):
-    """
-    Checks if user can request a forgot password OTP (limit 3 attempts per 24 hours).
-    Returns: (can_request: bool, attempts_left: int)
-    """
-    email = (email or "").strip().lower()
-    if not email:
-        return False, 0
-        
-    now = time.time()
-    with _get_db() as conn:
-        row = conn.execute("SELECT * FROM forgot_pass_attempts WHERE email = ?", (email,)).fetchone()
-        if not row:
-            return True, 3
-            
-        # Reset limit if last attempt was over 24 hours ago
-        if now - (row["last_attempt_at"] or 0) > 86400:
-            conn.execute("DELETE FROM forgot_pass_attempts WHERE email = ?", (email,))
-            conn.commit()
-            return True, 3
-            
-        count = row["attempt_count"]
-        if count >= 3:
-            return False, 0
-            
-        return True, (3 - count)
-
-def record_forgot_password_attempt(email: str):
-    """Increments the forgot password attempt counter."""
-    email = (email or "").strip().lower()
-    if not email:
-        return
-    now = time.time()
-    with _get_db() as conn:
-        row = conn.execute("SELECT * FROM forgot_pass_attempts WHERE email = ?", (email,)).fetchone()
-        if row:
-            conn.execute("UPDATE forgot_pass_attempts SET attempt_count = attempt_count + 1, last_attempt_at = ? WHERE email = ?", (now, email))
-        else:
-            conn.execute("INSERT INTO forgot_pass_attempts (email, attempt_count, last_attempt_at) VALUES (?, 1, ?)", (email, now))
-        conn.commit()
-
-def reset_forgot_password_attempts(email: str):
-    """Clears forgot password attempts after successful reset."""
-    email = (email or "").strip().lower()
-    if not email:
-        return
-    with _get_db() as conn:
-        conn.execute("DELETE FROM forgot_pass_attempts WHERE email = ?", (email,))
-        conn.commit()
-
 # --- OTP GENERATION & VERIFICATION ---
+
+def configure_otp_code_pepper(pepper: str) -> None:
+    global _otp_code_pepper
+    if pepper:
+        _otp_code_pepper = pepper.encode("utf-8")
+
+
+def _hash_otp_code(email: str, purpose: str, code: str) -> str:
+    message = f"{email}\0{purpose}\0{code}".encode("utf-8")
+    return hmac.new(_otp_code_pepper, message, hashlib.sha256).hexdigest()
+
+def _consume_otp_request_quota(email: str, purpose: str, now: float) -> Tuple[bool, int]:
+    with _get_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT * FROM otp_rate_limits WHERE email = ? AND purpose = ?",
+            (email, purpose)
+        ).fetchone()
+
+        if row and row["locked_until"] and now < row["locked_until"]:
+            retry_after = max(1, int(row["locked_until"] - now + 0.999))
+            conn.commit()
+            return False, retry_after
+
+        if row and row["locked_until"]:
+            conn.execute("""
+                UPDATE otp_rate_limits
+                SET failed_attempt_count = 0, failed_window_started_at = NULL, locked_until = NULL
+                WHERE email = ? AND purpose = ?
+            """, (email, purpose))
+
+        window_started_at = row["request_window_started_at"] if row else None
+        request_count = row["request_count"] if row else 0
+        if window_started_at is None or now - window_started_at >= OTP_REQUEST_WINDOW_SECONDS:
+            window_started_at = now
+            request_count = 0
+
+        if request_count >= OTP_REQUEST_LIMIT:
+            retry_after = max(1, int(window_started_at + OTP_REQUEST_WINDOW_SECONDS - now + 0.999))
+            conn.commit()
+            return False, retry_after
+
+        conn.execute("""
+            INSERT INTO otp_rate_limits (email, purpose, request_count, request_window_started_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(email, purpose) DO UPDATE SET
+                request_count = excluded.request_count,
+                request_window_started_at = excluded.request_window_started_at
+        """, (email, purpose, request_count + 1, window_started_at))
+        conn.commit()
+        return True, 0
 
 def _mail_transport_configured() -> bool:
     """Return True when Brevo API is configured."""
@@ -292,12 +309,28 @@ def _send_email_brevo(recipient: str, subject: str, body_html: str) -> bool:
 
 def generate_and_send_otp(email: str, purpose: str = "2FA Verification") -> dict:
     """
-    Generates a 6-digit OTP code, stores it in SQLite (valid for 45 seconds), and sends it via email.
-    Returns: a dict with the code, send status, expires_at, and resend cooldown details.
+    Generates a 6-digit OTP code, stores it in SQLite, and sends it via email.
+    Returns delivery status, expiry/cooldown details, and rate-limit feedback.
     """
     email = (email or "").strip().lower()
-    code = f"{random.randint(0, 999999):06d}"
     now = time.time()
+
+    if not email:
+        return {"sent": False, "fallback_allowed": False, "message": "An email address is required."}
+
+    request_allowed, retry_after = _consume_otp_request_quota(email, purpose, now)
+    if not request_allowed:
+        wait_minutes = max(1, (retry_after + 59) // 60)
+        return {
+            "sent": False,
+            "fallback_allowed": False,
+            "rate_limited": True,
+            "retry_after_seconds": retry_after,
+            "message": f"OTP request limit reached. Please try again in {wait_minutes} minute(s).",
+        }
+
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    code_digest = _hash_otp_code(email, purpose, code)
     expires_at = now + OTP_EXPIRY_SECONDS
     
     with _get_db() as conn:
@@ -306,11 +339,9 @@ def generate_and_send_otp(email: str, purpose: str = "2FA Verification") -> dict
         conn.execute("""
             INSERT INTO otp_codes (email, code, purpose, created_at, expires_at, is_used)
             VALUES (?, ?, ?, ?, ?, 0)
-        """, (email, code, purpose, now, expires_at))
+        """, (email, code_digest, purpose, now, expires_at))
         conn.commit()
         
-    logger.info(f"[SECURITY OTP] Generated code for {email} ({purpose}): {code}")
-    
     # Clean, vibrant SVG logo matching approved account email
     cocoscan_logo_svg = """
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="64" height="64" style="display: block; margin: 0 auto;">
@@ -407,13 +438,11 @@ def generate_and_send_otp(email: str, purpose: str = "2FA Verification") -> dict
     
     sent = _send_email_brevo(email, subject, body_html)
     delivery_available = _mail_transport_configured()
-    fallback_allowed = not sent
     return {
-        "code": code,
         "sent": sent,
         "delivery_available": delivery_available,
-        "fallback_allowed": fallback_allowed,
-        "delivery_message": "Verification code sent successfully." if sent else "Email delivery is currently unavailable; continuing without email verification.",
+        "fallback_allowed": False,
+        "delivery_message": "Verification code sent successfully." if sent else "Verification code could not be delivered. Please try again later.",
         "expires_at": expires_at,
         "expires_in_seconds": OTP_EXPIRY_SECONDS,
         "resend_cooldown_seconds": OTP_RESEND_COOLDOWN_SECONDS,
@@ -432,27 +461,76 @@ def verify_otp(email: str, code: str, purpose: str = "2FA Verification"):
         
     now = time.time()
     with _get_db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        limits = conn.execute(
+            "SELECT * FROM otp_rate_limits WHERE email = ? AND purpose = ?",
+            (email, purpose)
+        ).fetchone()
+        if limits and limits["locked_until"] and now < limits["locked_until"]:
+            retry_after = max(1, int(limits["locked_until"] - now + 0.999))
+            conn.commit()
+            wait_minutes = max(1, (retry_after + 59) // 60)
+            return False, f"Too many incorrect codes. Please try again in {wait_minutes} minutes."
+
+        if limits and limits["locked_until"]:
+            conn.execute("""
+                UPDATE otp_rate_limits
+                SET failed_attempt_count = 0, failed_window_started_at = NULL, locked_until = NULL
+                WHERE email = ? AND purpose = ?
+            """, (email, purpose))
+
         row = conn.execute("""
-            SELECT * FROM otp_codes 
+            SELECT * FROM otp_codes
             WHERE email = ? AND purpose = ? AND is_used = 0
             ORDER BY id DESC LIMIT 1
         """, (email, purpose)).fetchone()
-        
+
         if not row:
+            conn.commit()
             return False, "No active verification code found. Please request a new code."
-            
+
         if now > row["expires_at"]:
             conn.execute("UPDATE otp_codes SET is_used = 1 WHERE id = ?", (row["id"],))
             conn.commit()
             return False, "This verification code has expired. Please request a new code."
-            
-        if row["code"] != code:
-            return False, "Incorrect verification code. Please try again."
-            
-        # Mark as used
+
+        code_matches = (
+            len(code) == 6
+            and code.isascii()
+            and code.isdigit()
+            and hmac.compare_digest(row["code"], _hash_otp_code(email, purpose, code))
+        )
+        if not code_matches:
+            previous_count = limits["failed_attempt_count"] if limits else 0
+            failed_window_started_at = limits["failed_window_started_at"] if limits else None
+            if failed_window_started_at is None or now - failed_window_started_at >= OTP_VERIFICATION_LOCK_SECONDS:
+                failed_window_started_at = now
+                previous_count = 0
+            failed_attempt_count = previous_count + 1
+            locked_until = now + OTP_VERIFICATION_LOCK_SECONDS if failed_attempt_count >= OTP_VERIFICATION_ATTEMPT_LIMIT else None
+            conn.execute("""
+                INSERT INTO otp_rate_limits (
+                    email, purpose, failed_attempt_count, failed_window_started_at, locked_until
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(email, purpose) DO UPDATE SET
+                    failed_attempt_count = excluded.failed_attempt_count,
+                    failed_window_started_at = excluded.failed_window_started_at,
+                    locked_until = excluded.locked_until
+            """, (email, purpose, failed_attempt_count, failed_window_started_at, locked_until))
+            conn.commit()
+            if locked_until:
+                return False, "Too many incorrect codes. Please try again in 60 minutes."
+            attempts_left = OTP_VERIFICATION_ATTEMPT_LIMIT - failed_attempt_count
+            return False, f"Incorrect verification code. {attempts_left} attempt(s) remaining."
+
         conn.execute("UPDATE otp_codes SET is_used = 1 WHERE id = ?", (row["id"],))
+        conn.execute("""
+            UPDATE otp_rate_limits
+            SET failed_attempt_count = 0, failed_window_started_at = NULL, locked_until = NULL
+            WHERE email = ? AND purpose = ?
+        """, (email, purpose))
         conn.commit()
-        
+
     return True, "Verification successful."
 
 # --- TWO FACTOR AUTHENTICATION (7 DAYS) ---

@@ -25,7 +25,10 @@ def test_lgu_dashboard_has_notification_bell_and_modal(client, monkeypatch):
         tbl.eq.return_value = tbl
         tbl.order.return_value = tbl
         if table_name == 'users':
-            tbl.execute.return_value = MagicMock(data=[{'first_name': 'LGU', 'last_name': 'Officer'}])
+            tbl.execute.return_value = MagicMock(data=[{
+                'id': 'test-lgu-user', 'email': 'lgu@laguna.gov.ph', 'role': 'lgu',
+                'status': 'Approved', 'first_name': 'LGU', 'last_name': 'Officer',
+            }])
         elif table_name == 'reports':
             tbl.execute.return_value = MagicMock(data=[
                 {
@@ -74,7 +77,10 @@ def test_agri_dashboard_has_notification_bell_and_modal(client, monkeypatch):
         tbl.eq.return_value = tbl
         tbl.order.return_value = tbl
         if table_name == 'users':
-            tbl.execute.return_value = MagicMock(data=[{'first_name': 'Maria', 'last_name': 'Santos'}])
+            tbl.execute.return_value = MagicMock(data=[{
+                'id': 'test-agri-user', 'email': 'agri@laguna.gov.ph', 'role': 'agri_expert',
+                'status': 'Approved', 'first_name': 'Maria', 'last_name': 'Santos',
+            }])
         elif table_name == 'reports':
             tbl.execute.return_value = MagicMock(data=[
                 {
@@ -120,7 +126,11 @@ def test_admin_dashboard_has_no_notification_bell_or_modal(client, monkeypatch):
     def mock_table(table_name):
         tbl = MagicMock()
         tbl.select.return_value = tbl
-        tbl.execute.return_value = MagicMock(data=[])
+        tbl.eq.return_value = tbl
+        tbl.execute.return_value = MagicMock(data=[{
+            'id': 'test-admin-user', 'email': 'admin@cocoscan.local', 'role': 'admin',
+            'status': 'Approved', 'first_name': 'System', 'last_name': 'Admin',
+        }])
         return tbl
 
     monkeypatch.setattr(main, 'supabase', MagicMock(table=mock_table))

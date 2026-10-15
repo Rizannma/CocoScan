@@ -66,6 +66,14 @@
         font-size: 1rem;
     }
 
+    mark.ux-highlight {
+        background: rgba(74, 198, 143, 0.28);
+        color: #0b1315;
+        padding: 0 2px;
+        border-radius: 4px;
+        font-weight: 700;
+    }
+
     .filter-dropdowns {
         display: flex;
         gap: 10px;
@@ -287,9 +295,6 @@
         <h1 style="font-size: 1.6rem; font-weight: 800; color: #0b1315; margin: 0; line-height: 1.1;">System Audit Log</h1>
         <p style="font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0;">Comprehensive activity trail of user authentication, security interventions, and system events.</p>
     </div>
-    <div>
-        <button class="btn-icon-refresh" onclick="spinAndRefresh(this)" title="Refresh Layout"><i class="fa-solid fa-arrows-rotate"></i></button>
-    </div>
 </div>
 
 <form method="GET" action="{{ url_for('admin_audit_log') }}" class="control-actions-form" id="filterForm">
@@ -364,26 +369,26 @@
                 {% for log in logs %}
                 <tr style="border-bottom: 1px solid var(--bg-base, #f1f5f9); transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='var(--bg-base, #f8fafc)'" onmouseout="this.style.backgroundColor='transparent'">
                     <td style="padding: 16px 12px; font-size: 0.9rem; font-family: monospace; color: #475569;">{{ log.timestamp }}</td>
-                    <td style="padding: 16px 12px; font-size: 0.9rem; font-weight: 600; color: #1e293b;">{{ log.user_email }}</td>
+                    <td style="padding: 16px 12px; font-size: 0.9rem; font-weight: 600; color: #1e293b;">{{ log.highlighted_user_email | safe }}</td>
                     <td style="padding: 16px 12px; font-size: 0.9rem;"><span style="background: #f1f5f9; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; color: #475569;">{{ log.user_role }}</span></td>
                     <td style="padding: 16px 12px; font-size: 0.9rem;">
                         {% if log.action == 'LOGIN' %}
-                        <span class="action-badge login">Login Success</span>
+                        <span class="action-badge login">{{ log.highlighted_action | safe }}</span>
                         {% elif log.action == '2FA_VERIFIED' %}
-                        <span class="action-badge login">2FA Verified</span>
+                        <span class="action-badge login">{{ log.highlighted_action | safe }}</span>
                         {% elif log.action == 'LOGIN_FAILED' %}
-                        <span class="action-badge failed">Login Failed</span>
+                        <span class="action-badge failed">{{ log.highlighted_action | safe }}</span>
                         {% elif log.action == 'ACCOUNT_LOCKOUT' %}
-                        <span class="action-badge lockout">Account Lockout</span>
+                        <span class="action-badge lockout">{{ log.highlighted_action | safe }}</span>
                         {% elif log.action == 'PASSWORD_RESET' %}
-                        <span class="action-badge reset">Password Reset</span>
+                        <span class="action-badge reset">{{ log.highlighted_action | safe }}</span>
                         {% elif log.action == 'SESSION_TIMEOUT' %}
-                        <span class="action-badge failed">Session Timeout</span>
+                        <span class="action-badge failed">{{ log.highlighted_action | safe }}</span>
                         {% else %}
-                        <span class="action-badge default">{{ log.action | replace('_', ' ') | title }}</span>
+                        <span class="action-badge default">{{ log.highlighted_action | safe }}</span>
                         {% endif %}
                     </td>
-                    <td style="padding: 16px 12px; font-size: 0.9rem; color: #475569;">{{ log.details }}</td>
+                    <td style="padding: 16px 12px; font-size: 0.9rem; color: #475569;">{{ log.highlighted_details | safe }}</td>
                     <td style="padding: 16px 12px; font-size: 0.85rem; font-family: monospace; color: #64748b;">{{ log.ip_address or 'N/A' }}</td>
                 </tr>
                 {% endfor %}

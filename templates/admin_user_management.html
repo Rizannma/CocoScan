@@ -193,7 +193,8 @@
         box-shadow: 0 2px 6px rgba(26, 77, 50, 0.2);
     }
 
-    mark.ux-highlight {
+    mark.ux-highlight,
+    .search-highlight {
         background: rgba(74, 198, 143, 0.28);
         color: #0b1315;
         padding: 0 2px;
@@ -230,6 +231,10 @@
         font-weight: 600;
     }
 
+    .pca-data-table th:last-child {
+        width: 76px;
+    }
+
     .pca-data-table tbody tr {
         border-bottom: 1px solid var(--bg-base);
         transition: background-color 0.2s;
@@ -246,19 +251,30 @@
     }
 
     .role-badge-cell {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        font-weight: 500;
-        color: var(--text-dark);
+        display: inline;
+        color: #315444;
+        font-size: 0.78rem;
+        font-weight: 650;
+        white-space: nowrap;
     }
 
     .status-tag {
-        display: inline-block;
-        padding: 4px 12px;
-        border-radius: 20px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        min-height: 28px;
+        padding: 4px 11px;
+        border: 1px solid transparent;
+        border-radius: 999px;
         font-size: 0.75rem;
         font-weight: 700;
+        line-height: 1.1;
+        white-space: nowrap;
+    }
+
+    .status-tag i {
+        margin: 0 !important;
     }
 
     .status-tag.pending {
@@ -281,40 +297,119 @@
         color: #4a5568;
     }
 
-    .btn-action-approve {
-        background-color: #1b4332;
-        color: #ffffff;
-        border: none;
-        padding: 6px 14px;
-        border-radius: 6px;
+    .action-cell {
+        min-width: 76px;
+    }
+
+    .user-action-stack {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+    }
+
+    .action-menu-trigger {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: 1px solid #e2e8f0;
+        border-radius: 50%;
+        background: #ffffff;
+        color: #475569;
         cursor: pointer;
-        font-weight: 600;
-        font-size: 0.8rem;
-        transition: background-color 0.2s ease, transform 0.1s ease;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
     }
 
-    .btn-action-approve:hover {
-        background-color: var(--btn-approve-hover);
-        transform: translateY(-1px);
+    .action-menu-trigger:hover,
+    .action-menu-trigger[aria-expanded="true"] {
+        background: #f1f5f9;
+        border-color: #cbd5e1;
+        color: #1b4332;
     }
 
-    .btn-action-reject {
+    .action-menu-trigger:focus-visible,
+    .action-context-menu-item:focus-visible {
+        outline: 2px solid #1b4332;
+        outline-offset: 2px;
+    }
+
+    .action-context-menu {
+        display: none;
+        position: fixed;
+        z-index: 1200;
+        width: 210px;
+        max-height: calc(100vh - 16px);
+        overflow-y: auto;
+        padding: 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+    }
+
+    .action-context-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        min-height: 38px;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 5px;
         background: transparent;
-        color: #b70909;
-        border: 1px solid #b70909;
-        padding: 5px 13px;
-        border-radius: 6px;
+        color: #334155;
+        font: inherit;
+        font-size: 0.84rem;
+        text-align: left;
         cursor: pointer;
-        font-weight: 600;
-        font-size: 0.8rem;
-        transition: all 0.2s ease, transform 0.1s ease;
     }
 
-    .btn-action-reject:hover {
-        background-color: #fee2e2;
-        border-color: var(--btn-reject-hover);
-        color: var(--btn-reject-hover);
-        transform: translateY(-1px);
+    .action-context-menu-item:hover {
+        background: #f1f5f9;
+        color: #0f172a;
+    }
+
+    .action-context-menu-item > i:first-child {
+        width: 16px;
+        color: #64748b;
+        text-align: center;
+    }
+
+    .action-context-menu-item .menu-chevron {
+        margin-left: auto;
+        font-size: 0.7rem;
+    }
+
+    .action-context-menu-item.danger,
+    .action-context-menu-item.danger > i:first-child {
+        color: #b91c1c;
+    }
+
+    .role-options-menu {
+        display: none;
+        margin: 3px 0 6px 25px;
+        padding: 5px;
+        border-radius: 6px;
+        background: #ffffff;
+    }
+
+    .role-options-menu .action-context-menu-item.selected {
+        background: #ecfdf5;
+        color: #065f46;
+        font-weight: 650;
+    }
+
+    .action-menu-divider {
+        height: 1px;
+        margin: 5px 4px;
+        background: #e2e8f0;
+    }
+
+    @media (max-width: 767px) {
+        .pca-data-table {
+            min-width: 920px;
+        }
     }
 
     /* Undo Toast */
@@ -539,9 +634,6 @@
         <h1 style="font-size: 1.6rem; font-weight: 800; color: #0b1315; margin: 0; line-height: 1.1;">User Management</h1>
         <p style="font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0;">Overview of all registered users and pending applications for system access verification.</p>
     </div>
-    <div>
-        <button class="btn-icon-refresh" onclick="spinAndRefresh(this)" title="Refresh Layout"><i class="fa-solid fa-arrows-rotate"></i></button>
-    </div>
 </div>
 
 <form method="GET" action="{{ url_for('admin_user_management') }}" class="control-actions-form" id="filterForm">
@@ -630,9 +722,9 @@
                 <tr id="row-{{ user.id }}">
                     <td>
                         <div class="role-badge-cell">
-                            {% if user.role == 'farmer' %} Farmer
-                            {% elif user.role == 'lgu' %} LGU
-                            {% else %} Expert
+                            {% if user.role == 'farmer' %}Farmer
+                            {% elif user.role == 'lgu' %}LGU
+                            {% else %}Agri Expert
                             {% endif %}
                         </div>
                     </td>
@@ -684,17 +776,51 @@
                     </td>
 
                     <td class="action-cell" style="text-align: center;">
-                        {% if user.status == 'Under Review' %}
-                        <div style="display: flex; gap: 6px; justify-content: center;">
-                            <button type="button" class="btn-action-approve"
-                                onclick="triggerStatusConfirmation('{{ user.id }}', 'approve')">Approve</button>
-                            <button type="button" class="btn-action-reject"
-                                onclick="triggerStatusConfirmation('{{ user.id }}', 'reject')">Reject</button>
+                        <div class="user-action-stack">
+                            <button type="button" class="action-menu-trigger" title="User actions"
+                                aria-label="User actions" aria-haspopup="menu" aria-expanded="false"
+                                onclick="toggleActionMenu('userActionMenu-{{ user.id }}', event)">
+                                <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                            </button>
+                            <div id="userActionMenu-{{ user.id }}" class="action-context-menu" role="menu"
+                                aria-label="User actions">
+                                <button type="button" class="action-context-menu-item" role="menuitem"
+                                    aria-expanded="false" aria-controls="roleOptions-{{ user.id }}"
+                                    onclick="toggleRoleOptions('roleOptions-{{ user.id }}', event, this)">
+                                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                                    <span>Edit Role</span>
+                                    <i class="fa-solid fa-chevron-down menu-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div id="roleOptions-{{ user.id }}" class="role-options-menu">
+                                    <button type="button" class="action-context-menu-item {% if user.role == 'farmer' %}selected{% endif %}" role="menuitem"
+                                        onclick="updateUserRole('{{ user.id }}', 'farmer')">Farmer</button>
+                                    <button type="button" class="action-context-menu-item {% if user.role == 'lgu' %}selected{% endif %}" role="menuitem"
+                                        onclick="updateUserRole('{{ user.id }}', 'lgu')">LGU</button>
+                                    <button type="button" class="action-context-menu-item {% if user.role == 'agri_expert' %}selected{% endif %}" role="menuitem"
+                                        onclick="updateUserRole('{{ user.id }}', 'agri_expert')">Agri Expert</button>
+                                </div>
+                                <div class="action-menu-divider" role="separator"></div>
+                                {% if user.status == 'Under Review' %}
+                                <button type="button" class="action-context-menu-item" role="menuitem"
+                                    onclick="triggerStatusConfirmation('{{ user.id }}', 'approve')">
+                                    <i class="fa-solid fa-check" aria-hidden="true"></i><span>Approve</span>
+                                </button>
+                                <button type="button" class="action-context-menu-item danger" role="menuitem"
+                                    onclick="triggerStatusConfirmation('{{ user.id }}', 'reject')">
+                                    <i class="fa-solid fa-xmark" aria-hidden="true"></i><span>Reject</span>
+                                </button>
+                                {% elif user.status == 'Approved' %}
+                                <button type="button" class="action-context-menu-item danger" role="menuitem"
+                                    onclick="triggerStatusConfirmation('{{ user.id }}', 'revoke')">
+                                    <i class="fa-solid fa-ban" aria-hidden="true"></i><span>Revoke Access</span>
+                                </button>
+                                {% elif user.status == 'Revoked' %}
+                                <button type="button" class="action-context-menu-item" role="menuitem"
+                                    onclick="triggerStatusConfirmation('{{ user.id }}', 'restore')">
+                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>Restore</span>
+                                </button>
+                                {% endif %}
                         </div>
-                        {% else %}
-                        <small style="color:#9ca3af;">Handled by:<br><span style="font-weight:400">{{ user.approved_by
-                                or 'System' }}</span></small>
-                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -783,11 +909,6 @@
     </div>
 </div>
 
-<div class="undo-toast-wrapper" id="undoToast">
-    <div>Action staged. Changes will apply automatically...</div>
-    <button type="button" class="btn-undo-trigger" onclick="executeActionUndo()">Undo</button>
-    <div class="toast-countdown-slider" id="toastSlider"></div>
-</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -796,6 +917,17 @@
         const searchInput = document.getElementById('searchInput');
         const filterForm = document.getElementById('filterForm');
         let debounceTimer;
+
+        // Highlighting support functions
+        function escapeHtml(str) {
+            return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+        function highlightSearchText(text, query) {
+            if (!query) return escapeHtml(text);
+            const escapedText = escapeHtml(text);
+            const regex = new RegExp(`(${query.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')})`, 'ig');
+            return escapedText.replace(regex, '<span class="search-highlight">$1</span>');
+        }
 
         // AJAX search function
         window.triggerSearch = function () {
@@ -833,6 +965,50 @@
             }
         };
 
+        window.toggleActionMenu = function (menuId, event) {
+            event.stopPropagation();
+            const menu = document.getElementById(menuId);
+            const trigger = event.currentTarget;
+            const isVisible = menu.style.display === 'block';
+            document.querySelectorAll('.action-context-menu').forEach(openMenu => {
+                openMenu.style.display = 'none';
+                const openTrigger = openMenu.parentElement.querySelector('.action-menu-trigger');
+                if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+                openMenu.querySelectorAll('.role-options-menu').forEach(options => {
+                    options.style.display = 'none';
+                });
+            });
+
+            if (isVisible) return;
+
+            menu.style.display = 'block';
+            trigger.setAttribute('aria-expanded', 'true');
+            const triggerRect = trigger.getBoundingClientRect();
+            const menuRect = menu.getBoundingClientRect();
+            const left = Math.max(8, Math.min(triggerRect.right - menuRect.width, window.innerWidth - menuRect.width - 8));
+            let top = triggerRect.bottom + 4;
+            if (top + menuRect.height > window.innerHeight - 8) {
+                top = Math.max(8, triggerRect.top - menuRect.height - 4);
+            }
+            menu.style.left = `${left}px`;
+            menu.style.top = `${top}px`;
+        };
+
+        window.toggleRoleOptions = function (menuId, event, trigger) {
+            event.stopPropagation();
+            const options = document.getElementById(menuId);
+            const isVisible = options.style.display === 'block';
+            options.style.display = isVisible ? 'none' : 'block';
+            trigger.setAttribute('aria-expanded', String(!isVisible));
+            trigger.querySelector('.menu-chevron').classList.toggle('fa-chevron-down', isVisible);
+            trigger.querySelector('.menu-chevron').classList.toggle('fa-chevron-up', !isVisible);
+            const menu = trigger.closest('.action-context-menu');
+            const menuRect = menu.getBoundingClientRect();
+            if (menuRect.bottom > window.innerHeight - 8) {
+                menu.style.top = `${Math.max(8, window.innerHeight - menuRect.height - 8)}px`;
+            }
+        };
+
         window.updateFilter = function (inputId, value) {
             document.getElementById(inputId).value = value;
             document.querySelectorAll('.filter-dropdown-panel').forEach(p => p.style.display = 'none');
@@ -842,19 +1018,28 @@
         // Close dropdowns when clicking outside
         document.addEventListener('click', function () {
             document.querySelectorAll('.filter-dropdown-panel').forEach(p => p.style.display = 'none');
+            document.querySelectorAll('.action-context-menu').forEach(menu => {
+                menu.style.display = 'none';
+                const trigger = menu.parentElement.querySelector('.action-menu-trigger');
+                if (trigger) trigger.setAttribute('aria-expanded', 'false');
+                menu.querySelectorAll('.role-options-menu').forEach(options => {
+                    options.style.display = 'none';
+                });
+                const roleToggle = menu.querySelector('[aria-controls^="roleOptions-"]');
+                if (roleToggle) roleToggle.setAttribute('aria-expanded', 'false');
+            });
         });
     });
 
-    // System operational queues variables
-    let pendingExecutionTimeout = null;
     let targetUserId = null;
     let targetAction = null;
-    let originalRowHTML = null;
+    let targetRole = null;
 
     /* --- STEP 1: OPEN CONFIRMATION DIALOG MODAL --- */
     function triggerStatusConfirmation(userId, action) {
         targetUserId = userId;
         targetAction = action;
+        targetRole = null;
 
         const modal = document.getElementById('confirmationModal');
         const title = document.getElementById('modalTitle');
@@ -868,6 +1053,16 @@
             desc.textContent = `Are you sure you want to approve system access credentials for ${userName}?`;
             confirmBtn.textContent = "Approve User";
             confirmBtn.style.backgroundColor = "var(--pca-dark-green)";
+        } else if (action === 'restore') {
+            title.textContent = "Restore User Access";
+            desc.textContent = `Restore system access for ${userName}?`;
+            confirmBtn.textContent = "Restore User";
+            confirmBtn.style.backgroundColor = "var(--pca-dark-green)";
+        } else if (action === 'revoke') {
+            title.textContent = "Revoke User Access";
+            desc.textContent = `Are you sure you want to revoke system permissions for ${userName}?`;
+            confirmBtn.textContent = "Revoke Access";
+            confirmBtn.style.backgroundColor = "var(--btn-reject-hover)";
         } else {
             title.textContent = "Reject User Application";
             desc.textContent = `Are you sure you want to reject and decline the system registration access request from ${userName}?`;
@@ -876,143 +1071,82 @@
         }
 
 
-        confirmBtn.onclick = function () {
-            closeConfirmationModal();
-
-
-            if (typeof initializeUndoStage === "function") {
-                initializeUndoStage();
-            }
-
-            // Fire Asynchronous payload request directly to Flask API
-            fetch('/admin/update-user-status', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    user_id: targetUserId,
-                    action: targetAction
-                })
-            })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Instantly reloads the page so Jinja can render the fresh database 'email_status' column values!
-                        window.location.reload();
-                    } else {
-                        alert("Error processing changes: " + data.message);
-                    }
-                })
-                .catch(err => {
-                    console.error("Critical communications breakdown:", err);
-                    alert("Network connection error. Database was not updated.");
-                });
-        };
+        confirmBtn.onclick = submitConfirmedAction;
 
         modal.classList.add('active');
     }
 
+    function triggerRoleConfirmation(userId, role) {
+        const roleNames = { farmer: 'Farmer', lgu: 'LGU', agri_expert: 'Agri Expert' };
+        const row = document.getElementById(`row-${userId}`);
+        if (!row || !roleNames[role]) return;
+
+        targetUserId = userId;
+        targetAction = 'edit-role';
+        targetRole = role;
+        document.getElementById('modalTitle').textContent = 'Confirm Role Change';
+        document.getElementById('modalDescription').textContent =
+            `Change ${row.querySelector('.user-display-name').textContent.trim()}'s permission level to ${roleNames[role]}?`;
+        const confirmBtn = document.getElementById('modalConfirmBtn');
+        confirmBtn.textContent = `Set ${roleNames[role]}`;
+        confirmBtn.style.backgroundColor = 'var(--pca-dark-green)';
+        confirmBtn.onclick = submitConfirmedAction;
+        document.getElementById('confirmationModal').classList.add('active');
+    }
+
+    async function postAdminAction(url, payload) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const responseText = await response.text();
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (_error) {
+            throw new Error(`Server returned HTTP ${response.status} without a JSON response.`);
+        }
+        if (!response.ok || !data.success) {
+            throw new Error(data.message || data.error || `Request failed with HTTP ${response.status}.`);
+        }
+        return data;
+    }
+
+    async function submitConfirmedAction() {
+        const userId = targetUserId;
+        const action = targetAction;
+        const role = targetRole;
+        const confirmBtn = document.getElementById('modalConfirmBtn');
+        confirmBtn.disabled = true;
+        closeConfirmationModal();
+
+        try {
+            if (action === 'edit-role') {
+                await postAdminAction('/admin/update-user-role', { user_id: userId, role });
+            } else {
+                await postAdminAction('/admin/update-user-status', { user_id: userId, action });
+            }
+            window.location.reload();
+        } catch (error) {
+            alert(`Unable to ${action === 'edit-role' ? 'update role' : 'update account status'}: ${error.message}`);
+        } finally {
+            confirmBtn.disabled = false;
+        }
+    }
+
+    function updateUserRole(userId, role) {
+        document.querySelectorAll('.filter-dropdown-panel').forEach(menu => menu.style.display = 'none');
+        triggerRoleConfirmation(userId, role);
+    }
+
     function closeConfirmationModal() {
         document.getElementById('confirmationModal').classList.remove('active');
+        const confirmBtn = document.getElementById('modalConfirmBtn');
+        confirmBtn.disabled = false;
     }
 
-    /* --- STEP 2: STAGE TEMPORARY UI STATE WITH 5s COUNTDOWN --- */
-    function initializeUndoStage() {
-        // If an operation is already pending in the queue, run it immediately before starting a new one
-        if (pendingExecutionTimeout) {
-            clearTimeout(pendingExecutionTimeout);
-            commitStatusToDatabase();
-        }
-
-        const row = document.getElementById(`row-${targetUserId}`);
-        originalRowHTML = row.innerHTML; // Back up row layout state in case user cancels
-
-        // Optimistically change row elements locally
-        const statusCell = row.querySelector('.account-status-cell');
-        const actionCell = row.querySelector('.action-cell');
-
-        if (targetAction === 'approve') {
-            statusCell.innerHTML = `<span class="status-tag approved">Approved</span>`;
-        } else {
-            statusCell.innerHTML = `<span class="status-tag rejected">Rejected</span>`;
-        }
-        actionCell.innerHTML = `<small style="color:#f59e0b; font-weight:600;"><i class="fa-solid fa-spinner fa-spin"></i> Staged...</small>`;
-
-        // Trigger the 5-second slide banner
-        const toast = document.getElementById('undoToast');
-        const slider = document.getElementById('toastSlider');
-
-        slider.style.transition = 'none';
-        slider.style.width = '100%';
-        // Force layout redraw
-        toast.offsetHeight;
-
-        toast.classList.add('visible');
-        slider.style.transition = 'width 5s linear';
-        slider.style.width = '0%';
-
-        // Start background operation countdown timer thread
-        pendingExecutionTimeout = setTimeout(() => {
-            commitStatusToDatabase();
-        }, 5000);
-    }
-
-    /* --- STEP 3: UNDO ACTION CHANNELS --- */
-    function executeActionUndo() {
-        if (pendingExecutionTimeout) {
-            clearTimeout(pendingExecutionTimeout);
-            pendingExecutionTimeout = null;
-        }
-
-        // Revert table elements to their original state
-        const row = document.getElementById(`row-${targetUserId}`);
-        if (row && originalRowHTML) {
-            row.innerHTML = originalRowHTML;
-        }
-
-        // Hide notification toast banner
-        document.getElementById('undoToast').classList.remove('visible');
-
-        targetUserId = null;
-        targetAction = null;
-        originalRowHTML = null;
-    }
-
-    /* --- STEP 4: SAVE PERMANENT CHANGES TO DATABASE --- */
-    function commitStatusToDatabase() {
-        document.getElementById('undoToast').classList.remove('visible');
-
-        const currentUserId = targetUserId;
-        const currentAction = targetAction;
-
-        pendingExecutionTimeout = null;
-
-        fetch('/admin/update-user-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_id: currentUserId, action: currentAction })
-        })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    const row = document.getElementById(`row-${currentUserId}`);
-                    if (row) {
-                        const actionCell = row.querySelector('.action-cell');
-                        actionCell.innerHTML = `<small style="color:#9ca3af;">Handled by:<br>${data.admin_name}</small>`;
-                    }
-                } else {
-                    alert(`Error processing changes: ${data.message}`);
-                    location.reload();
-                }
-            })
-            .catch(err => {
-                console.error(err);
-                location.reload();
-            });
-    }
-
-    /* --- STEP 5: RESEND EMAIL FUNCTIONALITY --- */
+    /* --- RESEND EMAIL FUNCTIONALITY --- */
     function resendEmail(userId, btnElement) {
         const originalText = btnElement.innerHTML;
         btnElement.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Sending...`;

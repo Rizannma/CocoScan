@@ -19,6 +19,7 @@ from supabase import create_client, Client
 from PIL import Image
 import re
 import requests
+from markupsafe import Markup, escape
 
 from app.image_utils import (
     process_and_compress_image,
@@ -164,7 +165,12 @@ def _get_real_ip():
     return request.remote_addr or ""
 
 
-app.secret_key = os.getenv("FLASK_SECRET_KEY", "fallback_local_secret")
+app_secret_key = os.getenv("FLASK_SECRET_KEY")
+if not app_secret_key:
+    app_secret_key = os.urandom(32).hex()
+    logger.warning("FLASK_SECRET_KEY is unset; configure a persistent secret for deployments.")
+app.secret_key = app_secret_key
+security_service.configure_otp_code_pepper(os.getenv("OTP_CODE_PEPPER") or app_secret_key)
 # Upload configuration
 # Limit uploads to 25 MB by default
 app.config['MAX_CONTENT_LENGTH'] = int(os.getenv('MAX_CONTENT_MB', '25')) * 1024 * 1024
@@ -305,6 +311,57 @@ def check_session_timeout():
                 return resp
 
         session['last_active'] = now
+
+
+@app.before_request
+def enforce_live_account_access():
+    user_id = session.get('user_id')
+    if not user_id or user_id == 'offline_farmer' or not session.get('user_email'):
+        return
+    view = app.view_functions.get(request.endpoint)
+    if not getattr(view, '_required_roles', None):
+        return
+    if request.endpoint == 'static' or request.endpoint in {
+        'login', 'signup', 'forgot_password', 'verify_forgot_otp', 'reset_password',
+        'verify_2fa', 'resend_2fa', 'logout', 'offline', 'manifest', 'service_worker',
+        'api_farmer_remember_me',
+    }:
+        return
+
+    try:
+        response = supabase.table('users').select(
+            'role, status, email, first_name, last_name'
+        ).eq('id', user_id).execute()
+        user_rows = response.data or []
+    except Exception as exc:
+        logger.error(f"Unable to verify active account access: {exc}")
+        return jsonify({'success': False, 'error': 'Unable to verify account access.'}), 503
+
+    if not user_rows or user_rows[0].get('status') != 'Approved':
+        user_email = session.get('user_email', '')
+        user_role = normalize_role(session.get('user_role'))
+        remember_token = request.cookies.get(REMEMBER_COOKIE_NAME)
+        if remember_token:
+            security_service.revoke_remember_token(remember_token)
+        session.clear()
+        security_service.log_audit(
+            user_email, user_role, 'SESSION_ACCESS_REVOKED',
+            'Active session ended because the account is no longer approved.', _get_real_ip()
+        )
+        if request.is_json or request.path.startswith('/api/') or request.endpoint and request.endpoint.startswith('api_'):
+            result = jsonify({'success': False, 'error': 'Account access is no longer approved.'})
+            result.status_code = 403
+        else:
+            flash('Your account no longer has system access. Please contact an administrator.', 'error')
+            result = redirect(url_for('login'))
+        result.delete_cookie(REMEMBER_COOKIE_NAME)
+        result.delete_cookie('cocoscan_user_role')
+        result.delete_cookie('cocoscan_user_email')
+        return result
+
+    current_user = user_rows[0]
+    session['user_role'] = normalize_role(current_user.get('role'))
+    session['user_email'] = current_user.get('email') or session.get('user_email')
 
 @app.after_request
 def add_security_cache_headers(response):
@@ -1070,6 +1127,13 @@ def send_status_email(user_email, user_name, status):
             <a href="{login_url}" style="background-color: {status_color}; color: #ffffff; padding: 14px 32px; text-decoration: none; font-weight: 600; font-size: 16px; border-radius: 8px; display: inline-block;">Log In To Dashboard</a>
         </div>
         """
+    elif status == "Revoked":
+        status_title = "SYSTEM ACCESS REVOKED"
+        status_color = "#dc2626"
+        message_body = f"""
+        <p style="margin-bottom: 16px;">System access for your CocoScan account has been revoked by an administrator.</p>
+        <p style="margin-bottom: 24px;">You can no longer sign in or access protected CocoScan areas. Please contact the system administrator if you believe this change was made in error.</p>
+        """
     else:
         status_title = "APPLICATION DECLINED"
         status_color = "#dc2626"
@@ -1353,10 +1417,10 @@ def login():
                     return jsonify({'success': False, 'error': msg, 'status': 'under_review'}), 403
                 flash(msg, "warning")
                 return render_template('login.html')
-            elif user_status == 'Rejected':
-                msg = "Your application for this account has been declined. Please contact support."
+            elif user_status != 'Approved':
+                msg = "Your account does not currently have system access. Please contact support."
                 if wants_json:
-                    return jsonify({'success': False, 'error': msg, 'status': 'rejected'}), 403
+                    return jsonify({'success': False, 'error': msg, 'status': str(user_status).lower()}), 403
                 flash(msg, "error")
                 return render_template('login.html')
 
@@ -1390,16 +1454,15 @@ def login():
                         flash(f"A 6-digit verification code has been sent to {email}.", "info")
                         return redirect(url_for('verify_2fa'))
 
-                    if otp_result.get("fallback_allowed"):
-                        logger.warning(f"OTP delivery failed for {email}; allowing login to proceed without email verification.")
-                        if not wants_json:
-                            flash("We couldn't deliver the verification email right now, so the sign-in flow continued without it. Please contact support if this continues.", "warning")
-                    else:
-                        err_msg = "We couldn't send a verification code to your email. Please try again in a moment."
-                        if wants_json:
-                            return jsonify({'success': False, 'error': err_msg}), 500
-                        flash(err_msg, "error")
-                        return render_template('login.html')
+                    err_msg = otp_result.get(
+                        "message",
+                        "We couldn't send a verification code to your email. Please try again in a moment."
+                    )
+                    if wants_json:
+                        status_code = 429 if otp_result.get("rate_limited") else 503
+                        return jsonify({'success': False, 'error': err_msg}), status_code
+                    flash(err_msg, "error")
+                    return render_template('login.html')
 
             session.clear()
             session['user_id'] = user_data['id']
@@ -4892,29 +4955,50 @@ def update_user_status():
     user_id = data.get('user_id')
     action = data.get('action')
     
-    if not user_id or action not in ['approve', 'reject']:
+    if not user_id or action not in ['approve', 'reject', 'revoke', 'restore']:
         return jsonify({'success': False, 'message': 'Invalid parameters provided'}), 400
-        
-    target_status = 'Approved' if action == 'approve' else 'Rejected'
+
+    target_status = {
+        'approve': 'Approved', 'reject': 'Rejected', 'revoke': 'Revoked', 'restore': 'Approved'
+    }[action]
     admin_name = session.get('user_name', 'PCA Admin')
     
     try:
-        user_query = supabase.table("users").select("email, first_name, last_name").eq("id", user_id).execute()
+        user_query = supabase.table("users").select("email, first_name, last_name, status, role").eq("id", user_id).execute()
         if not user_query.data:
             return jsonify({'success': False, 'message': 'Target profile record not found'}), 404
             
         target_user = user_query.data[0]
+        if action == 'revoke' and normalize_role(target_user.get('role')) == 'admin':
+            return jsonify({'success': False, 'message': 'Administrator access cannot be revoked here.'}), 400
+        if action == 'revoke' and target_user.get('status') != 'Approved':
+            return jsonify({'success': False, 'message': 'Only approved users can have access revoked.'}), 400
+        if action == 'restore' and target_user.get('status') != 'Revoked':
+            return jsonify({'success': False, 'message': 'Only revoked users can be restored.'}), 400
         target_email = target_user.get('email')
         target_fullname = f"{target_user.get('first_name', '')} {target_user.get('last_name', '')}".strip()
-        
-        email_sent = send_status_email(target_email, target_fullname, target_status)
-        db_email_status = "Sent Successfully" if email_sent else "Delivery Failed"
 
         supabase.table("users").update({
             "status": target_status,
-            "approved_by": admin_name,
-            "email_status": db_email_status
+            "approved_by": admin_name
         }).eq("id", user_id).execute()
+
+        if action == 'revoke':
+            security_service.log_audit(
+                session.get('user_email', 'Administrator'), 'admin', 'ACCESS_REVOKED',
+                f"Revoked system access for {target_fullname or target_email} ({target_email}).",
+                _get_real_ip()
+            )
+
+        email_sent = send_status_email(target_email, target_fullname, target_status)
+        db_email_status = "Sent Successfully" if email_sent else "Delivery Failed"
+        try:
+            supabase.table("users").update({
+                "email_status": db_email_status
+            }).eq("id", user_id).execute()
+        except Exception as email_status_error:
+            logger.warning(f"Unable to save status email result for {user_id}: {email_status_error}")
+            email_sent = False
         
         return jsonify({
             'success': True, 
@@ -4925,6 +5009,50 @@ def update_user_status():
     except Exception as e:
         logger.error(f"Status update route processing failure: {str(e)}")
         return jsonify({'success': False, 'message': str(e)}), 500
+
+
+@app.route('/admin/update-user-role', methods=['POST'])
+@require_role('admin')
+def update_user_role():
+    if normalize_role(session.get('user_role')) != 'admin':
+        return jsonify({'success': False, 'message': 'Unauthorized access'}), 403
+
+    data = request.get_json() or {}
+    user_id = data.get('user_id')
+    target_role = normalize_role(data.get('role'))
+    allowed_roles = {'farmer', 'lgu', 'agri_expert'}
+    if not user_id or target_role not in allowed_roles:
+        return jsonify({'success': False, 'message': 'Select a valid user role.'}), 400
+
+    admin_name = session.get('user_name', 'PCA Admin')
+    try:
+        user_query = supabase.table('users').select(
+            'email, first_name, last_name, role'
+        ).eq('id', user_id).execute()
+        if not user_query.data:
+            return jsonify({'success': False, 'message': 'Target user not found.'}), 404
+
+        target_user = user_query.data[0]
+        if normalize_role(target_user.get('role')) == 'admin':
+            return jsonify({'success': False, 'message': 'Administrator roles cannot be changed here.'}), 400
+
+        previous_role = normalize_role(target_user.get('role'))
+        supabase.table('users').update({
+            'role': target_role,
+            'approved_by': admin_name,
+        }).eq('id', user_id).execute()
+
+        target_email = target_user.get('email') or 'unknown email'
+        target_name = f"{target_user.get('first_name', '')} {target_user.get('last_name', '')}".strip() or target_email
+        security_service.log_audit(
+            session.get('user_email', 'Administrator'), 'admin', 'USER_ROLE_UPDATED',
+            f"Changed {target_name} ({target_email}) role from {previous_role} to {target_role}.",
+            _get_real_ip()
+        )
+        return jsonify({'success': True, 'role': target_role})
+    except Exception as exc:
+        logger.error(f"User role update failed: {exc}")
+        return jsonify({'success': False, 'message': 'Unable to update the user role.'}), 500
 
 @app.route('/admin/resend-email', methods=['POST'])
 @require_role('admin')
@@ -5069,22 +5197,15 @@ def forgot_password():
             flash("Please enter your registered email address.", "error")
             return render_template('forgot_password.html')
             
-        can_req, attempts_left = security_service.can_request_forgot_password(email)
-        if not can_req:
-            flash("Maximum forgot password attempts (3 per day) reached. Please try again tomorrow or contact support.", "error")
-            return render_template('forgot_password.html', attempts_left=0)
-            
         try:
             user_query = supabase.table("users").select("*").eq("email", email).execute()
-            logger.info(f"[DEBUG] Checking email: '{email}' | Found: {bool(user_query.data)} | Data: {user_query.data}")
             if not user_query.data:
                 flash("This email is not registered in our system. Please sign up or check your email address.", "error")
                 return render_template('forgot_password.html', email=email)
                 
-            security_service.record_forgot_password_attempt(email)
             otp_result = security_service.generate_and_send_otp(email, purpose="Password Reset")
             if not otp_result.get("sent"):
-                flash("We couldn't send a verification code to your email. Please try again in a moment.", "error")
+                flash(otp_result.get("message", "We couldn't send a verification code to your email. Please try again in a moment."), "error")
                 return render_template('forgot_password.html', email=email)
 
             session['reset_email_pending'] = email
@@ -5136,11 +5257,6 @@ def resend_forgot_otp():
     if not email:
         return redirect(url_for('forgot_password'))
         
-    can_req, attempts_left = security_service.can_request_forgot_password(email)
-    if not can_req:
-        flash("Maximum forgot password attempts (3) reached. Please try again tomorrow.", "error")
-        return redirect(url_for('verify_forgot_otp'))
-        
     now = time.time()
     resend_available_at = session.get('otp_resend_available_at') or 0
     if resend_available_at > now:
@@ -5148,10 +5264,9 @@ def resend_forgot_otp():
         flash(f"Please wait {wait_seconds} seconds before requesting another code.", "warning")
         return redirect(url_for('verify_forgot_otp'))
 
-    security_service.record_forgot_password_attempt(email)
     otp_result = security_service.generate_and_send_otp(email, purpose="Password Reset")
     if not otp_result.get("sent"):
-        flash("We couldn't send a new verification code. Please try again in a moment.", "error")
+        flash(otp_result.get("message", "We couldn't send a new verification code. Please try again in a moment."), "error")
         return redirect(url_for('verify_forgot_otp'))
 
     session['otp_expires_at'] = otp_result.get("expires_at")
@@ -5186,7 +5301,6 @@ def reset_password():
             new_hash = hash_password(password)
             supabase.table("users").update({"password_hash": new_hash}).eq("email", email).execute()
             
-            security_service.reset_forgot_password_attempts(email)
             security_service.revoke_all_user_remember_tokens(email)
             security_service.log_audit(email, "User", "PASSWORD_RESET", "Password successfully reset via OTP", _get_real_ip())
             
@@ -5290,7 +5404,7 @@ def resend_2fa():
 
     otp_result = security_service.generate_and_send_otp(email, purpose="2FA Verification")
     if not otp_result.get("sent"):
-        flash("We couldn't send a new verification code. Please try again in a moment.", "error")
+        flash(otp_result.get("message", "We couldn't send a new verification code. Please try again in a moment."), "error")
         return redirect(url_for('verify_2fa'))
 
     session['otp_expires_at'] = otp_result.get("expires_at")
@@ -5313,6 +5427,40 @@ def admin_audit_log():
     per_page = 10
     
     data = security_service.get_audit_logs(page=page, per_page=per_page, search=search, action_filter=action_filter)
+
+    highlight_pattern = re.compile(re.escape(search), re.IGNORECASE) if search else None
+
+    def highlight_audit_value(value):
+        text = str(value or '')
+        if not highlight_pattern:
+            return escape(text)
+
+        parts = []
+        last_end = 0
+        for match in highlight_pattern.finditer(text):
+            parts.append(escape(text[last_end:match.start()]))
+            parts.append(Markup('<mark class="ux-highlight">') + escape(match.group(0)) + Markup('</mark>'))
+            last_end = match.end()
+        parts.append(escape(text[last_end:]))
+        return Markup('').join(parts)
+
+    action_labels = {
+        'LOGIN': 'Login Success',
+        '2FA_VERIFIED': '2FA Verified',
+        'LOGIN_FAILED': 'Login Failed',
+        'ACCOUNT_LOCKOUT': 'Account Lockout',
+        'PASSWORD_RESET': 'Password Reset',
+        'SESSION_TIMEOUT': 'Session Timeout',
+    }
+    for log in data['logs']:
+        for field in ('user_email', 'details'):
+            log[f'highlighted_{field}'] = highlight_audit_value(log.get(field))
+
+        raw_action = str(log.get('action') or '')
+        display_action = action_labels.get(raw_action, raw_action.replace('_', ' ').title())
+        if highlight_pattern and not highlight_pattern.search(display_action) and highlight_pattern.search(raw_action):
+            display_action = raw_action
+        log['highlighted_action'] = highlight_audit_value(display_action)
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render_template('admin_audit_log.html',
@@ -5494,8 +5642,15 @@ def admin_danger_delete_report():
 
     submitted_phrase = re.sub(r'\s+', ' ', request.form.get('confirmation_phrase', '')).strip().lower()
     report_id = request.form.get('report_id', '').strip()
+    report_ids_raw = request.form.get('report_ids', '').strip()
 
-    if not report_id:
+    ids_to_delete = []
+    if report_ids_raw:
+        ids_to_delete = [rid.strip() for rid in report_ids_raw.split(',') if rid.strip()]
+    elif report_id:
+        ids_to_delete = [rid.strip() for rid in report_id.split(',') if rid.strip()]
+
+    if not ids_to_delete:
         flash("Please specify a valid Report ID to delete.", "error")
         return redirect(url_for('admin_storage_backups'))
 
@@ -5506,23 +5661,59 @@ def admin_danger_delete_report():
     try:
         from app.backup_service import delete_report_cascading
         ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '')
-        result = delete_report_cascading(
-            report_id=report_id,
-            admin_id=admin_id,
-            admin_name=admin_name,
-            admin_email=admin_email,
-            supabase_client=supabase,
-            ip_address=ip_address,
-        )
 
-        if result.get("success"):
-            flash(
-                f"Report #{report_id} and {result.get('deleted_images_count', 0)} associated image(s) "
-                f"were permanently purged. Storage reclaimed and audit log recorded.",
-                "success",
+        if len(ids_to_delete) == 1:
+            target_id = ids_to_delete[0]
+            result = delete_report_cascading(
+                report_id=target_id,
+                admin_id=admin_id,
+                admin_name=admin_name,
+                admin_email=admin_email,
+                supabase_client=supabase,
+                ip_address=ip_address,
             )
+
+            if result.get("success"):
+                flash(
+                    f"Report #{target_id} and {result.get('deleted_images_count', 0)} associated image(s) "
+                    f"were permanently purged. Storage reclaimed and audit log recorded.",
+                    "success",
+                )
+            else:
+                flash(f"Deletion failed: {result.get('error')}", "error")
         else:
-            flash(f"Deletion failed: {result.get('error')}", "error")
+            deleted_count = 0
+            total_images = 0
+            failed_ids = []
+
+            for rid in ids_to_delete:
+                res = delete_report_cascading(
+                    report_id=rid,
+                    admin_id=admin_id,
+                    admin_name=admin_name,
+                    admin_email=admin_email,
+                    supabase_client=supabase,
+                    ip_address=ip_address,
+                )
+                if res.get("success"):
+                    deleted_count += 1
+                    total_images += int(res.get("deleted_images_count", 0))
+                else:
+                    failed_ids.append(rid)
+
+            if deleted_count > 0 and not failed_ids:
+                flash(
+                    f"Successfully deleted {deleted_count} reports (#{', #'.join(ids_to_delete)}) and {total_images} associated image(s). "
+                    f"Storage reclaimed and audit log recorded.",
+                    "success",
+                )
+            elif deleted_count > 0 and failed_ids:
+                flash(
+                    f"Partially completed: {deleted_count} report(s) deleted, but failed to delete reports: {', '.join(failed_ids)}.",
+                    "warning",
+                )
+            else:
+                flash("Deletion failed for the selected reports.", "error")
     except Exception as e:
         logger.error(f"Error during cascading report deletion: {e}")
         flash(f"Failed to delete report: {str(e)}", "error")

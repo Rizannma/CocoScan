@@ -129,7 +129,7 @@
             height: 40px;
             display: flex;
             align-items: center;
-            justify-content: flex-end;
+            justify-content: center;
         }
 
         .btn-inapp-back {
@@ -146,7 +146,7 @@
             text-decoration: none;
             transition: all 0.2s ease;
             flex-shrink: 0;
-            margin-right: 2px;
+            margin-right: 0;
         }
 
         .btn-inapp-back:hover {
@@ -821,31 +821,31 @@
             font-weight: 700;
         }
 
-        .btn-icon-refresh {
-            width: 42px;
-            height: 42px;
-            border-radius: 50%;
-            background-color: #ffffff;
-            border: 1px solid var(--border-light, rgba(0, 0, 0, 0.08));
-            color: var(--primary-green, #164630);
-            font-size: 1.05rem;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
-            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        .navbar-refresh-btn {
+        .navbar-refresh-btn {
+            margin-right: 0;
         }
 
-        .btn-icon-refresh:hover {
-            background-color: var(--primary-green, #164630);
-            color: #ffffff;
-            transform: rotate(45deg);
-            box-shadow: 0 6px 14px rgba(82, 130, 101, 0.15);
+        .navbar-refresh-btn:hover,
+        .navbar-refresh-btn:active {
+            transform: none;
         }
 
-        .btn-icon-refresh:active {
-            transform: rotate(90deg) scale(0.95);
+        .navbar-refresh-btn i {
+            display: inline-block;
+        }
+
+        .navbar-refresh-btn:hover i {
+            animation: navbar-refresh-spin 0.65s ease-in-out;
+        }
+
+        .navbar-refresh-btn i.fa-spin {
+            animation: navbar-refresh-spin 0.7s linear infinite;
+        }
+
+        @keyframes navbar-refresh-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
 
         /* ==========================================================================
@@ -879,7 +879,7 @@
                 height: 40px;
                 display: flex;
                 align-items: center;
-                justify-content: flex-end;
+                justify-content: center;
             }
 
             .sidebar-wrapper {
@@ -963,7 +963,7 @@
 
     <div class="mobile-viewport-container">
         <header class="mobile-header">
-            <div class="header-brand-group" style="display: flex; align-items: center; gap: 10px;">
+            <div class="header-brand-group" style="display: flex; align-items: center; gap: 20px;">
                 <button type="button" class="btn-inapp-back" onclick="handleInAppBackNavigation()" title="{{ t('navigation.btn_go_back', 'Go Back') }}" aria-label="{{ t('navigation.btn_go_back', 'Go Back') }}">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
@@ -977,7 +977,11 @@
                     </div>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button type="button" class="btn-inapp-back navbar-refresh-btn" onclick="spinAndRefresh(this)"
+                    title="Refresh page" aria-label="Refresh page">
+                    <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                </button>
                 {% if is_farmer_role %}
                 <button type="button" class="lang-toggle-btn" onclick="toggleLanguagePreference()" title="{{ t('navigation.lang_preference', 'Language' if current_lang != 'tl' else 'Wika') }}" aria-label="Toggle Language">
                     <i class="fa-solid fa-globe" style="font-size: 0.78rem; color: var(--brand-accent);"></i>
@@ -1284,18 +1288,7 @@
         }
 
         window.spinAndRefresh = function (btn) {
-            if (btn) btn.disabled = true;
-            const icon = btn ? btn.querySelector('i') : null;
-            if (icon) icon.classList.add('fa-spin');
-
-            const mainContent = document.querySelector('main') || document.body;
-            if (mainContent) {
-                mainContent.style.transition = 'opacity 0.15s ease';
-                mainContent.style.opacity = '0.6';
-            }
-            const url = new URL(window.location.href);
-            url.searchParams.set('_r', Date.now());
-            window.location.replace(url.toString());
+            return window.CocoScanRefresh?.refresh(btn);
         };
 
         function initCharts() {
@@ -1662,6 +1655,7 @@
     {% include 'components/notification_center.html' %}
     {% endif %}
     {% include 'components/pwa_scripts.html' %}
+    <script src="{{ url_for('static', filename='js/global_refresh.js') }}"></script>
 </body>
 
 </html>

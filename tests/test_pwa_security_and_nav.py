@@ -1,11 +1,15 @@
 import os
 import sys
 import pytest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 from flask import session
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from main import app
+import main
+
+app = main.app
 
 @pytest.fixture
 def client():
@@ -197,29 +201,44 @@ def test_farmer_bottom_navigation_bar_presence(client):
         sess['user_name'] = 'Farmer Juan'
         sess['user_email'] = 'juan@cocoscan.org'
 
+    original_table = main.supabase.table
+
+    def table_with_approved_farmer(table_name):
+        if table_name != 'users':
+            return original_table(table_name)
+        query = MagicMock()
+        query.select.return_value = query
+        query.eq.return_value = query
+        query.execute.return_value = SimpleNamespace(data=[{
+            'role': 'farmer', 'status': 'Approved', 'email': 'juan@cocoscan.org',
+            'first_name': 'Farmer', 'last_name': 'Juan',
+        }])
+        return query
+
     farmer_routes = ['/farmer/dashboard', '/farmer/scan', '/farmer/drafts', '/farmer/reports']
-    for route in farmer_routes:
-        resp = client.get(route)
-        assert resp.status_code == 200, f"Route {route} returned status {resp.status_code}"
-        html = resp.get_data(as_text=True)
+    with patch.object(main.supabase, 'table', side_effect=table_with_approved_farmer):
+        for route in farmer_routes:
+            resp = client.get(route)
+            assert resp.status_code == 200, f"Route {route} returned status {resp.status_code}"
+            html = resp.get_data(as_text=True)
 
-        # Persistent bottom bar container (4 primary routes, uncluttered)
-        assert 'farmer-bottom-nav' in html, f"Missing farmer-bottom-nav in {route}"
-        assert 'bottom-nav-dashboard' in html, f"Missing bottom-nav-dashboard in {route}"
-        assert 'bottom-nav-scan' in html, f"Missing bottom-nav-scan in {route}"
-        assert 'bottom-nav-drafts' in html, f"Missing bottom-nav-drafts in {route}"
-        assert 'bottom-nav-reports' in html, f"Missing bottom-nav-reports in {route}"
-        assert 'bottom-nav-profile' not in html, f"Redundant bottom-nav-profile found in {route}"
+            # Persistent bottom bar container (4 primary routes, uncluttered)
+            assert 'farmer-bottom-nav' in html, f"Missing farmer-bottom-nav in {route}"
+            assert 'bottom-nav-dashboard' in html, f"Missing bottom-nav-dashboard in {route}"
+            assert 'bottom-nav-scan' in html, f"Missing bottom-nav-scan in {route}"
+            assert 'bottom-nav-drafts' in html, f"Missing bottom-nav-drafts in {route}"
+            assert 'bottom-nav-reports' in html, f"Missing bottom-nav-reports in {route}"
+            assert 'bottom-nav-profile' not in html, f"Redundant bottom-nav-profile found in {route}"
 
-        # Header profile button & language toggle
-        assert 'header-profile-btn' in html, f"Missing header-profile-btn in {route}"
-        assert 'lang-toggle-btn' in html, f"Missing lang-toggle-btn in {route}"
+            # Header profile button & language toggle
+            assert 'header-profile-btn' in html, f"Missing header-profile-btn in {route}"
+            assert 'lang-toggle-btn' in html, f"Missing lang-toggle-btn in {route}"
 
-        # Dedicated profile modal sheet
-        assert 'farmer-profile-modal' in html, f"Missing farmer-profile-modal in {route}"
-        assert 'openFarmerProfileModal()' in html, f"Missing openFarmerProfileModal trigger in {route}"
-        assert 'closeFarmerProfileModal()' in html, f"Missing closeFarmerProfileModal trigger in {route}"
-        assert '/logout' in html, f"Missing logout link in {route}"
+            # Dedicated profile modal sheet
+            assert 'farmer-profile-modal' in html, f"Missing farmer-profile-modal in {route}"
+            assert 'openFarmerProfileModal()' in html, f"Missing openFarmerProfileModal trigger in {route}"
+            assert 'closeFarmerProfileModal()' in html, f"Missing closeFarmerProfileModal trigger in {route}"
+            assert '/logout' in html, f"Missing logout link in {route}"
 
 
 def test_farmer_no_sidebar_or_hamburger(client):

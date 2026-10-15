@@ -2,17 +2,36 @@ import os
 import sys
 import json
 import pytest
+from unittest.mock import MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from main import app
+import main
 from app import push_service
+
+app = main.app
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
+    original_table = main.supabase.table
+
+    def table_with_approved_farmer(table_name):
+        if table_name != 'users':
+            return original_table(table_name)
+        query = MagicMock()
+        query.select.return_value = query
+        query.eq.return_value = query
+        query.limit.return_value = query
+        query.execute.return_value = MagicMock(data=[{
+            'id': 'test-user-123', 'role': 'farmer', 'status': 'Approved',
+            'email': 'farmer@test.com', 'first_name': 'Test', 'last_name': 'Farmer',
+        }])
+        return query
+
+    monkeypatch.setattr(main, 'supabase', MagicMock(table=table_with_approved_farmer))
     with app.test_client() as client:
         with client.session_transaction() as sess:
             sess['user_id'] = 'test-user-123'

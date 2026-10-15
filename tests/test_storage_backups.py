@@ -32,6 +32,25 @@ class StorageBackupsTests(unittest.TestCase):
         init_security_db()
         main.app.config.update(TESTING=True, SECRET_KEY="test-secret-key")
         self.client = main.app.test_client()
+        original_table = main.supabase.table
+
+        def table_with_approved_admin(table_name):
+            if table_name != "users":
+                return original_table(table_name)
+            query = MagicMock()
+            query.select.return_value = query
+            query.eq.return_value = query
+            query.execute.return_value = MagicMock(data=[{
+                "id": "admin-777", "email": "admin@cocoscan.org", "role": "admin",
+                "status": "Approved", "first_name": "System", "last_name": "Admin",
+            }])
+            return query
+
+        self.supabase_users_patch = patch.object(
+            main.supabase, "table", side_effect=table_with_approved_admin
+        )
+        self.supabase_users_patch.start()
+        self.addCleanup(self.supabase_users_patch.stop)
 
     def test_format_bytes(self):
         self.assertEqual(format_bytes(0), "0 KB")
@@ -110,6 +129,44 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertIn("Trigger Report Deletion...", content)
         self.assertIn("Bulk Delete by Date Range", content)
         self.assertIn("delete report PCA Admin", content)
+        self.assertIn("reports-master-checkbox", content)
+        self.assertIn("Select All", content)
+        self.assertIn("danger-reports-table", content)
+
+    def test_reports_list_selection_component_rendered_with_reports(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = "admin-123"
+            sess["user_role"] = "admin"
+            sess["user_name"] = "PCA Admin"
+
+        mock_reports = [
+            {
+                "id": 21,
+                "pest_type": "Brontispa",
+                "formatted_date": "Oct 05, 2026",
+                "status": "Under Review",
+                "display_label": "Report #21 · Brontispa · Oct 05, 2026 (Under Review)",
+            },
+            {
+                "id": 20,
+                "pest_type": "Rhinoceros Beetle",
+                "formatted_date": "Sep 22, 2026",
+                "status": "Assessment Issued",
+                "display_label": "Report #20 · Rhinoceros Beetle · Sep 22, 2026 (Assessment Issued)",
+            },
+        ]
+
+        with patch("app.backup_service.get_recent_reports_for_danger_zone", return_value=mock_reports):
+            res = self.client.get("/admin/storage-backups")
+            self.assertEqual(res.status_code, 200)
+            html = res.get_data(as_text=True)
+            self.assertIn("reports-master-checkbox", html)
+            self.assertIn("Select All", html)
+            self.assertIn('class="report-row-checkbox', html)
+            self.assertIn('data-report-id="21"', html)
+            self.assertIn('data-report-id="20"', html)
+            self.assertIn("Brontispa", html)
+            self.assertIn("Rhinoceros Beetle", html)
 
     def test_admin_generate_download_delete_backup_routes(self):
         with self.client.session_transaction() as sess:
@@ -230,6 +287,34 @@ class StorageBackupsTests(unittest.TestCase):
             self.assertEqual(good_res.status_code, 200)
             self.assertIn("permanently purged", good_res.get_data(as_text=True))
             mock_delete.assert_called_once()
+
+    def test_admin_danger_delete_multiple_reports_route_security(self):
+        admin_name = "PCA Admin"
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = "admin-777"
+            sess["user_role"] = "admin"
+            sess["user_name"] = admin_name
+            sess["user_email"] = "admin@cocoscan.org"
+
+        with patch("app.backup_service.delete_report_cascading") as mock_delete:
+            mock_delete.return_value = {
+                "success": True,
+                "report_id": "101",
+                "deleted_images_count": 2,
+                "deleted_images": ["report_media/leaf1.jpg"],
+            }
+
+            res = self.client.post(
+                "/admin/storage-backups/danger/delete-report",
+                data={
+                    "report_ids": "101, 102, 103",
+                    "confirmation_phrase": f"delete report {admin_name}",
+                },
+                follow_redirects=True,
+            )
+            self.assertEqual(res.status_code, 200)
+            self.assertIn("Successfully deleted 3 reports", res.get_data(as_text=True))
+            self.assertEqual(mock_delete.call_count, 3)
 
     def test_delete_report_cascading_audit_log_written(self):
         from app.backup_service import delete_report_cascading

@@ -108,6 +108,7 @@ def require_role(*roles):
                 return redirect(url_for('login'))
                 
             return f(*args, **kwargs)
+        decorated_function._required_roles = allowed_roles
         return decorated_function
     return decorator
 
