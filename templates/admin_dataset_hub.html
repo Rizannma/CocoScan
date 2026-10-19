@@ -235,6 +235,353 @@
     .folder-path-pill i {
         color: #164630;
     }
+
+    /* View Images Button */
+    .btn-view-images {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: transparent;
+        color: #164630;
+        border: 1.5px solid #164630;
+        padding: 5px 12px;
+        border-radius: 8px;
+        font-size: 0.78rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        white-space: nowrap;
+    }
+
+    .btn-view-images:hover {
+        background: #164630;
+        color: #ffffff;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(22, 70, 48, 0.2);
+    }
+
+    /* ── Image Gallery Modal ──────────────────────────────────────── */
+    #galleryModal {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        background: rgba(8, 20, 14, 0.72);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        align-items: flex-start;
+        justify-content: center;
+        padding: 32px 16px;
+        overflow-y: auto;
+        animation: fadeInOverlay 0.22s ease;
+    }
+
+    #galleryModal.open {
+        display: flex;
+    }
+
+    @keyframes fadeInOverlay {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+    }
+
+    .gallery-modal-box {
+        background: #ffffff;
+        border-radius: 20px;
+        width: 100%;
+        max-width: 1100px;
+        overflow: hidden;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+        animation: slideUpModal 0.25s ease;
+        position: relative;
+    }
+
+    @keyframes slideUpModal {
+        from { transform: translateY(32px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+    }
+
+    .gallery-modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 20px 24px;
+        border-bottom: 1px solid #f1f5f9;
+        position: sticky;
+        top: 0;
+        background: #fff;
+        z-index: 1;
+    }
+
+    .gallery-modal-header h3 {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #0b1315;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .gallery-folder-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f0f4f2;
+        color: #164630;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        font-family: ui-monospace, monospace;
+    }
+
+    .gallery-total-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        background: #eff6ff;
+        color: #1d4ed8;
+        padding: 3px 10px;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .btn-gallery-close {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: none;
+        background: #f1f5f9;
+        color: #64748b;
+        font-size: 1rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s ease;
+        flex-shrink: 0;
+    }
+
+    .btn-gallery-close:hover {
+        background: #fee2e2;
+        color: #dc2626;
+    }
+
+    .gallery-modal-body {
+        padding: 24px;
+    }
+
+    /* Image grid */
+    .gallery-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 14px;
+    }
+
+    .gallery-img-card {
+        border-radius: 12px;
+        overflow: hidden;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        cursor: pointer;
+        transition: all 0.18s ease;
+        position: relative;
+    }
+
+    .gallery-img-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+        border-color: #164630;
+    }
+
+    .gallery-img-card img {
+        width: 100%;
+        aspect-ratio: 1 / 1;
+        object-fit: cover;
+        display: block;
+        background: #e2e8f0;
+    }
+
+    .gallery-img-card .gallery-img-info {
+        padding: 7px 9px 8px;
+    }
+
+    .gallery-img-card .gallery-img-id {
+        font-size: 0.7rem;
+        color: #64748b;
+        font-family: ui-monospace, monospace;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .gallery-img-card .gallery-img-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 20px;
+        margin-top: 3px;
+    }
+
+    .gallery-img-badge.correction {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .gallery-img-badge.validated {
+        background: #d1fae5;
+        color: #065f46;
+    }
+
+    /* Correction ribbon */
+    .gallery-img-card .correction-ribbon {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: #f59e0b;
+        color: #fff;
+        font-size: 0.6rem;
+        font-weight: 800;
+        padding: 2px 6px;
+        border-radius: 4px;
+        letter-spacing: 0.3px;
+        pointer-events: none;
+    }
+
+    /* Skeleton loader */
+    .gallery-skeleton {
+        border-radius: 12px;
+        background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.3s infinite;
+        aspect-ratio: 1 / 1;
+    }
+
+    @keyframes shimmer {
+        0%   { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    /* Empty state */
+    .gallery-empty {
+        text-align: center;
+        padding: 60px 24px;
+        color: #94a3b8;
+    }
+
+    .gallery-empty i {
+        font-size: 2.8rem;
+        margin-bottom: 12px;
+        display: block;
+        color: #cbd5e1;
+    }
+
+    .gallery-empty p {
+        font-size: 0.95rem;
+        margin: 0;
+    }
+
+    /* Pagination */
+    .gallery-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        margin-top: 24px;
+        flex-wrap: wrap;
+    }
+
+    .btn-gallery-page {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1.5px solid #e2e8f0;
+        background: #fff;
+        color: #334155;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .btn-gallery-page:hover:not(:disabled) {
+        background: #164630;
+        color: #fff;
+        border-color: #164630;
+    }
+
+    .btn-gallery-page:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .gallery-page-info {
+        font-size: 0.82rem;
+        color: #64748b;
+        font-weight: 600;
+        min-width: 100px;
+        text-align: center;
+    }
+
+    /* Lightbox */
+    #lightboxOverlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        z-index: 10500;
+        background: rgba(0,0,0,0.88);
+        align-items: center;
+        justify-content: center;
+        animation: fadeInOverlay 0.18s ease;
+    }
+
+    #lightboxOverlay.open {
+        display: flex;
+    }
+
+    #lightboxOverlay img {
+        max-width: 90vw;
+        max-height: 88vh;
+        border-radius: 12px;
+        object-fit: contain;
+        box-shadow: 0 16px 60px rgba(0,0,0,0.5);
+    }
+
+    .btn-lightbox-close {
+        position: fixed;
+        top: 18px;
+        right: 22px;
+        background: rgba(255,255,255,0.15);
+        border: none;
+        color: #fff;
+        font-size: 1.4rem;
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s ease;
+        backdrop-filter: blur(4px);
+    }
+
+    .btn-lightbox-close:hover {
+        background: rgba(239,68,68,0.7);
+    }
+
+    .gallery-error-msg {
+        text-align: center;
+        padding: 40px 24px;
+        color: #dc2626;
+    }
 </style>
 {% endblock %}
 
@@ -283,7 +630,7 @@
     </div>
 </div>
 
-<!-- Folder Structure Table: exact match from overview/reports with Export as ZIP button on upper right -->
+<!-- Folder Structure Table -->
 <div class="reports-table-card">
     <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
         <h3 style="font-size: 1.1rem; font-weight: 700; color: #0b1315; margin: 0; display: flex; align-items: center; gap: 8px;">
@@ -299,9 +646,10 @@
     <table>
         <thead>
             <tr>
-                <th style="width: 35%;">Folder Name</th>
-                <th style="width: 45%;">Class Label</th>
-                <th style="width: 20%; text-align: right;">Items</th>
+                <th style="width: 30%;">Folder Name</th>
+                <th style="width: 40%;">Class Label</th>
+                <th style="width: 15%; text-align: right;">Items</th>
+                <th style="width: 15%; text-align: right;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -313,6 +661,11 @@
                 </td>
                 <td style="font-weight: 500;">Coconut Leaf Beetle (Brontispa)</td>
                 <td style="text-align: right; font-weight: 600; color: #0b1315;">{{ summary.counts.brontispa }}</td>
+                <td style="text-align: right;">
+                    <button class="btn-view-images" onclick="openGallery('brontispa', 'Brontispa', {{ summary.counts.brontispa }})" id="btn-view-brontispa">
+                        <i class="fa-solid fa-images"></i> View
+                    </button>
+                </td>
             </tr>
             <tr>
                 <td>
@@ -322,6 +675,11 @@
                 </td>
                 <td style="font-weight: 500;">Coconut Rhinoceros Beetle</td>
                 <td style="text-align: right; font-weight: 600; color: #0b1315;">{{ summary.counts.rhinoceros_beetle }}</td>
+                <td style="text-align: right;">
+                    <button class="btn-view-images" onclick="openGallery('rhinoceros_beetle', 'Rhinoceros Beetle', {{ summary.counts.rhinoceros_beetle }})" id="btn-view-rhinoceros_beetle">
+                        <i class="fa-solid fa-images"></i> View
+                    </button>
+                </td>
             </tr>
             <tr>
                 <td>
@@ -331,6 +689,11 @@
                 </td>
                 <td style="font-weight: 500;">Healthy Coconut Leaf</td>
                 <td style="text-align: right; font-weight: 600; color: #0b1315;">{{ summary.counts.healthy }}</td>
+                <td style="text-align: right;">
+                    <button class="btn-view-images" onclick="openGallery('healthy', 'Healthy Coconut Leaf', {{ summary.counts.healthy }})" id="btn-view-healthy">
+                        <i class="fa-solid fa-images"></i> View
+                    </button>
+                </td>
             </tr>
             <tr>
                 <td>
@@ -340,6 +703,11 @@
                 </td>
                 <td style="font-weight: 500;">Unidentified / Non-Leaf</td>
                 <td style="text-align: right; font-weight: 600; color: #0b1315;">{{ summary.counts.not_coconut_leaf }}</td>
+                <td style="text-align: right;">
+                    <button class="btn-view-images" onclick="openGallery('not_coconut_leaf', 'Unidentified / Non-Leaf', {{ summary.counts.not_coconut_leaf }})" id="btn-view-not_coconut_leaf">
+                        <i class="fa-solid fa-images"></i> View
+                    </button>
+                </td>
             </tr>
         </tbody>
         <tfoot>
@@ -347,8 +715,214 @@
                 <td>Total</td>
                 <td style="color: #64748b;">4 Classes</td>
                 <td style="text-align: right;">{{ summary.total_samples }}</td>
+                <td></td>
             </tr>
         </tfoot>
     </table>
 </div>
+
+<!-- ─── Image Gallery Modal ─────────────────────────────────────── -->
+<div id="galleryModal" role="dialog" aria-modal="true" aria-labelledby="galleryModalTitle">
+    <div class="gallery-modal-box">
+        <div class="gallery-modal-header">
+            <h3 id="galleryModalTitle">
+                <i class="fa-solid fa-images" style="color: #164630;"></i>
+                <span id="galleryFolderLabel">Folder Images</span>
+                <span class="gallery-folder-badge" id="galleryFolderBadge">
+                    <i class="fa-regular fa-folder-open"></i>
+                    <span id="galleryFolderSlug">—</span>
+                </span>
+                <span class="gallery-total-badge" id="galleryTotalBadge" style="display:none;">
+                    <i class="fa-solid fa-image"></i>
+                    <span id="galleryTotalCount">0</span> images
+                </span>
+            </h3>
+            <button class="btn-gallery-close" onclick="closeGallery()" title="Close" aria-label="Close gallery">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        <div class="gallery-modal-body">
+            <div id="galleryContent">
+                <!-- Populated by JS -->
+            </div>
+            <div class="gallery-pagination" id="galleryPagination" style="display:none;">
+                <button class="btn-gallery-page" id="btnGalleryPrev" onclick="galleryChangePage(-1)" disabled>
+                    <i class="fa-solid fa-chevron-left"></i> Prev
+                </button>
+                <span class="gallery-page-info" id="galleryPageInfo">Page 1</span>
+                <button class="btn-gallery-page" id="btnGalleryNext" onclick="galleryChangePage(1)">
+                    Next <i class="fa-solid fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightboxOverlay" onclick="closeLightbox()">
+    <button class="btn-lightbox-close" onclick="closeLightbox()" aria-label="Close lightbox">
+        <i class="fa-solid fa-xmark"></i>
+    </button>
+    <img id="lightboxImg" src="" alt="Full size image">
+</div>
+
+<script>
+(function () {
+    // ── State ─────────────────────────────────────────────────────
+    let _currentFolder = '';
+    let _currentPage   = 1;
+    let _totalPages    = 1;
+    let _perPage       = 30;
+    let _isLoading     = false;
+
+    // ── Open / Close Modal ────────────────────────────────────────
+    window.openGallery = function (folder, label, total) {
+        _currentFolder = folder;
+        _currentPage   = 1;
+
+        document.getElementById('galleryFolderLabel').textContent = label;
+        document.getElementById('galleryFolderSlug').textContent  = folder + '/';
+        document.getElementById('galleryTotalCount').textContent  = total;
+        document.getElementById('galleryTotalBadge').style.display = total > 0 ? '' : 'none';
+        document.getElementById('galleryModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+
+        fetchGalleryPage(folder, 1);
+    };
+
+    window.closeGallery = function () {
+        document.getElementById('galleryModal').classList.remove('open');
+        document.body.style.overflow = '';
+        document.getElementById('galleryContent').innerHTML = '';
+        document.getElementById('galleryPagination').style.display = 'none';
+    };
+
+    // Close on backdrop click
+    document.getElementById('galleryModal').addEventListener('click', function (e) {
+        if (e.target === this) closeGallery();
+    });
+
+    // ── Fetch Images ──────────────────────────────────────────────
+    function fetchGalleryPage(folder, page) {
+        if (_isLoading) return;
+        _isLoading = true;
+
+        const content = document.getElementById('galleryContent');
+        content.innerHTML = renderSkeletons(12);
+        document.getElementById('galleryPagination').style.display = 'none';
+
+        fetch(`/api/admin/dataset-hub/folder-images?folder=${encodeURIComponent(folder)}&page=${page}&per_page=${_perPage}`)
+            .then(function(r) {
+                if (!r.ok) {
+                    return r.text().then(function(txt) {
+                        throw new Error('Server returned ' + r.status + (r.status === 404 ? ' — please restart the server to apply changes.' : ''));
+                    });
+                }
+                var ct = r.headers.get('content-type') || '';
+                if (!ct.includes('application/json')) {
+                    throw new Error('Server returned non-JSON response (' + r.status + '). Please restart the server.');
+                }
+                return r.json();
+            })
+            .then(data => {
+                _isLoading = false;
+                if (!data.success) {
+                    content.innerHTML = `<div class="gallery-error-msg"><i class="fa-solid fa-circle-exclamation"></i><p>${data.error || 'Failed to load images.'}</p></div>`;
+                    return;
+                }
+
+                _totalPages  = data.total_pages || 1;
+                _currentPage = data.page;
+
+                // Update total badge
+                document.getElementById('galleryTotalCount').textContent = data.total;
+                document.getElementById('galleryTotalBadge').style.display = data.total > 0 ? '' : 'none';
+
+                if (!data.images || data.images.length === 0) {
+                    content.innerHTML = `<div class="gallery-empty"><i class="fa-regular fa-image"></i><p>No images found in this folder yet.</p></div>`;
+                    return;
+                }
+
+                content.innerHTML = `<div class="gallery-grid">${data.images.map(renderImageCard).join('')}</div>`;
+
+                // Pagination
+                if (_totalPages > 1) {
+                    document.getElementById('galleryPagination').style.display = '';
+                    document.getElementById('galleryPageInfo').textContent = `Page ${_currentPage} of ${_totalPages}`;
+                    document.getElementById('btnGalleryPrev').disabled = _currentPage <= 1;
+                    document.getElementById('btnGalleryNext').disabled = _currentPage >= _totalPages;
+                }
+            })
+            .catch(err => {
+                _isLoading = false;
+                content.innerHTML = `<div class="gallery-error-msg"><i class="fa-solid fa-triangle-exclamation"></i><p>Network error: ${err.message}</p></div>`;
+            });
+    }
+
+    // ── Render Helpers ────────────────────────────────────────────
+    function renderImageCard(img) {
+        const badgeClass = img.is_correction ? 'correction' : 'validated';
+        const badgeIcon  = img.is_correction ? 'fa-pen' : 'fa-check';
+        const badgeText  = img.is_correction ? 'Corrected' : 'Validated';
+        const ribbon     = img.is_correction ? '<span class="correction-ribbon">Corrected</span>' : '';
+        const safeUrl    = img.url ? escapeHtml(img.url) : '';
+        const imgTag     = safeUrl
+            ? `<img src="${safeUrl}" alt="Report #${escapeHtml(String(img.report_id))}" loading="lazy" onerror="this.src='';this.style.background='#e2e8f0'">`
+            : `<div style="aspect-ratio:1/1;background:#e2e8f0;display:flex;align-items:center;justify-content:center;color:#94a3b8;"><i class="fa-regular fa-image" style="font-size:2rem;"></i></div>`;
+
+        return `
+        <div class="gallery-img-card" onclick="openLightbox('${safeUrl}', '${escapeHtml(String(img.report_id))}')" title="Report #${escapeHtml(String(img.report_id))}">
+            ${ribbon}
+            ${imgTag}
+            <div class="gallery-img-info">
+                <div class="gallery-img-id">Report #${escapeHtml(String(img.report_id))}</div>
+                <span class="gallery-img-badge ${badgeClass}">
+                    <i class="fa-solid ${badgeIcon}"></i> ${badgeText}
+                </span>
+            </div>
+        </div>`;
+    }
+
+    function renderSkeletons(n) {
+        return `<div class="gallery-grid">${'<div class="gallery-skeleton"></div>'.repeat(n)}</div>`;
+    }
+
+    function escapeHtml(str) {
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+
+    // ── Pagination ────────────────────────────────────────────────
+    window.galleryChangePage = function (delta) {
+        const next = _currentPage + delta;
+        if (next < 1 || next > _totalPages) return;
+        _currentPage = next;
+        fetchGalleryPage(_currentFolder, _currentPage);
+        document.querySelector('.gallery-modal-box').scrollIntoView({ behavior: 'smooth' });
+    };
+
+    // ── Lightbox ──────────────────────────────────────────────────
+    window.openLightbox = function (url, reportId) {
+        if (!url) return;
+        document.getElementById('lightboxImg').src  = url;
+        document.getElementById('lightboxImg').alt  = 'Report #' + reportId;
+        document.getElementById('lightboxOverlay').classList.add('open');
+    };
+
+    window.closeLightbox = function () {
+        document.getElementById('lightboxOverlay').classList.remove('open');
+        document.getElementById('lightboxImg').src = '';
+    };
+
+    // ESC key to close modals
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            if (document.getElementById('lightboxOverlay').classList.contains('open')) {
+                closeLightbox();
+            } else if (document.getElementById('galleryModal').classList.contains('open')) {
+                closeGallery();
+            }
+        }
+    });
+})();
+</script>
 {% endblock %}

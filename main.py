@@ -5512,6 +5512,44 @@ def api_admin_dataset_hub_stats():
     })
 
 
+@app.route('/api/admin/dataset-hub/folder-images')
+@require_role('admin')
+def api_admin_dataset_folder_images():
+    """Return paginated image list for a given dataset category folder."""
+    from app.dataset_hub import get_recent_dataset_samples, SLUG_TO_LABEL
+    folder = request.args.get('folder', '').strip().lower()
+    page = max(1, int(request.args.get('page', 1)))
+    per_page = min(60, max(12, int(request.args.get('per_page', 30))))
+    valid_folders = {'brontispa', 'rhinoceros_beetle', 'healthy', 'not_coconut_leaf'}
+    if folder not in valid_folders:
+        return jsonify({'success': False, 'error': 'Invalid folder name.'}), 400
+    samples = get_recent_dataset_samples(limit=1000, category=folder, supabase_client=supabase)
+    total = len(samples)
+    start = (page - 1) * per_page
+    page_samples = samples[start:start + per_page]
+    images = [
+        {
+            'id': s.get('id'),
+            'report_id': s.get('report_id'),
+            'url': s.get('public_url') or s.get('image_url') or '',
+            'label': s.get('verified_label', ''),
+            'is_correction': s.get('is_correction', False),
+            'created_at': s.get('created_at', ''),
+        }
+        for s in page_samples
+    ]
+    return jsonify({
+        'success': True,
+        'folder': folder,
+        'label': SLUG_TO_LABEL.get(folder, folder),
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': max(1, -(-total // per_page)),
+        'images': images,
+    })
+
+
 @app.route('/admin/dataset-hub/export-zip')
 @require_role('admin')
 def admin_export_dataset_zip():
