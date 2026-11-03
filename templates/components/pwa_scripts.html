@@ -777,6 +777,7 @@
             console.debug('[Push] Subscription init note:', e);
         }
     }
+    window.initPushNotificationSubscription = initPushNotificationSubscription;
 
     window.requestPushNotificationPermission = async function() {
         if (isIosDevice() && !isStandaloneMode()) {

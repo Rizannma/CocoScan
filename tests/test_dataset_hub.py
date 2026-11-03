@@ -106,6 +106,35 @@ class DatasetHubTests(unittest.TestCase):
         self.assertEqual(summary["corrected_count"], 1)
         self.assertEqual(len(summary["recent_samples"]), 2)
 
+    def test_get_dataset_summary_excludes_unreviewed_reports(self):
+        mock_client = MagicMock()
+        mock_resp = MagicMock()
+        mock_resp.data = [
+            {
+                "id": 1,
+                "pest_type": "Brontispa",
+                "image_url": "https://example.com/pending.jpg",
+                "status": "under_review",
+                "created_at": "2026-09-18T12:00:00Z",
+                "reviewed_by_id": None,
+            },
+            {
+                "id": 2,
+                "pest_type": "Brontispa",
+                "image_url": "https://example.com/verified.jpg",
+                "status": "assessment_issued",
+                "created_at": "2026-09-18T12:05:00Z",
+                "reviewed_by_id": "agri-1",
+            },
+        ]
+        mock_client.table.return_value.select.return_value.order.return_value.execute.return_value = mock_resp
+
+        summary = get_dataset_summary(mock_client)
+
+        self.assertEqual(summary["total_samples"], 1)
+        self.assertEqual(summary["validated_count"], 1)
+        self.assertEqual([sample["report_id"] for sample in summary["recent_samples"]], ["2"])
+
     def test_generate_dataset_zip(self):
         mock_client = MagicMock()
         mock_resp = MagicMock()

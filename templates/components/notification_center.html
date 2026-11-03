@@ -737,6 +737,8 @@
         const t = (k, def, params) => getNotifI18n(k, def, params);
 
         const isMuted = isPushNotificationsMuted();
+        const pushPermission = 'Notification' in window ? Notification.permission : 'unsupported';
+        const canEnablePush = pushPermission === 'default' || pushPermission === 'denied';
 
         if (bellBtn && bellIcon) {
             if (isMuted) {
@@ -751,14 +753,23 @@
         }
 
         if (muteBtn && muteBtnIcon && muteBtnText) {
-            if (isMuted) {
+            if (canEnablePush) {
+                muteBtn.classList.remove('muted-active');
+                muteBtnIcon.className = 'fa-solid fa-bell';
+                muteBtnText.textContent = t('dashboard.push_consent_btn_enable', 'Enable');
+                muteBtn.title = pushPermission === 'denied'
+                    ? 'Enable notifications in your browser settings'
+                    : 'Enable device notifications';
+            } else if (isMuted) {
                 muteBtn.classList.add('muted-active');
                 muteBtnIcon.className = 'fa-solid fa-bell-slash';
                 muteBtnText.textContent = t('dashboard.notif_btn_unmute', 'Unmute');
+                muteBtn.title = 'Unmute in-app notifications';
             } else {
                 muteBtn.classList.remove('muted-active');
                 muteBtnIcon.className = 'fa-solid fa-bell';
                 muteBtnText.textContent = t('dashboard.notif_btn_mute', 'Mute');
+                muteBtn.title = 'Mute in-app notifications';
             }
         }
     }
@@ -901,18 +912,55 @@
 
     async function fetchNotificationsFromAPI() {
         try {
-            const resp = await fetch('/api/notifications');
+            const resp = await fetch('/api/notifications', {
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
             if (resp.ok) {
                 const data = await resp.json();
                 if (data && Array.isArray(data.notifications)) {
+                    const previousIds = new Set(cachedApiNotifications.map(item => item.id));
                     cachedApiNotifications = data.notifications;
+                    window.dispatchEvent(new CustomEvent('cocoscan:notificationsupdated', {
+                        detail: data.notifications
+                    }));
                     renderFarmerNotifications();
                     updateNotificationIconUI();
+
+                    if (previousIds.size > 0) {
+                        const newItems = data.notifications.filter(item => !previousIds.has(item.id));
+                        newItems.slice(0, 3).forEach(item => {
+                            if (
+                                document.visibilityState !== 'visible' &&
+                                'Notification' in window &&
+                                Notification.permission === 'granted'
+                            ) {
+                                new Notification(item.title || 'CocoScan update', {
+                                    body: item.desc || 'You have a new CocoScan update.',
+                                    icon: '/static/icons/icon-192x192.png',
+                                    tag: `cocoscan-api-${item.id}`
+                                });
+                            }
+                        });
+                    }
                 }
             }
         } catch (err) {
             console.debug('Failed to fetch /api/notifications:', err);
         }
+    }
+
+    let notificationPollingTimer = null;
+    function scheduleNotificationPolling() {
+        if (notificationPollingTimer) {
+            clearTimeout(notificationPollingTimer);
+        }
+        notificationPollingTimer = setTimeout(async () => {
+            if (document.visibilityState === 'visible' && navigator.onLine) {
+                await fetchNotificationsFromAPI();
+            }
+            scheduleNotificationPolling();
+        }, 30000);
     }
 
     function escapeHtml(str) {
@@ -952,6 +1000,7 @@
     };
 
     window.openPushConsentModal = function() {
+        localStorage.setItem('cocoscan_push_asked', 'true');
         closeNotificationCenter();
         enforceStaffNotificationEnglish();
         const modal = document.getElementById('farmer-push-consent-modal');
@@ -1003,6 +1052,11 @@
     };
 
     window.toggleNotificationMuteState = function() {
+        if ('Notification' in window && Notification.permission !== 'granted') {
+            openPushConsentModal();
+            return;
+        }
+
         const currentMuted = isPushNotificationsMuted();
         const nextMuted = !currentMuted;
         localStorage.setItem('cocoscan_push_muted', nextMuted ? 'true' : 'false');
@@ -1079,6 +1133,7 @@
         enforceStaffNotificationEnglish();
         updateNotificationIconUI();
         fetchNotificationsFromAPI();
+        scheduleNotificationPolling();
     });
 
     // Also trigger immediately in case DOM is already ready
@@ -1086,6 +1141,7 @@
         enforceStaffNotificationEnglish();
         updateNotificationIconUI();
         fetchNotificationsFromAPI();
+        scheduleNotificationPolling();
     }
 })();
 </script>

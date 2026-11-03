@@ -200,12 +200,14 @@
         font-size: 0.78rem;
         font-weight: 600;
         letter-spacing: 0.3px;
+        white-space: nowrap;
     }
 
     .action-badge.login { background-color: #d1fae5; color: #065f46; }
     .action-badge.failed { background-color: #fef3c7; color: #92400e; }
     .action-badge.lockout { background-color: #fee2e2; color: #991b1b; }
     .action-badge.reset { background-color: #e0e7ff; color: #3730a3; }
+    .action-badge.danger { background-color: #fee2e2; color: #991b1b; }
     .action-badge.default { background-color: #f1f5f9; color: #475569; }
 
     /* --- PAGINATION SYSTEM --- */
@@ -321,6 +323,8 @@
                     {% elif current_action == 'PASSWORD_RESET' %}Password Reset
                     {% elif current_action == '2FA_VERIFIED' %}2FA Verified
                     {% elif current_action == 'SESSION_TIMEOUT' %}Session Timeout
+                    {% elif current_action == 'DANGER_ZONE_REPORT_DELETE' %}Danger Zone Report Delete
+                    {% elif current_action == 'DANGER_ZONE_BULK_REPORT_DELETE' %}Danger Zone Bulk Delete
                     {% elif current_action %}{{ current_action | replace('_', ' ') | title }}
                     {% else %}Event Type{% endif %} ▾
                 </button>
@@ -339,6 +343,10 @@
                         onclick="updateFilter('actionFilter', '2FA_VERIFIED')">2FA Verified</button>
                     <button type="button" class="dropdown-item {% if current_action == 'SESSION_TIMEOUT' %}selected{% endif %}"
                         onclick="updateFilter('actionFilter', 'SESSION_TIMEOUT')">Session Timeout</button>
+                    <button type="button" class="dropdown-item {% if current_action == 'DANGER_ZONE_REPORT_DELETE' %}selected{% endif %}"
+                        onclick="updateFilter('actionFilter', 'DANGER_ZONE_REPORT_DELETE')">Danger Zone Report Delete</button>
+                    <button type="button" class="dropdown-item {% if current_action == 'DANGER_ZONE_BULK_REPORT_DELETE' %}selected{% endif %}"
+                        onclick="updateFilter('actionFilter', 'DANGER_ZONE_BULK_REPORT_DELETE')">Danger Zone Bulk Delete</button>
                 </div>
             </div>
         </div>
@@ -384,11 +392,19 @@
                         <span class="action-badge reset">{{ log.highlighted_action | safe }}</span>
                         {% elif log.action == 'SESSION_TIMEOUT' %}
                         <span class="action-badge failed">{{ log.highlighted_action | safe }}</span>
+                        {% elif log.action in ['DANGER_ZONE_REPORT_DELETE', 'DANGER_ZONE_BULK_REPORT_DELETE'] %}
+                        <span class="action-badge danger">{{ log.highlighted_action | safe }}</span>
                         {% else %}
                         <span class="action-badge default">{{ log.highlighted_action | safe }}</span>
                         {% endif %}
                     </td>
-                    <td style="padding: 16px 12px; font-size: 0.9rem; color: #475569;">{{ log.highlighted_details | safe }}</td>
+                    <td style="padding: 16px 12px; font-size: 0.9rem; color: #475569; line-height: 1.45;">
+                        {% if log.action in ['DANGER_ZONE_REPORT_DELETE', 'DANGER_ZONE_BULK_REPORT_DELETE'] %}
+                        {{ (log.highlighted_audit_summary or log.highlighted_details) | safe }}
+                        {% else %}
+                        {{ log.highlighted_details | safe }}
+                        {% endif %}
+                    </td>
                     <td style="padding: 16px 12px; font-size: 0.85rem; font-family: monospace; color: #64748b;">{{ log.ip_address or 'N/A' }}</td>
                 </tr>
                 {% endfor %}

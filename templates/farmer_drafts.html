@@ -424,15 +424,7 @@
                     <i class="fa-solid fa-camera"></i> <span data-i18n="drafts.btn_scan_now">{{ t('drafts.btn_scan_now', 'Scan Pest Now') }}</span>
                 </a>
             </div>
-{% endblock %}
-
-            if (icon) {
-                icon.classList.add('fa-spin');
-                setTimeout(() => icon.classList.remove('fa-spin'), 500);
-            }
-            loadDrafts();
-        }
-
+<script>
         function openDraftDB() {
             return new Promise((resolve, reject) => {
                 const request = window.indexedDB.open('cocoscan_farmer_drafts', 1);

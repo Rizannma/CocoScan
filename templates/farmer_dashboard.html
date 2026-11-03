@@ -861,6 +861,7 @@
         }
     })();
     window.rawDashboardReports = rawDashboardReports;
+    let liveApiNotifications = null;
 
     function isPushNotificationsMuted() {
         return localStorage.getItem('cocoscan_push_muted') === 'true';
@@ -905,16 +906,19 @@
     function handleNotificationIconClick(event) {
         if (event) event.stopPropagation();
 
-        // If push permission has never been decided and notifications are not muted yet
         const pushAsked = localStorage.getItem('cocoscan_push_asked');
         const hasPermissionApi = 'Notification' in window;
         const currentPermission = hasPermissionApi ? Notification.permission : 'denied';
 
         if (!pushAsked && currentPermission === 'default') {
+            localStorage.setItem('cocoscan_push_asked', 'true');
             openPushConsentModal();
             return;
         }
 
+        if (currentPermission === 'granted' && typeof initPushNotificationSubscription === 'function') {
+            initPushNotificationSubscription();
+        }
         openNotificationCenter();
     }
 
@@ -935,6 +939,7 @@
     }
 
     function openPushConsentModal() {
+        localStorage.setItem('cocoscan_push_asked', 'true');
         closeNotificationCenter();
         const modal = document.getElementById('farmer-push-consent-modal');
         if (modal) {
@@ -1067,6 +1072,15 @@
                 }
             });
         } catch (e) {}
+
+        if (Array.isArray(liveApiNotifications)) {
+            liveApiNotifications.forEach(item => {
+                if (item && item.id && !clearedIds.includes(item.id)) {
+                    list.push(item);
+                }
+            });
+            return list;
+        }
 
         // Process report records for notifications
         if (Array.isArray(rawDashboardReports)) {
@@ -1274,6 +1288,12 @@
         } catch (e) {
             console.debug('Error saving push to inbox:', e);
         }
+    });
+
+    window.addEventListener('cocoscan:notificationsupdated', (event) => {
+        liveApiNotifications = Array.isArray(event.detail) ? event.detail : [];
+        renderFarmerNotifications();
+        updateNotificationIconUI();
     });
 
     function escapeHtml(str) {

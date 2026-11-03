@@ -122,7 +122,7 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertIn("System Backups Storage", content)
         self.assertIn("Database Backups", content)
         self.assertIn("Generate Backup Now", content)
-        self.assertIn("Tiered Retention Policy", content)
+        self.assertIn("Manual backup policy", content)
         self.assertIn("Danger Zone", content)
         self.assertIn("By Specific Report", content)
         self.assertIn("By Date Range / Bulk", content)
@@ -493,5 +493,4 @@ class StorageBackupsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
 

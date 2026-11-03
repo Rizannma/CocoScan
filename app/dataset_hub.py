@@ -260,7 +260,9 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
 
     if client:
         try:
-            # Query reports with pest_type and images
+            # Only reports reviewed by an agriculturist are eligible for the
+            # training dataset. AI predictions and pending reports must remain
+            # outside the dataset until expert review is recorded.
             rep_resp = (
                 client.table("reports")
                 .select("id, pest_type, image_url, expert_recommendations, status, created_at, reviewed_by_id")
@@ -270,6 +272,9 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
             rows = getattr(rep_resp, "data", []) or []
 
             for row in rows:
+                if not row.get("reviewed_by_id"):
+                    continue
+
                 pest_type = row.get("pest_type") or "Not a Coconut Leaf Image"
                 canonical = normalize_class_label(pest_type)
                 slug = get_category_slug(canonical)
@@ -286,7 +291,8 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
                     or ""
                 )
 
-                # Determine if validated or corrected
+                # A reviewed sample is validated; notes only distinguish
+                # whether the agriculturist corrected the AI prediction.
                 is_corrected = False
                 if "corrected" in str(notes).lower() or "correction" in str(notes).lower():
                     is_corrected = True

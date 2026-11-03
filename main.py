@@ -1811,7 +1811,7 @@ def get_user_notifications():
         return jsonify({"success": True, "notifications": [], "role": user_role}), 200
 
     try:
-        query = supabase.table("reports").select("*, visit_chats(count)").order("created_at", desc=True).limit(30)
+        query = supabase.table("reports").select("*, visit_chats(count)").order("updated_at", desc=True).limit(30)
         if user_role == 'farmer':
             query = query.eq("user_id", user_id)
 
@@ -3661,28 +3661,13 @@ def agriculturist_submit_assessment():
             logger.error(f"Assessment update failed: {update_response.error}")
             return jsonify({'success': False, 'message': 'The assessment could not be saved.'}), 500
 
-        # Auto-upload sample into Dataset Hub (Supabase Storage)
+        # Dataset Hub archival is intentionally separate from submitting an
+        # assessment. The image is archived only when the agriculturist
+        # explicitly confirms the classification.
         target_label = verified_pest
-        try:
-            from app.dataset_hub import save_verified_sample, normalize_class_label
-            rep_check = supabase.table('reports').select('image_url, pest_type').eq('id', report_id).execute()
-            if rep_check and getattr(rep_check, 'data', None) and len(rep_check.data) > 0:
-                rep_item = rep_check.data[0]
-                img_url = rep_item.get('image_url')
-                orig_pest = rep_item.get('pest_type') or 'Unknown'
-                target_label = normalize_class_label(verified_pest or orig_pest)
-                if img_url:
-                    save_verified_sample(
-                        report_id=report_id,
-                        image_data=img_url,
-                        verified_label=target_label,
-                        original_prediction=orig_pest,
-                        agriculturist_id=user_id,
-                        notes=assessment_notes,
-                        supabase_client=supabase,
-                    )
-        except Exception as arc_err:
-            logger.warning(f"Failed to auto-archive verified sample: {arc_err}")
+        if verified_pest:
+            from app.dataset_hub import normalize_class_label
+            target_label = normalize_class_label(verified_pest)
 
         reviewer_name = session.get('user_name', '')
         reviewer_first_name = ""
@@ -3753,6 +3738,18 @@ def agriculturist_verify_classification():
         rep_item = rep_check.data[0]
         img_url = rep_item.get('image_url')
         orig_pest = rep_item.get('pest_type') or 'Unknown'
+
+        update_response = _update_report_workflow(
+            report_id,
+            'assessment_issued',
+            extra_updates={
+                'pest_type': canonical_label,
+                'reviewed_by_id': user_id,
+            },
+        )
+        if getattr(update_response, 'error', None):
+            logger.error(f"Classification verification update failed: {update_response.error}")
+            return jsonify({'success': False, 'message': 'The classification could not be verified.'}), 500
 
         saved_sample = None
         if img_url:
@@ -5451,10 +5448,39 @@ def admin_audit_log():
         'ACCOUNT_LOCKOUT': 'Account Lockout',
         'PASSWORD_RESET': 'Password Reset',
         'SESSION_TIMEOUT': 'Session Timeout',
+        'DANGER_ZONE_REPORT_DELETE': 'Report Deleted',
+        'DANGER_ZONE_BULK_REPORT_DELETE': 'Reports Deleted',
     }
+
+    def format_audit_details(log):
+        raw_details = str(log.get('details') or '')
+        if log.get('action') == 'DANGER_ZONE_REPORT_DELETE':
+            match = re.search(
+                r"permanently deleted Report #(?P<report_id>[^ ]+) and (?P<images>\d+) associated image file\(s\)",
+                raw_details,
+            )
+            if match:
+                return (
+                    f"Report #{match.group('report_id')} deleted permanently"
+                    f" · {match.group('images')} associated image file(s) removed"
+                )
+        elif log.get('action') == 'DANGER_ZONE_BULK_REPORT_DELETE':
+            match = re.search(
+                r"for (?P<period>.*?): permanently removed (?P<reports>\d+) report\(s\) and "
+                r"(?P<images>\d+) associated image file\(s\)",
+                raw_details,
+            )
+            if match:
+                return (
+                    f"{match.group('period')} · {match.group('reports')} report(s) deleted"
+                    f" · {match.group('images')} associated image file(s) removed"
+                )
+        return raw_details
+
     for log in data['logs']:
         for field in ('user_email', 'details'):
             log[f'highlighted_{field}'] = highlight_audit_value(log.get(field))
+        log['highlighted_audit_summary'] = highlight_audit_value(format_audit_details(log))
 
         raw_action = str(log.get('action') or '')
         display_action = action_labels.get(raw_action, raw_action.replace('_', ' ').title())

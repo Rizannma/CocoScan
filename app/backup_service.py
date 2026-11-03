@@ -119,8 +119,7 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
     backups_dir = get_backups_dir()
     timestamp = datetime.now(timezone.utc)
     timestamp_slug = timestamp.strftime("%Y%m%d_%H%M%S")
-    type_slug = "manual" if backup_type.lower() == "manual" else "daily"
-    filename = f"cocoscan_db_{type_slug}_{timestamp_slug}.json.gz"
+    filename = f"cocoscan_db_manual_{timestamp_slug}.json.gz"
     filepath = backups_dir / filename
 
     tables_data: Dict[str, Any] = {}
@@ -158,7 +157,7 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
         "metadata": {
             "project": "CocoScan",
             "version": "2.0",
-            "backup_type": backup_type,
+            "backup_type": "Manual",
             "created_at": timestamp.isoformat(),
             "table_counts": table_counts,
             "total_records": sum(table_counts.values()),
@@ -175,7 +174,7 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
 
     backup_info = {
         "filename": filename,
-        "type": "Manual" if backup_type.lower() == "manual" else "Daily Automated",
+        "type": "Manual",
         "size_bytes": file_size,
         "size_formatted": format_bytes(file_size),
         "created_at": timestamp.strftime("%b %d, %Y %H:%M"),
@@ -200,10 +199,9 @@ def list_backups() -> List[Dict[str, Any]]:
             stat = f.stat()
             size = stat.st_size
             mtime = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
-            is_manual = "manual" in f.name.lower()
             backups.append({
                 "filename": f.name,
-                "type": "Manual" if is_manual else "Daily Automated",
+                "type": "Manual",
                 "size_bytes": size,
                 "size_formatted": format_bytes(size),
                 "created_at": mtime.strftime("%b %d, %Y %H:%M"),
@@ -495,6 +493,7 @@ def delete_report_cascading(
     }
 
 
+
 def count_reports_by_date_range(
     year: Union[int, str],
     month: Optional[Union[int, str]] = None,
@@ -724,5 +723,3 @@ def bulk_delete_reports_by_date_range(
         "timestamp": iso_timestamp,
         "audit_details": audit_details,
     }
-
-
