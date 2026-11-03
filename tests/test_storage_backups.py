@@ -17,6 +17,7 @@ from app.backup_service import (
     format_bytes,
     get_backups_dir,
     get_storage_metrics,
+    get_recent_reports_for_danger_zone,
     generate_database_backup,
     list_backups,
     get_backup_path,
@@ -93,6 +94,22 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertIn("system_backups", metrics)
         self.assertEqual(len(metrics["dataset_hub"]["categories"]), 4)
 
+    def test_recent_reports_use_shared_date_and_status_formatting(self):
+        response = MagicMock(data=[{
+            "id": 27,
+            "pest_type": "Rhinoceros Beetle",
+            "created_at": "2026-11-02T16:00:00+00:00",
+            "status": "awaiting_confirmed_schedule",
+        }])
+        supabase_client = MagicMock()
+        supabase_client.table.return_value.select.return_value.order.return_value.limit.return_value.execute.return_value = response
+
+        reports = get_recent_reports_for_danger_zone(supabase_client)
+
+        self.assertEqual(reports[0]["formatted_date"], "Nov 03, 2026")
+        self.assertEqual(reports[0]["status"], "Waiting for Agriculturist Confirmation")
+        self.assertIn("Nov 03, 2026 (Waiting for Agriculturist Confirmation)", reports[0]["display_label"])
+
     def test_admin_storage_backups_access_control(self):
         # Unauthenticated: should redirect to login
         res = self.client.get("/admin/storage-backups")
@@ -132,6 +149,11 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertIn("reports-master-checkbox", content)
         self.assertIn("Select All", content)
         self.assertIn("danger-reports-table", content)
+        self.assertIn("status-assessment", content)
+        self.assertIn("status-waiting", content)
+        self.assertIn("background: #eff6ff", content)
+        self.assertIn("padding: 4px 8px", content)
+        self.assertIn("border-radius: 4px", content)
 
     def test_reports_list_selection_component_rendered_with_reports(self):
         with self.client.session_transaction() as sess:
@@ -493,4 +515,3 @@ class StorageBackupsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

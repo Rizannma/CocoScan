@@ -717,8 +717,8 @@
     .report-mini-status {
         display: inline-flex;
         align-items: center;
-        padding: 3px 8px;
-        border-radius: 6px;
+        padding: 4px 8px;
+        border-radius: 4px;
         font-size: 0.75rem;
         font-weight: 600;
     }
@@ -726,19 +726,41 @@
     .report-mini-status.status-review {
         background: #fef3c7;
         color: #92400e;
-        border: 1px solid #fde68a;
     }
 
-    .report-mini-status.status-progress {
-        background: #e0f2fe;
-        color: #0369a1;
-        border: 1px solid #bae6fd;
+    .report-mini-status.status-assessment {
+        background: #ecfdf5;
+        color: #065f46;
+    }
+
+    .report-mini-status.status-waiting {
+        background: #eff6ff;
+        color: #1d4ed8;
+    }
+
+    .report-mini-status.status-scheduled {
+        background: #fefce8;
+        color: #a16207;
+    }
+
+    .report-mini-status.status-completed {
+        background: #ecfeff;
+        color: #0f766e;
+    }
+
+    .report-mini-status.status-recommendation {
+        background: #ecfdf5;
+        color: #065f46;
+    }
+
+    .report-mini-status.status-visit-requested {
+        background: #fdf2f8;
+        color: #be185d;
     }
 
     .report-mini-status.status-resolved {
         background: #dcfce7;
-        color: #15803d;
-        border: 1px solid #bbf7d0;
+        color: #166534;
     }
 
     /* Pre-Confirmation Mini Modal */
@@ -1427,7 +1449,7 @@
                                 </td>
                                 <td>
                                     {% set s = (r.status or 'Under Review')|lower %}
-                                    <span class="report-mini-status {% if 'resolved' in s %}status-resolved{% elif 'progress' in s or 'schedule' in s %}status-progress{% else %}status-review{% endif %}">
+                                    <span class="report-mini-status {% if 'resolved' in s or 'closed' in s %}status-resolved{% elif 'assessment issued' in s %}status-assessment{% elif 'waiting for agriculturist confirmation' in s or 'awaiting confirmed schedule' in s %}status-waiting{% elif 'visit scheduled' in s %}status-scheduled{% elif 'visit completed' in s %}status-completed{% elif 'recommendation issued' in s %}status-recommendation{% elif 'visit requested' in s %}status-visit-requested{% else %}status-review{% endif %}">
                                         {{ r.status or 'Under Review' }}
                                     </span>
                                 </td>

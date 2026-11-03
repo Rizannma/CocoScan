@@ -13,6 +13,8 @@ from pathlib import Path
 import shutil
 from typing import Any, Dict, List, Optional, Union
 
+from app.report_storage import format_report_date, normalize_report_status
+
 logger = logging.getLogger(__name__)
 
 # Base directory for storing database backups
@@ -352,16 +354,17 @@ def get_recent_reports_for_danger_zone(supabase_client: Optional[Any] = None, li
         rows: List[Dict[str, Any]] = resp.data or []
         for r in rows:
             created_raw = r.get("created_at") or ""
-            formatted_date = ""
-            if created_raw:
-                try:
-                    dt = datetime.fromisoformat(str(created_raw).replace("Z", "+00:00"))
-                    formatted_date = dt.strftime("%b %d, %Y")
-                except Exception:
-                    formatted_date = str(created_raw)[:10]
-            r["formatted_date"] = formatted_date or "Recent"
+            formatted_date = format_report_date(created_raw) or (
+                str(created_raw)[:10] if created_raw else ""
+            )
+            r["formatted_date"] = (
+                datetime.strptime(formatted_date, "%Y-%m-%d").strftime("%b %d, %Y")
+                if formatted_date
+                else "Recent"
+            )
             pest = r.get("pest_type") or "General"
-            status = r.get("status") or "Under Review"
+            status = normalize_report_status(r.get("status"), default="Under Review")
+            r["status"] = status
             r["display_label"] = f"Report #{r.get('id')} · {pest} · {r['formatted_date']} ({status})"
         return rows
     except Exception as e:
