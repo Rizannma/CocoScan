@@ -89,11 +89,23 @@ def get_storage_bucket() -> str:
     return (os.getenv("SUPABASE_STORAGE_BUCKET", "reports") or "reports").strip() or "reports"
 
 
-def get_public_storage_url(storage_path: str) -> str:
-    """Construct the public HTTP URL for an object in Supabase storage."""
+def get_public_storage_url(storage_path: str, client: Optional[Any] = None, expires_in: int = 300) -> str:
+    """Return a short-lived URL for an object in private Supabase Storage."""
     base_url = os.getenv("SUPABASE_URL", "https://utvltqgxqnpcqrphuojc.supabase.co").rstrip("/")
     bucket = get_storage_bucket()
     clean_path = storage_path.lstrip("/")
+    if client is not None:
+        try:
+            result = client.storage.from_(bucket).create_signed_url(clean_path, expires_in)
+            if isinstance(result, dict):
+                signed_url = result.get("signedURL") or result.get("signedUrl")
+                if signed_url:
+                    signed_url = str(signed_url)
+                    if signed_url.startswith("/"):
+                        signed_url = f"{base_url}{signed_url}"
+                    return signed_url
+        except Exception as error:
+            logger.warning(f"Could not create signed storage URL for {clean_path}: {error}")
     return f"{base_url}/storage/v1/object/public/{bucket}/{clean_path}"
 
 
@@ -191,7 +203,7 @@ def save_verified_sample(
                     except Exception as direct_err:
                         logger.debug(f"Direct storage download fallback for {image_data}: {direct_err}")
                 if pil_img is None:
-                    storage_url = get_public_storage_url(image_data)
+                    storage_url = get_public_storage_url(image_data, client)
                     import httpx
                     resp = httpx.get(storage_url, timeout=10.0)
                     if resp.status_code == 200:
@@ -221,7 +233,7 @@ def save_verified_sample(
     else:
         logger.warning(f"Supabase client unavailable; verified sample in-memory only: {storage_path}")
 
-    public_url = get_public_storage_url(storage_path)
+    public_url = get_public_storage_url(storage_path, client)
     is_correction = bool(original_prediction and normalize_class_label(original_prediction) != canonical_label)
 
     entry = {
@@ -303,7 +315,7 @@ def get_dataset_summary(supabase_client: Optional[Any] = None) -> Dict[str, Any]
                 img_url = row.get("image_url") or ""
                 thumb_url = img_url
                 if img_url and not (img_url.startswith("http://") or img_url.startswith("https://") or img_url.startswith("data:")):
-                    thumb_url = get_public_storage_url(img_url)
+                    thumb_url = get_public_storage_url(img_url, client)
 
                 samples.append({
                     "id": f"report_{row.get('id')}",

@@ -37,12 +37,12 @@ def _image_to_base64(image: Image.Image) -> str:
     return base64.b64encode(buf.getvalue()).decode("ascii")
 
 
-class TestH5Inference(unittest.TestCase):
+class TestTFLiteInference(unittest.TestCase):
     def test_model_paths_exist(self):
         pest_path = get_pest_model_path()
         self.assertTrue(pest_path.exists(), f"Pest model does not exist at {pest_path}")
         self.assertTrue(
-            str(pest_path).endswith("pest_classifier.tflite") or str(pest_path).endswith("pest_classifier.h5")
+            str(pest_path).endswith("pest_classifier.tflite")
         )
 
     def test_tflite_model_used_by_default(self):

@@ -428,12 +428,6 @@ async function verifyOfflineCredentials(email, password) {
             if (userRecord.userId) localStorage.setItem('cocoscan_user_id', userRecord.userId);
             localStorage.setItem('cocoscan_offline_active', 'true');
         }
-        if (typeof document !== 'undefined') {
-            document.cookie = "cocoscan_offline_active=true; path=/; max-age=86400; SameSite=Lax";
-            document.cookie = "cocoscan_user_role=" + encodeURIComponent(userRecord.role) + "; path=/; max-age=86400; SameSite=Lax";
-            document.cookie = "cocoscan_user_email=" + encodeURIComponent(normalizedEmail) + "; path=/; max-age=86400; SameSite=Lax";
-        }
-
         // Activate user offline session data
         await activateUserOfflineSession(normalizedEmail);
 
@@ -856,13 +850,6 @@ async function setRememberMeSession(email, role = 'farmer', name = '', userId = 
         localStorage.setItem('cocoscan_remember_last_used', String(now));
         localStorage.setItem('cocoscan_offline_active', 'true');
     }
-    if (typeof document !== 'undefined') {
-        const maxAgeSeconds = Math.max(1, Math.floor((expiresTimestamp - now) / 1000));
-        document.cookie = "cocoscan_offline_active=true; path=/; max-age=" + maxAgeSeconds + "; SameSite=Lax";
-        document.cookie = "cocoscan_user_role=farmer; path=/; max-age=" + maxAgeSeconds + "; SameSite=Lax";
-        document.cookie = "cocoscan_user_email=" + encodeURIComponent(normalizedEmail) + "; path=/; max-age=" + maxAgeSeconds + "; SameSite=Lax";
-    }
-
     try {
         const db = await openAuthDB();
         return new Promise((resolve, reject) => {

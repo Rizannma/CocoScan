@@ -2,7 +2,6 @@ import base64
 import gc
 import io
 import logging
-import os
 from pathlib import Path
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -10,14 +9,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from PIL import Image
 
-# Ensure Keras uses the PyTorch backend if TensorFlow is not present
-os.environ.setdefault("KERAS_BACKEND", "torch")
+from app.model_integrity import verify_model_integrity
 
 logger = logging.getLogger(__name__)
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "model"
 PEST_TFLITE_FILE_NAME = "pest_classifier.tflite"
-PEST_H5_FILE_NAME = "pest_classifier.h5"
 PEST_MODEL_FILE_NAME = PEST_TFLITE_FILE_NAME
 
 # The trained 4-class pest model output order:
@@ -72,11 +69,7 @@ class TFLiteModelWrapper:
                 from tflite_runtime.interpreter import Interpreter
                 interpreter_cls = Interpreter
             except ImportError:
-                try:
-                    from tensorflow.lite import Interpreter
-                    interpreter_cls = Interpreter
-                except ImportError:
-                    pass
+                pass
 
         if interpreter_cls is None:
             raise RuntimeError(
@@ -120,19 +113,6 @@ def clear_inference_memory():
     Aggressively clear GPU/MPS memory caches, temporary tensors, and run garbage collection.
     Ensures zero residual memory remains trapped between rapid successive inference requests.
     """
-    try:
-        import torch
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-            if hasattr(torch.cuda, "ipc_collect"):
-                torch.cuda.ipc_collect()
-        if hasattr(torch, "mps") and hasattr(torch.mps, "empty_cache"):
-            try:
-                torch.mps.empty_cache()
-            except Exception:
-                pass
-    except Exception:
-        pass
     gc.collect()
 
 
@@ -141,23 +121,25 @@ def get_pest_model_path(model_path: Optional[str] = None) -> Path:
         target_path = Path(model_path)
         if not target_path.exists():
             raise FileNotFoundError(f"Pest model not found: {target_path}")
+        if target_path.suffix.lower() != ".tflite":
+            raise ValueError("Only TFLite pest models are supported.")
+        verify_model_integrity(target_path)
         return target_path
 
     tflite_path = MODEL_DIR / PEST_TFLITE_FILE_NAME
     if tflite_path.exists():
+        verify_model_integrity(tflite_path)
         return tflite_path
 
-    h5_path = MODEL_DIR / PEST_H5_FILE_NAME
-    if h5_path.exists():
-        return h5_path
-
-    raise FileNotFoundError(f"Pest model not found in {MODEL_DIR} (checked .tflite and .h5)")
+    raise FileNotFoundError(f"TFLite pest model not found in {MODEL_DIR}")
 
 
 def get_active_model_format(model_path: Optional[str] = None) -> str:
-    """Returns 'tflite' or 'h5' for the active pest classification model."""
+    """Return the active pest classification model format."""
     path = get_pest_model_path(model_path)
-    return "tflite" if path.suffix.lower() == ".tflite" else "h5"
+    if path.suffix.lower() != ".tflite":
+        raise ValueError("Only TFLite pest models are supported.")
+    return "tflite"
 
 
 # Backward compatibility alias
@@ -174,22 +156,6 @@ def reload_pest_model(model_path: Optional[str] = None):
     return _get_pest_model(model_path)
 
 
-def _load_keras_model(model_path: Path):
-    try:
-        import keras
-        model = keras.models.load_model(str(model_path), compile=False)
-        if hasattr(model, "eval") and callable(getattr(model, "eval")):
-            model.eval()
-        return model
-    except Exception as exc:
-        try:
-            import tensorflow as tf
-            model = tf.keras.models.load_model(str(model_path), compile=False)
-            return model
-        except Exception:
-            raise RuntimeError(f"Failed to load Keras H5 model from {model_path}: {exc}")
-
-
 def _get_pest_model(model_path: Optional[str] = None):
     global _cached_pest_model, _cached_pest_path
     resolved_path = get_pest_model_path(model_path)
@@ -197,10 +163,9 @@ def _get_pest_model(model_path: Optional[str] = None):
         with _model_lock:
             if _cached_pest_model is None or _cached_pest_path != resolved_path:
                 logger.info(f"Loading pest classifier model globally from {resolved_path}")
-                if resolved_path.suffix.lower() == ".tflite":
-                    _cached_pest_model = TFLiteModelWrapper(resolved_path)
-                else:
-                    _cached_pest_model = _load_keras_model(resolved_path)
+                if resolved_path.suffix.lower() != ".tflite":
+                    raise ValueError("Only TFLite pest models are supported.")
+                _cached_pest_model = TFLiteModelWrapper(resolved_path)
                 _cached_pest_path = resolved_path
     return _cached_pest_model
 
@@ -218,16 +183,7 @@ def preload_models(pest_model_path: Optional[str] = None) -> Any:
             _ = pest_model(dummy)
             logger.info("Global pest TFLite model successfully preloaded, warmed up, and ready for inference.")
         else:
-            try:
-                import torch
-                dummy_t = torch.zeros((1, 224, 224, 3), dtype=torch.float32).contiguous()
-                ctx = torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
-                with ctx:
-                    _ = pest_model(dummy_t)
-                del dummy_t
-            except Exception:
-                _ = pest_model(dummy)
-            logger.info("Global pest H5 model successfully preloaded, warmed up, and ready for inference.")
+            raise RuntimeError("Only TFLite pest models are supported.")
         del dummy
         clear_inference_memory()
     except Exception as warmup_err:
@@ -317,13 +273,7 @@ def _prepare_input(image: Image.Image) -> Union[np.ndarray, Any]:
     # Guarantee contiguous C-order buffer in memory
     array = np.ascontiguousarray(array, dtype=np.float32)
 
-    # Convert to contiguous PyTorch tensor
-    try:
-        import torch
-        tensor = torch.from_numpy(array).contiguous()
-        return tensor
-    except Exception:
-        return array
+    return array
 
 
 def _run_model_forward(model, input_tensor: Union[np.ndarray, Any]) -> np.ndarray:
@@ -346,48 +296,7 @@ def _run_model_forward(model, input_tensor: Union[np.ndarray, Any]) -> np.ndarra
             preds = _softmax(preds)
         return preds.astype(np.float32)
 
-    try:
-        import torch
-        ctx = torch.inference_mode() if hasattr(torch, "inference_mode") else torch.no_grad()
-        with ctx:
-            if isinstance(input_tensor, np.ndarray):
-                tensor = torch.from_numpy(np.ascontiguousarray(input_tensor, dtype=np.float32)).contiguous()
-            else:
-                tensor = input_tensor
-
-            try:
-                preds = model(tensor)
-            except Exception:
-                preds = model.predict(tensor, verbose=0)
-
-            if hasattr(preds, "detach"):
-                preds = preds.detach().cpu().numpy()
-            elif hasattr(preds, "cpu"):
-                preds = preds.cpu().numpy()
-            elif hasattr(preds, "numpy"):
-                preds = preds.numpy()
-            else:
-                preds = np.asarray(preds)
-
-    except ImportError:
-        if hasattr(input_tensor, "numpy"):
-            input_tensor = input_tensor.numpy()
-        preds = model(input_tensor)
-        if hasattr(preds, "numpy"):
-            preds = preds.numpy()
-        else:
-            preds = np.asarray(preds)
-    except Exception as exc:
-        logger.warning(f"Inference primary forward pass failed ({exc}), attempting model.predict fallback...")
-        if hasattr(input_tensor, "numpy"):
-            input_tensor = input_tensor.numpy()
-        elif hasattr(input_tensor, "detach"):
-            input_tensor = input_tensor.detach().cpu().numpy()
-        preds = model.predict(input_tensor, verbose=0)
-        if hasattr(preds, "numpy"):
-            preds = preds.numpy()
-        else:
-            preds = np.asarray(preds)
+    raise RuntimeError("Only TFLite pest models are supported.")
 
     preds = np.squeeze(preds)
     if preds.ndim > 1 and preds.shape[0] == 1:
@@ -409,7 +318,7 @@ def _get_labels(num_classes: int, base_labels: List[str] = PEST_LABELS) -> List[
 
 def predict_pest(image: Image.Image, model_path: Optional[str] = None) -> Dict:
     """
-    Run single-model pest classification on a PIL Image using pest_classifier.h5.
+    Run single-model pest classification on a PIL Image using pest_classifier.tflite.
     Returns predicted_pest label, confidence_score, and class probabilities.
     """
     try:

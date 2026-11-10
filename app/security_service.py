@@ -20,11 +20,35 @@ OTP_REQUEST_LIMIT = 3
 OTP_REQUEST_WINDOW_SECONDS = 3600
 OTP_VERIFICATION_ATTEMPT_LIMIT = 3
 OTP_VERIFICATION_LOCK_SECONDS = 3600
+RATE_LIMIT_WINDOW_SECONDS = 60
 _otp_code_pepper = (
     os.getenv("OTP_CODE_PEPPER") or os.getenv("FLASK_SECRET_KEY") or secrets.token_hex(32)
 ).encode("utf-8")
 
 _db_initialized = False
+
+
+def _audit_entry_hash(previous_hash: str, timestamp: str, email: str, role: str,
+                      action: str, details: str, ip_address: str) -> str:
+    payload = "\x1f".join(
+        (previous_hash, timestamp, email, role, action, details, ip_address)
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _emit_audit_integrity_alert(details: str) -> None:
+    logger.critical("AUDIT_LOG_INTEGRITY_FAILURE: %s", details)
+    alert_url = os.getenv("SECURITY_ALERT_WEBHOOK_URL", "").strip()
+    if not alert_url:
+        return
+    try:
+        requests.post(
+            alert_url,
+            json={"event": "audit_log_integrity_failure", "details": details},
+            timeout=5,
+        ).raise_for_status()
+    except requests.RequestException as exc:
+        logger.error("Failed to deliver audit integrity alert: %s", exc)
 
 @contextmanager
 def _get_db():
@@ -83,6 +107,14 @@ def init_security_db():
                 PRIMARY KEY (email, purpose)
             )
         """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS request_rate_limits (
+                bucket TEXT PRIMARY KEY,
+                window_started_at REAL NOT NULL,
+                request_count INTEGER NOT NULL DEFAULT 0
+            )
+        """)
         
         # Table for 2FA 7-day expiration tracking
         cursor.execute("""
@@ -101,9 +133,40 @@ def init_security_db():
                 user_role TEXT,
                 action TEXT,
                 details TEXT,
-                ip_address TEXT
+                ip_address TEXT,
+                previous_hash TEXT,
+                entry_hash TEXT
             )
         """)
+        for column in ("previous_hash", "entry_hash"):
+            try:
+                cursor.execute(f"ALTER TABLE audit_logs ADD COLUMN {column} TEXT")
+            except sqlite3.OperationalError:
+                pass
+        existing_logs = cursor.execute("""
+            SELECT id, timestamp, user_email, user_role, action, details, ip_address,
+                   previous_hash, entry_hash
+            FROM audit_logs ORDER BY id ASC
+        """).fetchall()
+        previous_hash = ""
+        for row in existing_logs:
+            if row["entry_hash"] and row["previous_hash"] == previous_hash:
+                previous_hash = row["entry_hash"]
+                continue
+            entry_hash = _audit_entry_hash(
+                previous_hash,
+                row["timestamp"] or "",
+                row["user_email"] or "",
+                row["user_role"] or "",
+                row["action"] or "",
+                row["details"] or "",
+                row["ip_address"] or "",
+            )
+            cursor.execute(
+                "UPDATE audit_logs SET previous_hash = ?, entry_hash = ? WHERE id = ?",
+                (previous_hash, entry_hash, row["id"]),
+            )
+            previous_hash = entry_hash
 
         # Table for Remember Me persistent tokens (Farmer-only with 30-day inactivity tracking)
         cursor.execute("""
@@ -138,23 +201,71 @@ def check_account_lockout(email: str):
     email = (email or "").strip().lower()
     if not email:
         return False, 0, ""
-        
+
     with _get_db() as conn:
         row = conn.execute("SELECT * FROM login_attempts WHERE email = ?", (email,)).fetchone()
         if not row:
             return False, 0, ""
-            
+
         locked_until = row["locked_until"]
         if locked_until and time.time() < locked_until:
             rem = int(locked_until - time.time())
             return True, rem, row["lock_reason"] or "Account temporarily locked."
-            
-        # If lock expired, clean up locked_until
+
         if locked_until and time.time() >= locked_until:
             conn.execute("UPDATE login_attempts SET locked_until = NULL, attempt_count = 0 WHERE email = ?", (email,))
             conn.commit()
-            
+
     return False, 0, ""
+
+
+def check_request_rate_limit(
+    bucket: str,
+    limit: int,
+    window_seconds: int = RATE_LIMIT_WINDOW_SECONDS,
+) -> Tuple[bool, int]:
+    """Consume one request from a fixed window and return (allowed, retry_after)."""
+    bucket = (bucket or "").strip()
+    if not bucket or limit < 1 or window_seconds < 1:
+        raise ValueError("Rate-limit bucket and positive limits are required.")
+
+    now = time.time()
+    with _get_db() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS request_rate_limits (
+                bucket TEXT PRIMARY KEY,
+                window_started_at REAL NOT NULL,
+                request_count INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        row = conn.execute(
+            "SELECT window_started_at, request_count FROM request_rate_limits WHERE bucket = ?",
+            (bucket,),
+        ).fetchone()
+        if not row or now - row["window_started_at"] >= window_seconds:
+            conn.execute(
+                """
+                INSERT INTO request_rate_limits (bucket, window_started_at, request_count)
+                VALUES (?, ?, 1)
+                ON CONFLICT(bucket) DO UPDATE SET
+                    window_started_at = excluded.window_started_at,
+                    request_count = excluded.request_count
+                """,
+                (bucket, now),
+            )
+            conn.commit()
+            return True, 0
+
+        request_count = row["request_count"] + 1
+        conn.execute(
+            "UPDATE request_rate_limits SET request_count = ? WHERE bucket = ?",
+            (request_count, bucket),
+        )
+        conn.commit()
+        if request_count <= limit:
+            return True, 0
+        retry_after = max(1, int(window_seconds - (now - row["window_started_at"])) + 1)
+        return False, retry_after
 
 def record_login_failure(email: str, ip_address: str = ""):
     """
@@ -638,13 +749,54 @@ def log_audit(email: str, role: str, action: str, details: str, ip_address: str 
             
     try:
         with _get_db() as conn:
+            previous = conn.execute(
+                "SELECT entry_hash FROM audit_logs ORDER BY id DESC LIMIT 1"
+            ).fetchone()
+            previous_hash = (previous["entry_hash"] if previous else "") or ""
+            entry_hash = _audit_entry_hash(
+                previous_hash, timestamp, email, role, action, details, ip_address
+            )
             conn.execute("""
-                INSERT INTO audit_logs (timestamp, user_email, user_role, action, details, ip_address)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (timestamp, email, role, action, details, ip_address))
+                INSERT INTO audit_logs
+                (timestamp, user_email, user_role, action, details, ip_address, previous_hash, entry_hash)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (timestamp, email, role, action, details, ip_address, previous_hash, entry_hash))
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to record audit log: {e}")
+
+
+def verify_audit_log_integrity() -> Dict[str, Any]:
+    """Verify the SQLite audit chain and alert when entries were altered or removed."""
+    with _get_db() as conn:
+        rows = conn.execute("""
+            SELECT id, timestamp, user_email, user_role, action, details, ip_address,
+                   previous_hash, entry_hash
+            FROM audit_logs ORDER BY id ASC
+        """).fetchall()
+
+    previous_hash = ""
+    for row in rows:
+        expected = _audit_entry_hash(
+            previous_hash,
+            row["timestamp"] or "",
+            row["user_email"] or "",
+            row["user_role"] or "",
+            row["action"] or "",
+            row["details"] or "",
+            row["ip_address"] or "",
+        )
+        if not row["entry_hash"] or not hmac.compare_digest(row["entry_hash"], expected):
+            details = f"SQLite audit entry {row['id']} failed hash validation."
+            _emit_audit_integrity_alert(details)
+            return {"valid": False, "checked": len(rows), "failed_id": row["id"]}
+        if not hmac.compare_digest(row["previous_hash"] or "", previous_hash):
+            details = f"SQLite audit entry {row['id']} has an invalid chain predecessor."
+            _emit_audit_integrity_alert(details)
+            return {"valid": False, "checked": len(rows), "failed_id": row["id"]}
+        previous_hash = row["entry_hash"]
+
+    return {"valid": True, "checked": len(rows), "failed_id": None}
 
 def get_audit_logs(page: int = 1, per_page: int = 10, search: str = "", action_filter: str = "") -> Dict[str, Any]:
     """
@@ -697,16 +849,18 @@ def get_audit_logs(page: int = 1, per_page: int = 10, search: str = "", action_f
     where_sql = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
     
     with _get_db() as conn:
-        total_row = conn.execute(f"SELECT COUNT(*) as cnt FROM audit_logs{where_sql}", params).fetchone()
+        count_query = "SELECT COUNT(*) as cnt FROM audit_logs" + where_sql  # nosec B608
+        total_row = conn.execute(count_query, params).fetchone()
         total = total_row["cnt"] if total_row else 0
         
         total_pages = (total + per_page - 1) // per_page if total > 0 else 1
         
-        rows = conn.execute(f"""
+        logs_query = """
             SELECT * FROM audit_logs{where_sql}
             ORDER BY id DESC
             LIMIT ? OFFSET ?
-        """, (*params, per_page, offset)).fetchall()
+        """.format(where_sql=where_sql)  # nosec B608
+        rows = conn.execute(logs_query, (*params, per_page, offset)).fetchall()
         
         logs = [dict(r) for r in rows]
         
@@ -890,4 +1044,3 @@ def cleanup_expired_remember_tokens() -> int:
         """, (now, inactivity_cutoff))
         conn.commit()
         return cursor.rowcount
-

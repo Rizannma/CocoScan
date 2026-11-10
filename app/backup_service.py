@@ -13,6 +13,8 @@ from pathlib import Path
 import shutil
 from typing import Any, Dict, List, Optional, Union
 
+from cryptography.fernet import Fernet
+
 from app.report_storage import format_report_date, normalize_report_status
 
 logger = logging.getLogger(__name__)
@@ -25,6 +27,30 @@ DEFAULT_STORAGE_LIMIT_MB = 1024.0
 
 # Estimated average image size for calculations when remote byte query is unsupported
 DEFAULT_IMAGE_SIZE_KB = 180.0
+BACKUP_ENCRYPTION_CONTEXT = b"CocoScan database backup encryption v1"
+
+
+def _backup_cipher() -> Fernet:
+    """Build the backup-at-rest cipher from the dedicated key configuration."""
+    configured_key = os.getenv("BACKUP_ENCRYPTION_KEY", "").strip()
+    if configured_key:
+        try:
+            return Fernet(configured_key.encode("ascii"))
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise RuntimeError("BACKUP_ENCRYPTION_KEY must be a valid Fernet key.") from exc
+
+    secret = os.getenv("FLASK_SECRET_KEY", "").strip() or os.getenv("SECRET_KEY", "").strip()
+    if not secret:
+        raise RuntimeError(
+            "BACKUP_ENCRYPTION_KEY must be configured; refusing to create an unencrypted backup."
+        )
+    import base64
+    import hashlib
+
+    derived_key = base64.urlsafe_b64encode(
+        hashlib.sha256(BACKUP_ENCRYPTION_CONTEXT + secret.encode("utf-8")).digest()
+    )
+    return Fernet(derived_key)
 
 
 def get_backups_dir() -> Path:
@@ -121,7 +147,7 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
     backups_dir = get_backups_dir()
     timestamp = datetime.now(timezone.utc)
     timestamp_slug = timestamp.strftime("%Y%m%d_%H%M%S")
-    filename = f"cocoscan_db_manual_{timestamp_slug}.json.gz"
+    filename = f"cocoscan_db_manual_{timestamp_slug}.json.gz.enc"
     filepath = backups_dir / filename
 
     tables_data: Dict[str, Any] = {}
@@ -169,8 +195,9 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
 
     # Write gzipped JSON with compact formatting for speed & efficiency
     json_bytes = json.dumps(backup_payload, separators=(',', ':'), default=str).encode("utf-8")
-    with gzip.open(filepath, "wb") as gz_file:
-        gz_file.write(json_bytes)
+    compressed_bytes = gzip.compress(json_bytes)
+    encrypted_bytes = _backup_cipher().encrypt(compressed_bytes)
+    filepath.write_bytes(encrypted_bytes)
 
     file_size = filepath.stat().st_size
 
@@ -182,6 +209,7 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
         "created_at": timestamp.strftime("%b %d, %Y %H:%M"),
         "timestamp_iso": timestamp.isoformat(),
         "total_records": sum(table_counts.values()),
+        "encrypted": True,
     }
 
     logger.info(f"Database backup successfully generated: {filename} ({format_bytes(file_size)})")
@@ -193,7 +221,11 @@ def list_backups() -> List[Dict[str, Any]]:
     List all database backups stored in the backups directory sorted by creation date descending.
     """
     backups_dir = get_backups_dir()
-    backup_files = [f for f in backups_dir.glob("*.json.gz") if f.is_file()]
+    backup_files = [
+        f for pattern in ("*.json.gz", "*.json.gz.enc")
+        for f in backups_dir.glob(pattern)
+        if f.is_file()
+    ]
 
     backups: List[Dict[str, Any]] = []
     for f in backup_files:
@@ -208,6 +240,7 @@ def list_backups() -> List[Dict[str, Any]]:
                 "size_formatted": format_bytes(size),
                 "created_at": mtime.strftime("%b %d, %Y %H:%M"),
                 "timestamp": stat.st_mtime,
+                "encrypted": f.name.endswith(".json.gz.enc"),
             })
         except Exception as err:
             logger.warning(f"Failed to read backup file {f}: {err}")
@@ -222,7 +255,7 @@ def get_backup_path(filename: str) -> Optional[Path]:
     Safely resolve a backup file path, preventing directory traversal.
     """
     safe_name = Path(filename).name
-    if not safe_name.endswith(".json.gz"):
+    if not (safe_name.endswith(".json.gz") or safe_name.endswith(".json.gz.enc")):
         return None
     backups_dir = get_backups_dir()
     filepath = backups_dir / safe_name

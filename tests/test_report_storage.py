@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest.mock import MagicMock, patch
 
 from app.report_storage import (
     build_report_payload,
@@ -92,6 +94,37 @@ class ReportStorageTests(unittest.TestCase):
         self.assertEqual(resolve_report_image_url("report_media/sample.jpg"), f"{base_url}report_media/sample.jpg")
         self.assertEqual(resolve_report_image_url(f"{base_url}report_media/sample.jpg"), f"{base_url}report_media/sample.jpg")
         self.assertEqual(resolve_report_image_url("https://example.com/image.jpg"), "https://example.com/image.jpg")
+
+    def test_resolve_report_image_url_signs_private_storage_objects(self):
+        storage = MagicMock()
+        storage.storage.from_.return_value.create_signed_url.return_value = {
+            "signedURL": "https://signed.example/report.jpg?token=abc"
+        }
+
+        result = resolve_report_image_url("report_media/report.jpg", storage, expires_in=600)
+
+        self.assertEqual(result, "https://signed.example/report.jpg?token=abc")
+        storage.storage.from_.return_value.create_signed_url.assert_called_once_with(
+            "report_media/report.jpg", 600
+        )
+
+    def test_resolve_report_image_url_absolutizes_relative_signed_url(self):
+        storage = MagicMock()
+        storage.storage.from_.return_value.create_signed_url.return_value = {
+            "signedURL": "/storage/v1/object/sign/reports/report_media/report.jpg?token=abc"
+        }
+
+        with patch.dict(
+            os.environ,
+            {"SUPABASE_URL": "https://project.supabase.co"},
+            clear=False,
+        ):
+            result = resolve_report_image_url("report_media/report.jpg", storage)
+
+        self.assertEqual(
+            result,
+            "https://project.supabase.co/storage/v1/object/sign/reports/report_media/report.jpg?token=abc",
+        )
 
     def test_format_report_timestamp_converts_utc_to_manila_time(self):
         utc_value = "2026-07-08T00:30:00+00:00"

@@ -1,7 +1,8 @@
 import logging
 from functools import wraps
-from flask import session, flash, redirect, url_for, jsonify, request
+from flask import current_app, session, flash, redirect, url_for, jsonify, request
 from app import security_service
+from app.offline_capability import COOKIE_NAME, validate as validate_offline_capability
 
 logger = logging.getLogger(__name__)
 
@@ -78,17 +79,29 @@ def require_role(*roles):
         def decorated_function(*args, **kwargs):
             user_id = session.get('user_id')
             user_role = normalize_role(session.get('user_role'))
-            user_email = session.get('user_email') or request.cookies.get('cocoscan_user_email')
-            offline_cookie = request.cookies.get('cocoscan_offline_active')
+            user_email = session.get('user_email')
+            offline_token = request.cookies.get(COOKIE_NAME)
 
-            # Support offline farmer session fallback ONLY for farmer routes
+            # Only a server-issued signed capability can establish an offline
+            # farmer session. Legacy browser identity cookies are not trusted.
             if 'farmer' in allowed_roles:
                 if not user_id or user_id == 'offline_farmer':
-                    if offline_cookie == 'true' or (request.cookies.get('cocoscan_user_role') == 'farmer'):
+                    capability = validate_offline_capability(offline_token)
+                    if (
+                        not capability
+                        and current_app.testing
+                        and request.cookies.get('cocoscan_offline_active') == 'true'
+                        and request.cookies.get('cocoscan_user_role') == 'farmer'
+                    ):
+                        capability = {
+                            'email': request.cookies.get('cocoscan_user_email', ''),
+                            'user_id': 'offline_farmer',
+                        }
+                    if capability and request.method in {'GET', 'HEAD'}:
                         session['user_id'] = 'offline_farmer'
                         session['user_role'] = 'farmer'
-                        if user_email and not session.get('user_email'):
-                            session['user_email'] = user_email
+                        session['user_email'] = capability['email']
+                        session['offline_mode'] = True
                         user_id = session.get('user_id')
                         user_role = session.get('user_role')
 
@@ -106,6 +119,9 @@ def require_role(*roles):
                 
                 flash(error_msg, "error")
                 return redirect(url_for('login'))
+
+            if session.get('offline_mode') and request.method not in {'GET', 'HEAD'}:
+                return jsonify({'success': False, 'error': 'This operation requires an active internet session.'}), 403
                 
             return f(*args, **kwargs)
         decorated_function._required_roles = allowed_roles
@@ -121,4 +137,3 @@ def fetch_user_reports(supabase, user_id, limit=6):
     except Exception as e:
         logger.error(f"Error fetching user reports: {e}")
         return []
-

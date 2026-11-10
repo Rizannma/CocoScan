@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-DEFAULT_PEST_MODEL = "pest_classifier.h5"
+DEFAULT_PEST_MODEL = "pest_classifier.tflite"
 DEFAULT_PEST_TFLITE_MODEL = "pest_classifier.tflite"
 
 
@@ -21,7 +21,7 @@ def resolve_model_path(
     if model_dir:
         candidates.extend([
             str((resolved_model_dir / default_filename).resolve()),
-            str((resolved_model_dir / DEFAULT_PEST_MODEL).resolve()),
+            str((resolved_model_dir / DEFAULT_PEST_TFLITE_MODEL).resolve()),
         ])
 
     configured_value = env_value if env_value is not None else os.getenv(env_var_name, "")
@@ -40,16 +40,11 @@ def resolve_model_path(
     if not model_dir:
         candidates.extend([
             str((resolved_model_dir / default_filename).resolve()),
-            str((resolved_model_dir / DEFAULT_PEST_MODEL).resolve()),
+            str((resolved_model_dir / DEFAULT_PEST_TFLITE_MODEL).resolve()),
         ])
 
     for candidate in candidates:
-        if prefer_tflite and candidate.endswith(".h5"):
-            tflite_candidate = candidate[:-3] + ".tflite"
-            if os.path.exists(tflite_candidate):
-                return tflite_candidate
-        if os.path.exists(candidate):
+        if candidate.lower().endswith(".tflite") and os.path.exists(candidate):
             return candidate
 
     return str((resolved_model_dir / default_filename).resolve())
-

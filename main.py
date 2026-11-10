@@ -1,6 +1,4 @@
 import os
-# Ensure Keras uses PyTorch backend globally
-os.environ.setdefault("KERAS_BACKEND", "torch")
 
 import time
 import traceback
@@ -68,6 +66,8 @@ from app.session_utils import (
     get_remember_me_lifetime_seconds
 )
 from app.i18n import t, get_all_translations, load_translations
+from app.csrf import get_token as get_csrf_token, set_cookie as set_csrf_cookie, validate_request as validate_csrf_request
+from app.offline_capability import COOKIE_NAME as OFFLINE_CAPABILITY_COOKIE, MAX_AGE_SECONDS as OFFLINE_CAPABILITY_MAX_AGE, issue as issue_offline_capability
 
 # Configure logging
 logging.basicConfig(
@@ -102,11 +102,19 @@ load_dotenv()
 app = Flask(__name__)
 app.session_interface = RoleBasedSessionInterface()
 app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=(
+        os.getenv("COOKIE_SECURE", "").lower() in {"1", "true", "yes"}
+        or os.getenv("FLASK_ENV", "").lower() == "production"
+    ),
+)
 
-# Preload H5 AI pest classification model once globally at startup
+# Preload the TFLite AI pest classification model once globally at startup
 try:
     from model.inference import preload_models
-    _startup_pest_path = resolve_model_path('PEST_MODEL_PATH', 'pest_classifier.h5')
+    _startup_pest_path = resolve_model_path('PEST_MODEL_PATH', 'pest_classifier.tflite')
     preload_models(pest_model_path=_startup_pest_path)
 except Exception as _startup_exc:
     logger.warning(f"Startup global AI model preloading notice: {_startup_exc}")
@@ -155,7 +163,52 @@ def inject_i18n():
         "current_lang": current_lang,
         "t": _jinja_t,
         "farmer_i18n": get_all_translations(current_lang),
+        "csrf_token": get_csrf_token(),
     }
+
+
+@app.before_request
+def enforce_csrf():
+    validate_csrf_request()
+
+
+@app.before_request
+def enforce_request_rate_limits():
+    """Throttle credential and resource-intensive endpoints before route execution."""
+    if app.testing and not app.config.get("TEST_RATE_LIMITS", False):
+        return None
+    if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
+        return None
+
+    endpoint = request.endpoint or ""
+    client_ip = _get_real_ip()
+    limits = None
+    if endpoint == "login":
+        limits = ("login", client_ip, 10, 60)
+    elif endpoint == "farmer_predict":
+        identity = session.get("user_id") or client_ip
+        limits = ("prediction", f"{identity}:{client_ip}", 30, 60)
+    elif endpoint in {"farmer_submit_report", "farmer_follow_up_report"}:
+        identity = session.get("user_id") or client_ip
+        limits = ("upload", f"{identity}:{client_ip}", 10, 600)
+
+    if not limits:
+        return None
+
+    category, identifier, limit, window_seconds = limits
+    allowed, retry_after = security_service.check_request_rate_limit(
+        f"{category}:{identifier}", limit, window_seconds
+    )
+    if allowed:
+        return None
+
+    response = jsonify({
+        "success": False,
+        "error": "Too many requests. Please try again later.",
+    })
+    response.status_code = 429
+    response.headers["Retry-After"] = str(retry_after)
+    return response
 
 def _get_real_ip():
     """Retrieve the real IP address of the client, handling reverse proxies (X-Forwarded-For)."""
@@ -192,6 +245,15 @@ def handle_file_too_large(error):
         }),
         413,
     )
+
+
+class ReportAccessDenied(Exception):
+    """Raised when a user attempts to access a report outside their scope."""
+
+
+@app.errorhandler(ReportAccessDenied)
+def handle_report_access_denied(error):
+    return jsonify({"success": False, "error": "You are not authorized to access this report."}), 403
 
 # Initialize Supabase Client Connection
 url: str = os.getenv("SUPABASE_URL", "")
@@ -374,6 +436,28 @@ def add_security_cache_headers(response):
         response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         response.headers['Pragma'] = 'no-cache'
         response.headers['Expires'] = '0'
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'strict-origin-when-cross-origin')
+    response.headers.setdefault(
+        'Permissions-Policy',
+        'camera=(self), geolocation=(self), microphone=()',
+    )
+    if request.is_secure:
+        response.headers.setdefault(
+            'Strict-Transport-Security',
+            'max-age=31536000; includeSubDomains',
+        )
+    response.headers.setdefault(
+        'Content-Security-Policy',
+        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
+        "object-src 'none'; img-src 'self' data: https:; "
+        "connect-src 'self' https:; font-src 'self' https: data:; "
+        "style-src 'self' 'unsafe-inline' https:; "
+        "script-src 'self' 'unsafe-inline' https:; "
+        "form-action 'self'; upgrade-insecure-requests",
+    )
+    set_csrf_cookie(response)
     return response
 
 
@@ -669,7 +753,7 @@ def _fetch_visit_workflow_payload(report_id):
 
     visit_images_response = supabase.table("visit_images").select("image_url").eq("report_id", report_id).execute()
     visit_images = [
-        resolve_report_image_url(row.get("image_url"))
+        resolve_report_image_url(row.get("image_url"), supabase)
         for row in getattr(visit_images_response, "data", None) or []
         if row.get("image_url")
     ]
@@ -683,6 +767,59 @@ def _fetch_visit_workflow_payload(report_id):
         "schedule_title": schedule_title,
         "visit_images": visit_images,
     }
+
+
+def _assert_report_access(report_id, *, write=False):
+    """Enforce report-level access in addition to the route role check."""
+    if not has_request_context():
+        return
+    user_id = str(_get_current_app_user_id() or session.get("user_id") or "")
+    role = normalize_role(session.get("user_role"))
+    if not user_id or user_id == "offline_farmer":
+        raise ReportAccessDenied()
+
+    try:
+        response = supabase.table("reports").select(
+            "user_id, reviewed_by_id, status"
+        ).eq("id", report_id).execute()
+        rows = getattr(response, "data", None) or []
+    except Exception as exc:
+        logger.error("Unable to authorize report access: %s", exc)
+        raise ReportAccessDenied() from exc
+
+    if not rows:
+        raise ReportAccessDenied()
+    report = rows[0]
+    owner_id = str(report.get("user_id") or "")
+    reviewer_id = str(report.get("reviewed_by_id") or "")
+
+    allowed = (
+        role in {"admin", "lgu"}
+        or (role == "farmer" and user_id == owner_id)
+        or (role == "agri_expert" and (not write or user_id == reviewer_id or not reviewer_id))
+    )
+    if not allowed:
+        raise ReportAccessDenied()
+    return report
+
+
+REPORT_STATUS_TRANSITIONS = {
+    "Under Review": {"Assessment Issued", "Waiting for Agriculturist Confirmation", "Resolved"},
+    "Assessment Issued": {"Waiting for Agriculturist Confirmation", "Visit Scheduled", "Resolved"},
+    "Waiting for Agriculturist Confirmation": {"Visit Scheduled", "Assessment Issued", "Resolved"},
+    "Visit Scheduled": {"Visit Completed", "Resolved", "Waiting for Agriculturist Confirmation"},
+    "Visit Completed": {"Resolved"},
+    "Resolved": {"Under Review"},
+}
+
+
+def _assert_report_transition(current_status, next_status):
+    current = normalize_report_status(current_status, default="Under Review")
+    target = normalize_report_status(next_status, default="Under Review")
+    if current == target:
+        return
+    if target not in REPORT_STATUS_TRANSITIONS.get(current, set()):
+        raise ValueError(f"Invalid report status transition: {current} -> {target}")
 
 REPORTS_TABLE_COLUMNS = {
     "id",
@@ -722,8 +859,11 @@ REPORTS_TABLE_COLUMNS = {
 def _update_report_workflow(report_id, status, *, note=None, extra_updates=None):
     if not report_id:
         raise ValueError("Missing report reference")
+    report = _assert_report_access(report_id, write=True) or {}
 
     norm_status = normalize_report_status(status, default="Under Review")
+    if report.get("status") is not None:
+        _assert_report_transition(report.get("status"), norm_status)
     now_iso = datetime.now(UTC).isoformat()
     raw_update: dict[str, Any] = {
         "status": norm_status,
@@ -1551,6 +1691,14 @@ def api_farmer_remember_me():
                 samesite='Lax',
                 secure=request.is_secure
             )
+            resp.set_cookie(
+                OFFLINE_CAPABILITY_COOKIE,
+                issue_offline_capability(user_id, user_email),
+                max_age=OFFLINE_CAPABILITY_MAX_AGE,
+                httponly=True,
+                samesite='Lax',
+                secure=request.is_secure,
+            )
             resp.set_cookie('cocoscan_user_role', 'farmer', max_age=max_age, samesite='Lax')
             resp.set_cookie('cocoscan_user_email', user_email, max_age=max_age, samesite='Lax')
             security_service.log_audit(user_email, 'farmer', "REMEMBER_ME_OPT_IN", "Farmer opted in to 90-day persistent session", _get_real_ip())
@@ -1563,6 +1711,7 @@ def api_farmer_remember_me():
         session['session_expires_at'] = None
         session.modified = True
         resp.delete_cookie(REMEMBER_COOKIE_NAME)
+        resp.delete_cookie(OFFLINE_CAPABILITY_COOKIE)
         security_service.log_audit(user_email, 'farmer', "REMEMBER_ME_OPT_OUT", "Farmer declined persistent session", _get_real_ip())
 
     return resp
@@ -2349,7 +2498,9 @@ def _fetch_report_supporting_images(report_ids):
         report_id = str(row.get("report_id") or "").strip()
         if not report_id:
             continue
-        grouped_images.setdefault(report_id, []).append(resolve_report_image_url(row.get("image_url") or ""))
+        grouped_images.setdefault(report_id, []).append(
+            resolve_report_image_url(row.get("image_url") or "", supabase)
+        )
 
     return grouped_images
 
@@ -2376,7 +2527,9 @@ def _fetch_report_visit_images(report_ids):
         report_id = str(row.get("report_id") or "").strip()
         if not report_id:
             continue
-        grouped_images.setdefault(report_id, []).append(resolve_report_image_url(row.get("image_url") or ""))
+        grouped_images.setdefault(report_id, []).append(
+            resolve_report_image_url(row.get("image_url") or "", supabase)
+        )
 
     return grouped_images
 
@@ -2573,7 +2726,9 @@ def _build_report_modal_payload(item, *, supporting_images=None, visit_images=No
             "accuracy": item.get("gps_accuracy") or "",
             "source": item.get("location_source") or "",
         },
-        "primary_image": resolve_report_image_url(item.get("image_url") or item.get("img") or ""),
+        "primary_image": resolve_report_image_url(
+            item.get("image_url") or item.get("img") or "", supabase
+        ),
         "additional_images": [img for img in supporting_images if img],
         "initial_recommendations": _normalize_string_list(raw_initial_recommendations),
         "expert_recommendations": _normalize_string_list(raw_expert_recommendations),
@@ -2744,7 +2899,7 @@ def farmer_predict():
         
         pest_model_path = resolve_model_path(
             'PEST_MODEL_PATH',
-            'pest_classifier.h5'
+            'pest_classifier.tflite'
         )
 
         if not os.path.exists(pest_model_path):
@@ -3584,6 +3739,7 @@ def farmer_follow_up_report():
         if not report_id:
             return jsonify({'success': False, 'message': 'Missing report reference'}), 400
 
+        _assert_report_access(report_id, write=True)
         existing_response = supabase.table('reports').select('*').eq('id', report_id).execute()
         existing_rows = getattr(existing_response, 'data', None) or []
         existing_report = existing_rows[0] if existing_rows else {}
@@ -3728,6 +3884,7 @@ def agriculturist_verify_classification():
         if not report_id or not verified_label:
             return jsonify({'success': False, 'message': 'Report reference and verified label are required.'}), 400
 
+        _assert_report_access(report_id, write=True)
         from app.dataset_hub import save_verified_sample, normalize_class_label
         canonical_label = normalize_class_label(verified_label)
 
@@ -3872,6 +4029,7 @@ def get_visit_discussion(report_id):
     user_id = _get_current_app_user_id()
     user_role = normalize_role(session.get('user_role'))
 
+    _assert_report_access(report_id)
     payload = _fetch_visit_workflow_payload(report_id)
     report_row = payload.get('report') or {}
     is_archived = payload.get('is_archived', False)
@@ -3898,6 +4056,7 @@ def save_visit_chat(report_id):
     user_id = _get_current_app_user_id()
     user_role = normalize_role(session.get('user_role'))
 
+    _assert_report_access(report_id, write=True)
     if not user_id or user_id == 'offline_farmer':
         try:
             r_check = supabase.table('reports').select('user_id').eq('id', report_id).execute()
@@ -3973,6 +4132,7 @@ def get_report_details_json(report_id):
         if not raw_reports:
             return jsonify({'success': False, 'message': 'Report not found'}), 404
 
+        _assert_report_access(report_id)
         raw_reports = _enrich_reports_with_reviewer_info(raw_reports)
         item = raw_reports[0]
         supporting_map = _fetch_report_supporting_images([report_id])
@@ -3993,6 +4153,8 @@ def get_report_details_json(report_id):
                 "img": payload["primary_image"],
             }
         })
+    except ReportAccessDenied:
+        return jsonify({'success': False, 'message': 'You are not authorized to access this report.'}), 403
     except Exception as e:
         logger.error(f"Error fetching report {report_id} json: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
@@ -5149,10 +5311,12 @@ def view_report_readonly(report_id):
         chats = chats_response.data or []
         
         # Get images
-        primary_image = resolve_report_image_url(report.get('image_url') or report.get('img'))
+        primary_image = resolve_report_image_url(
+            report.get('image_url') or report.get('img'), supabase
+        )
         supporting_images = [primary_image] if primary_image else []
         for chat in chats:
-            chat_img = resolve_report_image_url(chat.get('image_url'))
+            chat_img = resolve_report_image_url(chat.get('image_url'), supabase)
             if chat_img and chat_img not in supporting_images:
                 supporting_images.append(chat_img)
                 
@@ -5423,6 +5587,9 @@ def admin_audit_log():
     action_filter = request.args.get('action_filter', '', type=str).strip()
     per_page = 10
     
+    audit_integrity = security_service.verify_audit_log_integrity()
+    if not audit_integrity["valid"]:
+        flash("Audit log integrity verification failed. Security administrators have been alerted.", "error")
     data = security_service.get_audit_logs(page=page, per_page=per_page, search=search, action_filter=action_filter)
 
     highlight_pattern = re.compile(re.escape(search), re.IGNORECASE) if search else None
@@ -5650,7 +5817,7 @@ def admin_download_backup(filename):
 
     return send_file(
         filepath,
-        mimetype='application/gzip',
+        mimetype='application/octet-stream',
         as_attachment=True,
         download_name=filename,
     )
@@ -5924,6 +6091,7 @@ def logout():
     session.clear()
     resp = redirect(url_for('login'))
     resp.delete_cookie(REMEMBER_COOKIE_NAME)
+    resp.delete_cookie(OFFLINE_CAPABILITY_COOKIE)
     resp.delete_cookie('cocoscan_offline_active')
     resp.delete_cookie('cocoscan_user_email')
     resp.delete_cookie('cocoscan_user_role')
@@ -5942,6 +6110,6 @@ def internal_error(e):
 
 if __name__ == "__main__":
     app.run(
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104 - container deployments require external binding
         port=int(os.environ.get("PORT", 5001))
     )

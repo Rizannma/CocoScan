@@ -151,5 +151,18 @@ class TestSecurityService(unittest.TestCase):
         self.assertGreaterEqual(logs_data['total'], 1)
         self.assertEqual(logs_data['logs'][0]['action'], "LOGIN")
 
+    def test_request_rate_limit(self):
+        self.assertEqual(
+            security_service.check_request_rate_limit("test-bucket", 2, 60),
+            (True, 0),
+        )
+        self.assertEqual(
+            security_service.check_request_rate_limit("test-bucket", 2, 60),
+            (True, 0),
+        )
+        allowed, retry_after = security_service.check_request_rate_limit("test-bucket", 2, 60)
+        self.assertFalse(allowed)
+        self.assertGreaterEqual(retry_after, 1)
+
 if __name__ == '__main__':
     unittest.main()

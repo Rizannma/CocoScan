@@ -9,6 +9,7 @@ import sys
 import unittest
 from typing import Any
 from unittest.mock import MagicMock, patch
+from cryptography.fernet import Fernet
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -31,6 +32,12 @@ class StorageBackupsTests(unittest.TestCase):
     def setUp(self):
         from app.security_service import init_security_db
         init_security_db()
+        self.backup_key_patch = patch.dict(
+            os.environ,
+            {"BACKUP_ENCRYPTION_KEY": Fernet.generate_key().decode("ascii")},
+        )
+        self.backup_key_patch.start()
+        self.addCleanup(self.backup_key_patch.stop)
         main.app.config.update(TESTING=True, SECRET_KEY="test-secret-key")
         self.client = main.app.test_client()
         original_table = main.supabase.table
@@ -68,12 +75,14 @@ class StorageBackupsTests(unittest.TestCase):
         backup_info = generate_database_backup(supabase_client=None, backup_type="Manual")
         self.assertIn("filename", backup_info)
         self.assertEqual(backup_info["type"], "Manual")
-        self.assertTrue(backup_info["filename"].endswith(".json.gz"))
+        self.assertTrue(backup_info["filename"].endswith(".json.gz.enc"))
+        self.assertTrue(backup_info["encrypted"])
 
         # Verify file exists and is gzipped json
         file_path = get_backup_path(backup_info["filename"])
         self.assertIsNotNone(file_path)
         self.assertTrue(file_path.exists())
+        self.assertNotEqual(file_path.read_bytes()[:2], b"\x1f\x8b")
 
         # Verify list_backups finds it
         backups = list_backups()
@@ -208,7 +217,7 @@ class StorageBackupsTests(unittest.TestCase):
         # 3. Download the backup
         dl_res = self.client.get(f"/admin/storage-backups/download/{target_filename}")
         self.assertEqual(dl_res.status_code, 200)
-        self.assertEqual(dl_res.mimetype, "application/gzip")
+        self.assertEqual(dl_res.mimetype, "application/octet-stream")
         self.assertTrue(len(dl_res.data) > 0)
 
         # 4. Delete the backup - Reject if confirmation phrase is missing or wrong

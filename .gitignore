@@ -36,6 +36,8 @@ config/local.py
 # Local uploads and database files
 static/uploads/*
 !static/uploads/.gitkeep
+backups/*
+!backups/.gitkeep
 *.sqlite3
 *.db
 *.sqlite
