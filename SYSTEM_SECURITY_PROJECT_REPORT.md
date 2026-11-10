@@ -1,4 +1,4 @@
-# CocoScan System Security Project Report
+# CocoScan System Security Assessment and Control Implementation Report
 
 **Assessment date:** 2026-11-10  
 **System:** CocoScan  
@@ -6,6 +6,19 @@
 **Security baseline:** OWASP Top 10:2025
 
 > This report describes controls implemented in the repository and evidence obtained from local automated testing. It is not a penetration-test certificate, a Supabase configuration attestation, or a guarantee that deployment infrastructure is secure.
+
+## Document Reconciliation
+
+This report incorporates the uploaded *Cybersecurity Plan for CocoScan* (ITEP 413, November 2026) and reconciles it with the current repository. The uploaded plan is treated as the system-design and governance baseline; repository behavior and executed tests take precedence for implementation status.
+
+Important corrections:
+
+- The plan describes TensorFlow/Keras inference. The current production implementation is **TFLite-only** using `ai-edge-litert`, with H5/Keras/Torch fallbacks removed.
+- The plan describes a WAF/reverse proxy and Fortinet controls as proposed architecture. No repository evidence proves that a WAF or Fortinet appliance is currently deployed; these remain deployment responsibilities.
+- The plan refers to Supabase Auth/JWT and RLS. The repository also contains application-level user/session, role, OTP, and authorization controls. Supabase RLS and provider configuration must be independently verified in the project dashboard.
+- The plan states encryption at rest as an architectural expectation. Application evidence proves Fernet-encrypted backups, but local SQLite databases are not database-level encrypted and Supabase/provider encryption must be verified operationally.
+- The plan recommends MFA for administrators and agriculturists. The repository contains OTP/2FA flows and controls, but production enforcement scope must be confirmed with role-by-role testing.
+- The plan’s 90-day farmer persistence recommendation should be reviewed against the current remember-me expiry and approved session policy.
 
 ## Executive Summary
 
@@ -29,8 +42,18 @@ Automated evidence at the time of this report:
 | Python regression suite | **214 passed** |
 | `pip-audit -r requirements.txt` | **No known vulnerabilities** |
 | `bandit -r app model main.py -ll` | **No issues identified** |
-| Gitleaks | Configured in GitHub Actions; run the workflow before release |
+| Gitleaks | **CI execution blocked by shallow checkout; no leak was reported** |
 | Authenticated penetration test | **Not yet performed** |
+
+### Assessment conclusion
+
+The application controls described in this report are implemented in the repository and have passing local automated evidence. The system is **not yet production-approved** because the latest GitHub Actions security runs failed before completing the secret scan, and deployment-level controls have not been independently evidenced. The CI failure is attributable to the workflow checkout depth, not to a confirmed secret finding: the action attempted to inspect a parent commit that was not present in the shallow checkout and scanned zero bytes.
+
+The workflow has been corrected to fetch full history (`fetch-depth: 0`). A new successful run is required before the Gitleaks control can be marked verified.
+
+### Remote CI observation
+
+On 2026-11-10, the latest 14 queried `Security checks` workflow runs were marked failed, including the main-branch run [42792289318](https://github.com/Rizannma/CocoScan/actions/runs/42792289318) and Dependabot update runs. The failure occurred in the Gitleaks step before a complete scan: the runner could not resolve the parent commit because the checkout was shallow. This is recorded as a CI evidence defect and has been remediated in the workflow; it is not recorded as a confirmed credential leak.
 
 ## 1. System and Assets
 
@@ -218,43 +241,33 @@ Formal compliance requires organizational policies, data-retention decisions, da
 
 ## 8. Testing and Evidence
 
-### 8.1 Verified automated evidence
+### 8.1 Completed automated evidence
 
-Run from the repository root:
+The following results were obtained from the repository’s Python 3.14 virtual environment and are recorded as implementation evidence:
 
-```bash
-./.venv/bin/pytest -q
-./.venv/bin/pip-audit -r requirements.txt
-./.venv/bin/bandit -r app model main.py -ll
-```
+| Evidence ID | Control tested | Observed result | Assessment |
+|---|---|---|---|
+| EV-01 | Python regression suite | 214 tests passed | Pass |
+| EV-02 | Dependency vulnerability audit | `pip-audit -r requirements.txt`: no known vulnerabilities | Pass |
+| EV-03 | Bandit static analysis | `bandit -r app model main.py -ll`: no issues identified | Pass |
+| EV-04 | Gitleaks on GitHub Actions | [Run 42792289318](https://github.com/Rizannma/CocoScan/actions/runs/42792289318) and Dependabot runs on 2026-11-10 failed because the checkout did not contain the parent commit required by Gitleaks; the log states “scanned ~0 bytes” and “no leaks found in partial scan” | Inconclusive, workflow defect |
+| EV-05 | Private Storage image access | Signed URL generation and relative-to-absolute URL normalization regression tests pass | Pass |
+| EV-06 | Backup protection | Fernet-encrypted `.json.gz.enc` backup creation, listing, download, deletion, and access controls are covered by tests | Pass |
 
-Expected current results:
+The CI defect was corrected in [`.github/workflows/security.yml`](./.github/workflows/security.yml) by configuring the checkout action with `fetch-depth: 0`. Until a post-fix run succeeds, EV-04 remains **inconclusive** rather than being represented as a passing secret scan.
 
-- `214 passed`
-- `No known vulnerabilities found`
-- `No issues identified`
-
-Gitleaks runs in GitHub Actions:
-
-1. Push the branch or open a pull request.
-2. Open **GitHub → Actions → Security checks**.
-3. Confirm the `Scan tracked files for secrets` step succeeds.
-4. Save the workflow URL, commit SHA, date, and result as release evidence.
-
-### 8.2 Required production evidence
+### 8.2 Outstanding evidence and findings
 
 Before production approval, attach:
 
-- GitHub Actions run URLs for pip-audit, Bandit, and Gitleaks.
-- Full pytest output and commit SHA.
-- Supabase Storage screenshot/export showing the `reports` bucket is private.
-- Supabase RLS policy export for users, reports, chats, visits, and Storage objects.
-- Successful signed-URL browser test showing an image loads while an unauthenticated direct object URL returns 401/404.
-- Backup creation output and proof that the archive is not a gzip plaintext file.
-- Backup restoration test using a non-production environment.
-- TLS scan or reverse-proxy configuration proving HTTPS and HSTS.
-- Authenticated authorization test matrix for farmer/agriculturist/LGU/admin roles.
-- Penetration-test report, test scope, dates, findings, severity, remediation, and retest evidence.
+- **CI secret scanning:** obtain one successful post-fix GitHub Actions run and retain its URL, commit SHA, and artifact.
+- **Supabase authorization:** retain the private-bucket setting, RLS policy export, and cross-role/cross-user access results.
+- **Transport security:** retain a production header/TLS scan proving HTTPS, HSTS, CSP, and cache protections.
+- **Backup recovery:** retain a non-production restore result and evidence that the archive cannot be read as plaintext gzip data.
+- **Authorization testing:** retain the farmer/agriculturist/LGU/admin negative-test matrix.
+- **Penetration testing:** retain the scoped report, findings, remediation records, and retest results.
+
+These are open evidence items, not claims that the controls are absent.
 
 ### 8.3 Suggested authenticated penetration tests
 
@@ -294,13 +307,53 @@ Reference: [OWASP Top 10:2025](https://top10.owasp.org/2025/)
 
 ## Release Decision
 
-**Application security baseline:** Ready for controlled staging validation.  
-**Production release:** Conditional on:
+**Application security baseline:** Implemented with local automated evidence.
+**Current release decision:** **Do not approve production release yet.** The decision is conditional on:
 
-1. Valid production secrets and encrypted host/database storage.
-2. Successful GitHub Actions security workflow, including Gitleaks.
+1. A successful post-fix GitHub Actions security workflow, including Gitleaks.
+2. Valid production secrets and encrypted host/database storage.
 3. Removal or migration of all legacy plaintext backups.
 4. Supabase private-bucket and RLS evidence.
 5. Authenticated penetration testing and remediation/retest.
 6. External monitoring and incident-response ownership.
 
+## Appendix A: Reconciled Verification Checklist
+
+Use this checklist before wider deployment, after major changes, and during periodic reviews. Mark each item **Pass**, **Fail**, or **Not Yet Verified**, and retain the referenced evidence.
+
+| No. | Verification activity | Required evidence | Current status |
+|---:|---|---|---|
+| 1 | Test every role against protected pages, APIs, report IDs, chats, media, datasets, and backups, including cross-user and cross-jurisdiction negative tests. | Role/RLS test matrix, sanitized logs, defect and retest records. | Not Yet Verified |
+| 2 | Confirm administrator/agriculturist MFA policy, OTP expiry and attempt limits, password recovery, login limits, session timeout, revocation, and logout. | Authentication configuration and test evidence. | Partially implemented; production verification required |
+| 3 | Approve the farmer remember-me duration and confirm no long-lived bearer token is exposed to browser storage. | Session policy, cookie inspection, logout/revocation evidence. | Partially implemented; policy approval required |
+| 4 | Inspect production HTTPS, HSTS, CSP, `nosniff`, Referrer-Policy, Permissions-Policy, cache, and frame protections. | Header scan and PWA/camera/GPS/map compatibility results. | Implemented locally; production verification required |
+| 5 | Test malformed, unsupported, oversized, renamed, corrupted, and high-dimension images plus text, coordinates, search, and chat input. | Validation cases and safe rejection evidence. | Partially covered; expand staging tests |
+| 6 | Verify Supabase RLS, private Storage bucket policies, JWT/session behavior, least-privilege keys, and secret storage. | Policy export, bucket access tests, redacted secret inventory. | Not Yet Verified |
+| 7 | Review dependencies, repository access, CI permissions, deployment secrets, model hashes, and dataset release approval. | `pip-audit`, Bandit, Gitleaks workflow, access list, hashes. | Automated scans pass locally except Gitleaks pending CI |
+| 8 | Verify encrypted backups, restricted download, retention, and successful restore. | Backup inventory, access log, restore test, deletion evidence. | Encryption implemented; restore test required |
+| 9 | Exercise alerts for failed logins, OTP abuse, role changes, denials, exports, deletions, bucket changes, and service failures. | Alert test, escalation contacts, incident ticket. | Webhook capability implemented; operational setup required |
+| 10 | Approve privacy notice, PIA, PIC/PIP and DPO assignments, provider agreements, retention, user-rights handling, and breach escalation. | Privacy and governance records. | Not Yet Verified |
+
+## Appendix B: Privacy and Governance Alignment
+
+The uploaded plan identifies personal and operational information that requires restricted handling: names, emails, roles, profile and office data, exact farm coordinates, report images, notes, chats, visit schedules, IP addresses, push subscriptions, audit records, dataset exports, and backups.
+
+Recommended governance controls from the plan:
+
+- Apply data minimization and purpose limitation.
+- Restrict exact coordinates and media to authorized report participants and staff.
+- Maintain a retention and deletion schedule for reports, images, audit records, OTP data, and backups.
+- Complete a privacy impact assessment and identify the responsible privacy lead/DPO where required.
+- Maintain provider and data-processing reviews for Supabase, Railway, Brevo, Geoapify, Open-Meteo, and push services.
+- Document breach escalation and evidence-preservation procedures consistent with applicable Philippine privacy requirements.
+- PCI DSS is not applicable to the current scope because CocoScan does not process payment-card data; reassess if payment functionality is introduced.
+
+## Appendix C: Incident Response Runbook
+
+1. **Detect and report:** record the alert, affected account/service, time, and reporter.
+2. **Triage and classify:** determine whether the event concerns account takeover, data exposure, media access, malware, integrity, or availability.
+3. **Contain:** revoke sessions/tokens, disable accounts or keys, restrict Storage access, and isolate affected deployment components.
+4. **Preserve evidence:** retain CI, application, Supabase, Storage, reverse-proxy, and audit-chain evidence.
+5. **Eradicate and recover:** rotate compromised secrets, remove malicious artifacts, restore only from verified encrypted backups, and validate model hashes.
+6. **Notify and document:** follow organizational and applicable privacy-breach notification procedures.
+7. **Review and improve:** record root cause, corrective action, owner, due date, and retest result.

@@ -58,6 +58,10 @@ cocoscan-model/runs/
 *.log
 *.out
 
+# Generated security reports
+SYSTEM_SECURITY_PROJECT_REPORT.md
+SYSTEM_SECURITY_PROJECT_REPORT.pdf
+
 # ======================================
 # CocoScan Training Assets (Not for deployment)
 # ======================================
