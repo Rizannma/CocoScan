@@ -49,3 +49,15 @@ def test_csrf_header_allows_state_changing_request(client):
     )
 
     assert response.status_code != 403
+
+
+def test_farmer_is_redirected_when_opening_admin_dashboard_directly(client):
+    with client.session_transaction() as sess:
+        sess["user_id"] = "00000000-0000-0000-0000-000000000001"
+        sess["user_role"] = "farmer"
+        sess["user_email"] = "farmer@example.com"
+
+    response = client.get("/admin/dashboard", follow_redirects=False)
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/farmer/dashboard")

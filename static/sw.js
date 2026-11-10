@@ -1,6 +1,6 @@
-const CACHE_NAME = 'cocoscan-app-shell-v32';
-const RUNTIME_CACHE = 'cocoscan-pages-runtime-v32';
-const IMAGE_CACHE = 'cocoscan-report-images-v32';
+const CACHE_NAME = 'cocoscan-app-shell-v33';
+const RUNTIME_CACHE = 'cocoscan-pages-runtime-v33';
+const IMAGE_CACHE = 'cocoscan-report-images-v33';
 
 // Only precache truly public, unauthenticated assets to prevent login redirect caching corruption
 const PRECACHE_ASSETS = [
@@ -321,4 +321,3 @@ self.addEventListener('notificationclick', (event) => {
         })
     );
 });
-

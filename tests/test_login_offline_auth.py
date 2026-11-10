@@ -49,6 +49,34 @@ class TestLoginOfflineAuth(unittest.TestCase):
 
     @patch('main.supabase')
     @patch('main.security_service.check_account_lockout', return_value=(False, 0, ''))
+    @patch('main.security_service.record_login_failure', return_value=(1, None, ''))
+    def test_login_malformed_password_hash_is_treated_as_invalid_credentials(
+        self, mock_rec_fail, mock_lockout, mock_supabase
+    ):
+        mock_user = {
+            'id': 'admin-uuid-invalid-hash',
+            'email': 'admin@example.com',
+            'password_hash': 'not-a-valid-werkzeug-hash',
+            'role': 'admin',
+            'status': 'Approved',
+            'first_name': 'Admin',
+            'last_name': 'User',
+        }
+        mock_supabase.table().select().eq().execute.return_value = MagicMock(data=[mock_user])
+
+        response = self.client.post('/login', json={
+            'email': 'admin@example.com',
+            'password': 'WrongPassword123!',
+        })
+
+        self.assertEqual(response.status_code, 401)
+        data = response.get_json()
+        self.assertFalse(data['success'])
+        self.assertIn('Invalid credentials', data['error'])
+        mock_rec_fail.assert_called_once()
+
+    @patch('main.supabase')
+    @patch('main.security_service.check_account_lockout', return_value=(False, 0, ''))
     @patch('main.security_service.reset_login_failures')
     @patch('main.security_service.log_audit')
     def test_login_successful_farmer_json(self, mock_audit, mock_reset_fail, mock_lockout, mock_supabase):
@@ -182,4 +210,3 @@ class TestLoginOfflineAuth(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

@@ -2,7 +2,11 @@
 Password hashing and security utilities for CocoScan
 Uses werkzeug.security for password hashing
 """
+import logging
+
 from werkzeug.security import generate_password_hash, check_password_hash
+
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
@@ -29,7 +33,16 @@ def verify_password(password: str, password_hash: str) -> bool:
     Returns:
         True if password matches, False otherwise
     """
-    return check_password_hash(password_hash, password)
+    if not isinstance(password, str) or not isinstance(password_hash, str) or not password_hash:
+        return False
+
+    try:
+        return check_password_hash(password_hash, password)
+    except (TypeError, ValueError):
+        # A malformed legacy hash is an invalid credential, not an authentication
+        # service failure. Keep the failure generic and let the login lockout apply.
+        logger.warning("Password verification failed because the stored password hash is invalid.")
+        return False
 
 
 def is_strong_password(password: str) -> bool:

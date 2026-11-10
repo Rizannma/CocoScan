@@ -381,7 +381,8 @@ def enforce_live_account_access():
     if not user_id or user_id == 'offline_farmer' or not session.get('user_email'):
         return
     view = app.view_functions.get(request.endpoint)
-    if not getattr(view, '_required_roles', None):
+    required_roles = getattr(view, '_required_roles', None)
+    if not required_roles:
         return
     if request.endpoint == 'static' or request.endpoint in {
         'login', 'signup', 'forgot_password', 'verify_forgot_otp', 'reset_password',
@@ -389,6 +390,19 @@ def enforce_live_account_access():
         'api_farmer_remember_me',
     }:
         return
+
+    current_role = normalize_role(session.get('user_role'))
+    if current_role not in required_roles:
+        logger.info(
+            "User with role '%s' attempted to access %s (allowed: %s). "
+            "Redirecting before live account verification.",
+            current_role,
+            request.path,
+            required_roles,
+        )
+        if request.is_json or request.path.startswith('/api/') or request.endpoint.startswith('api_'):
+            return jsonify({'success': False, 'error': 'Unauthorized access'}), 403
+        return redirect(get_role_dashboard_url(current_role))
 
     try:
         response = supabase.table('users').select(
@@ -6110,6 +6124,7 @@ def internal_error(e):
 
 if __name__ == "__main__":
     app.run(
-        host="0.0.0.0",  # nosec B104 - container deployments require external binding
+        # Container deployments require external binding.
+        host="0.0.0.0",  # nosec B104
         port=int(os.environ.get("PORT", 5001))
     )

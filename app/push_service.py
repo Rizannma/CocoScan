@@ -293,9 +293,14 @@ def get_role_subscriptions(role: str) -> List[Dict[str, Any]]:
 
     # Fallback to local SQLite
     with _get_sqlite_conn() as conn:
-        placeholders = ",".join("?" for _ in target_roles)
-        # Placeholders are generated from the trusted list length; role values remain bound parameters.
-        query = "SELECT * FROM push_subscriptions WHERE LOWER(role) IN (" + placeholders + ")"  # nosec B608
+        # Placeholders are generated from the trusted list length; role values remain
+        # bound parameters, so this dynamic SQL does not introduce user-controlled SQL.
+        queries_by_role_count = {
+            1: "SELECT * FROM push_subscriptions WHERE LOWER(role) IN (?)",
+            2: "SELECT * FROM push_subscriptions WHERE LOWER(role) IN (?, ?)",
+            3: "SELECT * FROM push_subscriptions WHERE LOWER(role) IN (?, ?, ?)",
+        }
+        query = queries_by_role_count[len(target_roles)]
         cur = conn.execute(query, target_roles)
         return [dict(row) for row in cur.fetchall()]
 
