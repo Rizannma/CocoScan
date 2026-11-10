@@ -10,7 +10,7 @@ python-dateutil==2.9.0.post0
 
 ai-edge-litert==2.2.0
 
-supabase==2.31.0
+supabase==2.34.1
 
 email-validator==2.3.0
 PyYAML==6.0.3
