@@ -8,7 +8,7 @@ requests==2.34.2
 python-dotenv==1.2.2
 python-dateutil==2.9.0.post0
 
-ai-edge-litert==2.2.0
+ai-edge-litert==2.3.0
 
 supabase==2.31.0
 
