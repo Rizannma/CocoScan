@@ -2104,6 +2104,12 @@
                 alert('Please provide your farmer notes before submitting the report.');
                 return;
             }
+            const privacyConsent = document.getElementById('report-privacy-consent');
+            if (!privacyConsent?.checked) {
+                alert('Please read and acknowledge the privacy notice before submitting the report.');
+                privacyConsent?.focus();
+                return;
+            }
             if (!navigator.onLine) {
                 if (confirm('No network connection detected. Save this scan as a draft instead?')) {
                     saveDraftToIndexedDB(true);
@@ -2120,6 +2126,7 @@
             const predictionData = window.currentPrediction || {};
 
             const formData = new FormData();
+            formData.append('privacy_notice_acknowledged', 'true');
             formData.append('pest_type', compiledPest);
             formData.append('farmer_notes', additionalNotes);
             formData.append('location_notes', globalPrimaryGPS?.displayName || additionalNotes);
@@ -2352,6 +2359,8 @@
             const uploadInp = document.getElementById('hidden-upload-input');
             if (uploadInp) uploadInp.value = "";
             document.getElementById('field-notes-capture').value = "";
+            const privacyConsent = document.getElementById('report-privacy-consent');
+            if (privacyConsent) privacyConsent.checked = false;
             document.getElementById('supporting-photos-input').value = "";
             document.getElementById('supporting-preview-grid').innerHTML = '';
             const errorDiv = document.getElementById('supporting-photos-error');

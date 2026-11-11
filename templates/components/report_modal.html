@@ -961,6 +961,14 @@
         </div>
 
         <div class="control-action-bar" id="report-scan-action-bar" style="display:none;">
+            <div id="report-privacy-notice" style="width:100%; margin-bottom:12px; padding:12px 14px; border:1px solid #bfdbfe; border-radius:12px; background:#eff6ff; color:#1e3a8a; font-size:0.78rem; line-height:1.45; text-align:left;">
+                <strong style="display:block; margin-bottom:4px;">Privacy notice</strong>
+                When you submit this report, CocoScan collects your account identity, leaf photos and optional supporting photos, AI prediction and confidence, your notes, location details (including GPS coordinates, accuracy, source, and derived barangay/municipality/province), and photo/submission timestamps. This information is used to analyze your report, coordinate authorized agriculturist review, and improve service and dataset quality. Access is limited to authorized system users for these purposes.
+            </div>
+            <label for="report-privacy-consent" style="width:100%; display:flex; align-items:flex-start; gap:8px; margin-bottom:12px; color:#334155; font-size:0.8rem; line-height:1.4; text-align:left; cursor:pointer;">
+                <input id="report-privacy-consent" type="checkbox" style="margin-top:3px; flex:0 0 auto;">
+                <span>I have read and understand this privacy notice.</span>
+            </label>
             <button class="btn-control submit-primary" id="report-scan-submit-btn" type="button" onclick="submitReportPayload()" style="display:none;">
                 <i class="fa-solid fa-paper-plane"></i> <span data-i18n="modal.btn_submit_report">{{ t('modal.btn_submit_report', 'Submit Report') }}</span>
             </button>

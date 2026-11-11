@@ -4765,6 +4765,12 @@ def farmer_submit_report():
     user_role = normalize_role(session.get('user_role'))
     
     try:
+        if request.form.get('privacy_notice_acknowledged', '').strip().lower() != 'true':
+            return jsonify({
+                'success': False,
+                'message': 'Please acknowledge the privacy notice before submitting the report.',
+            }), 400
+
         # 1. Extract data sent by your scanning interface/form
         pest_type = request.form.get('pest_type', 'Unknown Pest').strip()
         farmer_notes = resolve_farmer_notes(request.form)
@@ -5601,9 +5607,12 @@ def admin_audit_log():
     action_filter = request.args.get('action_filter', '', type=str).strip()
     per_page = 10
     
-    audit_integrity = security_service.verify_audit_log_integrity()
-    if not audit_integrity["valid"]:
-        flash("Audit log integrity verification failed. Security administrators have been alerted.", "error")
+    # Integrity verification is intentionally kept off the interactive filter
+    # path; it scans the complete audit chain and can delay each AJAX refresh.
+    if request.headers.get('X-Requested-With') != 'XMLHttpRequest':
+        audit_integrity = security_service.verify_audit_log_integrity()
+        if not audit_integrity["valid"]:
+            flash("Audit log integrity verification failed. Security administrators have been alerted.", "error")
     data = security_service.get_audit_logs(page=page, per_page=per_page, search=search, action_filter=action_filter)
 
     highlight_pattern = re.compile(re.escape(search), re.IGNORECASE) if search else None
@@ -5631,6 +5640,7 @@ def admin_audit_log():
         'SESSION_TIMEOUT': 'Session Timeout',
         'DANGER_ZONE_REPORT_DELETE': 'Report Deleted',
         'DANGER_ZONE_BULK_REPORT_DELETE': 'Reports Deleted',
+        'DATASET_HUB_EXPORT': 'Datasethub Export',
     }
 
     def format_audit_details(log):
@@ -5764,6 +5774,16 @@ def admin_export_dataset_zip():
     try:
         from app.dataset_hub import generate_dataset_zip
         zip_stream, zip_filename = generate_dataset_zip(supabase)
+        security_service.log_audit(
+            email=session.get('user_email', ''),
+            role='admin',
+            action='DATASET_HUB_EXPORT',
+            details=(
+                f"Admin '{session.get('user_name', 'Administrator')}' exported the "
+                f"Datasethub archive '{zip_filename}'."
+            ),
+            ip_address=_get_real_ip(),
+        )
         return send_file(
             zip_stream,
             mimetype='application/zip',

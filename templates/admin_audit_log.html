@@ -325,6 +325,7 @@
                     {% elif current_action == 'SESSION_TIMEOUT' %}Session Timeout
                     {% elif current_action == 'DANGER_ZONE_REPORT_DELETE' %}Danger Zone Report Delete
                     {% elif current_action == 'DANGER_ZONE_BULK_REPORT_DELETE' %}Danger Zone Bulk Delete
+                    {% elif current_action == 'DATASET_HUB_EXPORT' %}Datasethub Export
                     {% elif current_action %}{{ current_action | replace('_', ' ') | title }}
                     {% else %}Event Type{% endif %} ▾
                 </button>
@@ -347,6 +348,8 @@
                         onclick="updateFilter('actionFilter', 'DANGER_ZONE_REPORT_DELETE')">Danger Zone Report Delete</button>
                     <button type="button" class="dropdown-item {% if current_action == 'DANGER_ZONE_BULK_REPORT_DELETE' %}selected{% endif %}"
                         onclick="updateFilter('actionFilter', 'DANGER_ZONE_BULK_REPORT_DELETE')">Danger Zone Bulk Delete</button>
+                    <button type="button" class="dropdown-item {% if current_action == 'DATASET_HUB_EXPORT' %}selected{% endif %}"
+                        onclick="updateFilter('actionFilter', 'DATASET_HUB_EXPORT')">Datasethub Export</button>
                 </div>
             </div>
         </div>
@@ -487,25 +490,53 @@
 <script>
     document.addEventListener("DOMContentLoaded", function () {
         const filterForm = document.getElementById('filterForm');
+        const tableContainer = document.getElementById('tableAndPagination');
         let debounceTimer;
+        let activeRequest;
 
         window.triggerSearch = function () {
             const url = new URL(filterForm.action, window.location.origin);
             url.search = new URLSearchParams(new FormData(filterForm)).toString();
+            const requestUrl = new URL(url);
+            requestUrl.searchParams.set('_', Date.now().toString());
 
-            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-                .then(response => response.text())
+            if (activeRequest) {
+                activeRequest.abort();
+            }
+            activeRequest = new AbortController();
+            tableContainer.setAttribute('aria-busy', 'true');
+            tableContainer.style.opacity = '0.65';
+
+            fetch(requestUrl, {
+                cache: 'no-store',
+                signal: activeRequest.signal,
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Filter request failed (${response.status})`);
+                    }
+                    return response.text();
+                })
                 .then(html => {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(html, 'text/html');
                     const newContent = doc.getElementById('tableAndPagination');
                     if (newContent) {
-                        document.getElementById('tableAndPagination').innerHTML = newContent.innerHTML;
+                        tableContainer.innerHTML = newContent.innerHTML;
                         attachSearchListener();
                     }
                     window.history.replaceState({}, '', url);
                 })
-                .catch(err => console.error("Filter AJAX error:", err));
+                .catch(err => {
+                    if (err.name !== 'AbortError') {
+                        console.error("Filter AJAX error:", err);
+                    }
+                })
+                .finally(() => {
+                    tableContainer.removeAttribute('aria-busy');
+                    tableContainer.style.opacity = '';
+                });
         };
 
         function attachSearchListener() {

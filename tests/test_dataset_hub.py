@@ -197,17 +197,43 @@ class DatasetHubTests(unittest.TestCase):
         self.assertIn("Export as ZIP", html)
         self.assertNotIn("Retrain Model", html)
 
+    def test_farmer_report_privacy_notice_is_present(self):
+        with self.client.session_transaction() as session:
+            session["user_id"] = "farmer-1"
+            session["user_role"] = "farmer"
+
+        resp = self.client.get("/farmer/scan")
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn("When you submit this report, CocoScan collects", html)
+        self.assertIn("report-privacy-consent", html)
+        self.assertIn("GPS coordinates, accuracy, source", html)
+
+    def test_farmer_report_requires_privacy_notice_acknowledgement(self):
+        with self.client.session_transaction() as session:
+            session["user_id"] = "farmer-1"
+            session["user_role"] = "farmer"
+
+        resp = self.client.post("/farmer/submit-report", data={})
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("privacy notice", resp.get_json()["message"].lower())
+
     def test_admin_export_zip_route(self):
         # Admin export ZIP route test
         with self.client.session_transaction() as session:
             session["user_id"] = "admin-1"
             session["user_role"] = "admin"
 
-        resp = self.client.get("/admin/dataset-hub/export-zip")
+        with patch("main.security_service.log_audit") as mock_audit:
+            resp = self.client.get("/admin/dataset-hub/export-zip")
+
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.mimetype, "application/zip")
         self.assertIn("attachment", resp.headers.get("Content-Disposition", ""))
         self.assertIn("cocoscan_dataset_", resp.headers.get("Content-Disposition", ""))
+        mock_audit.assert_called_once()
+        self.assertEqual(mock_audit.call_args.kwargs["action"], "DATASET_HUB_EXPORT")
+        self.assertIn("exported the Datasethub archive", mock_audit.call_args.kwargs["details"])
 
         # Verify stream is valid zip
         zip_bytes = io.BytesIO(resp.data)
