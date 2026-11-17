@@ -1,3 +1,4 @@
+import base64
 import io
 import os
 import sys
@@ -188,6 +189,9 @@ class TestFarmerPredictRouteErrorHandling:
         res_json = resp.get_json()
         assert res_json.get('success') is True
         assert res_json.get('pest') == 'Healthy Coconut Leaf'
+        preview_image = res_json.get('preview_image', '')
+        assert preview_image.startswith('data:image/jpeg;base64,')
+        assert base64.b64decode(preview_image.split(',', 1)[1]).startswith(b'\xff\xd8\xff')
 
 
 class TestSupabaseStorageLimitAndUploadErrors:
@@ -338,4 +342,3 @@ class TestSupabaseStorageLimitAndUploadErrors:
         assert resp.status_code == 507
         res_json = resp.get_json()
         assert res_json.get('error') == STORAGE_LIMIT_ERROR_MESSAGE
-

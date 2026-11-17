@@ -508,9 +508,12 @@
             tableContainer.style.opacity = '0.65';
 
             fetch(requestUrl, {
-                cache: 'no-store',
+                cache: 'reload',
                 signal: activeRequest.signal,
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'Accept': 'text/html; fragment=table'
+                }
             })
                 .then(response => {
                     if (!response.ok) {
@@ -524,8 +527,13 @@
                     const newContent = doc.getElementById('tableAndPagination');
                     if (newContent) {
                         tableContainer.innerHTML = newContent.innerHTML;
-                        attachSearchListener();
                     }
+                    const newFilterForm = doc.getElementById('filterForm');
+                    if (newFilterForm) {
+                        filterForm.querySelector('#actionFilter').value =
+                            newFilterForm.querySelector('#actionFilter')?.value || '';
+                    }
+                    attachSearchListener();
                     window.history.replaceState({}, '', url);
                 })
                 .catch(err => {
@@ -556,6 +564,10 @@
 
         window.updateFilter = function (inputId, value) {
             document.getElementById(inputId).value = value;
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) {
+                searchInput.blur();
+            }
             triggerSearch();
             document.querySelectorAll('.filter-dropdown-panel').forEach(menu => menu.classList.remove('show'));
         };

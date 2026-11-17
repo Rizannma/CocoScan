@@ -2050,7 +2050,7 @@
                     } : {},
                     notes: document.getElementById('field-notes-capture').value.trim(),
                     farmer: '{{ user_name|default("Farmer") }}',
-                    primary_image: globalActiveImagePayload || defaultImages[data.pest],
+                    primary_image: data.preview_image || globalActiveImagePayload || defaultImages[data.pest],
                     additional_images: supportingImages.map((file) => URL.createObjectURL(file)),
                     initial_recommendations: Array.isArray(data.recommendations) ? data.recommendations : [],
                     status: 'Ready to Submit'

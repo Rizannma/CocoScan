@@ -21,7 +21,33 @@ def test_security_headers_are_present(client):
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+    assert "upgrade-insecure-requests" not in response.headers["Content-Security-Policy"]
     assert "cocoscan_csrf_token=" in response.headers.get("Set-Cookie", "")
+
+
+def test_https_request_upgrades_insecure_requests(client):
+    response = client.get("/login", base_url="https://localhost")
+
+    assert "upgrade-insecure-requests" in response.headers["Content-Security-Policy"]
+
+
+def test_login_form_submits_csrf_token(client):
+    base_url = "https://localhost"
+    response = client.get("/login", base_url=base_url)
+    assert b'name="csrf_token"' in response.data
+
+    csrf_cookie = next(
+        header.split(";", 1)[0].split("=", 1)[1]
+        for header in response.headers.getlist("Set-Cookie")
+        if header.startswith("cocoscan_csrf_token=")
+    )
+    response = client.post(
+        "/login",
+        base_url=base_url,
+        data={"csrf_token": csrf_cookie, "email": "", "password": ""},
+    )
+
+    assert response.status_code != 403
 
 
 def test_state_changing_request_requires_csrf_after_cookie_issuance(client):

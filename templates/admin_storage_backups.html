@@ -169,7 +169,7 @@
     .reports-table-card {
         background: #ffffff;
         border-radius: 16px;
-        padding: 20px;
+        padding: 16px;
         border: 1px solid var(--border-light, rgba(0, 0, 0, 0.05));
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
         width: 100%;
@@ -340,10 +340,17 @@
         letter-spacing: 0.3px;
     }
 
-    .badge-backup-type.daily {
+    .badge-backup-type.daily,
+    .badge-backup-type.automated {
         background: #eff6ff;
         color: #1d4ed8;
         border: 1px solid #bfdbfe;
+    }
+
+    .badge-backup-type.unencrypted {
+        background: #fffbeb;
+        color: #b45309;
+        border: 1px solid #fde68a;
     }
 
     .badge-backup-type.manual {
@@ -604,8 +611,23 @@
     .danger-reports-table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 580px;
+        min-width: 840px;
         font-size: 0.88rem;
+        table-layout: auto;
+    }
+
+    .danger-reports-table .selection-column {
+        display: none;
+        width: 126px;
+        min-width: 126px;
+    }
+
+    .danger-reports-table-container.selection-mode .selection-column {
+        display: table-cell;
+    }
+
+    .danger-reports-table-container.selection-mode .report-row-item {
+        cursor: pointer;
     }
 
     .danger-reports-table thead th {
@@ -626,19 +648,57 @@
     .danger-reports-table tbody tr {
         border-bottom: 1px solid #f1f5f9;
         transition: background-color 0.15s ease;
-        cursor: pointer;
+        cursor: default;
     }
 
     .danger-reports-table tbody tr:hover {
         background-color: #f8fafc;
+        transform: none !important;
+        box-shadow: none !important;
     }
 
     .danger-reports-table tbody tr.selected-row {
         background-color: #fff1f2 !important;
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    .danger-reports-table .status-column,
+    .danger-reports-table .report-status-cell {
+        width: 300px;
+        max-width: 300px;
+    }
+
+    .danger-reports-table .report-status-cell {
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .danger-reports-table .quick-action-column,
+    .danger-reports-table .quick-action-cell {
+        width: 104px;
+        min-width: 104px;
+        padding-right: 8px;
+        padding-left: 8px;
+        white-space: nowrap;
+        text-align: center;
+    }
+
+    .danger-reports-table .report-id-column,
+    .danger-reports-table .report-id-cell {
+        width: 112px;
+        min-width: 112px;
+    }
+
+    .danger-reports-table .date-column,
+    .danger-reports-table .report-date-cell {
+        width: 180px;
+        min-width: 180px;
+        white-space: nowrap;
     }
 
     .danger-reports-table tbody td {
-        padding: 12px 14px;
+        padding: 10px 12px;
         color: #1e293b;
         vertical-align: middle;
     }
@@ -665,37 +725,14 @@
         gap: 4px;
     }
 
-    .selection-pill {
+    .selection-count {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        background: #fee2e2;
-        color: #991b1b;
-        border: 1px solid #fca5a5;
-        padding: 5px 12px;
-        border-radius: 999px;
-        font-size: 0.78rem;
+        color: #475569;
+        padding: 0;
+        font-size: 0.82rem;
         font-weight: 700;
-    }
-
-    .btn-clear-selection {
-        background: #ffffff;
-        border: 1px solid #cbd5e1;
-        color: #64748b;
-        padding: 5px 12px;
-        border-radius: 8px;
-        font-size: 0.78rem;
-        font-weight: 600;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        transition: all 0.15s;
-    }
-
-    .btn-clear-selection:hover {
-        background: #f1f5f9;
-        color: #1e293b;
+        white-space: nowrap;
     }
 
     .btn-row-delete-single {
@@ -721,6 +758,7 @@
         border-radius: 4px;
         font-size: 0.75rem;
         font-weight: 600;
+        white-space: nowrap;
     }
 
     .report-mini-status.status-review {
@@ -947,14 +985,149 @@
     .modal-danger-header .icon-circle {
         width: 44px;
         height: 44px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 44px;
         border-radius: 50%;
         background: #fee2e2;
         color: #dc2626;
-        display: flex;
+    }
+
+    .modal-danger-header .icon-circle i {
+        display: block;
+        font-size: 1.1rem;
+        line-height: 1;
+    }
+
+    .report-row-actions {
+        position: relative;
+        display: inline-flex;
+        justify-content: center;
+        flex-wrap: nowrap;
+        white-space: nowrap;
+        vertical-align: middle;
+    }
+
+    .quick-action-cell .report-row-actions {
+        width: 100%;
+        align-items: center;
+    }
+
+    .btn-row-actions-menu {
+        width: 36px;
+        height: 36px;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.35rem;
-        flex-shrink: 0;
+        border: 1px solid #cbd5e1;
+        border-radius: 50%;
+        background: #f8fafc;
+        color: #475569;
+        cursor: pointer;
+        transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .btn-row-actions-menu:hover,
+    .report-row-actions.menu-open .btn-row-actions-menu {
+        background: #eef5f2;
+        border-color: #b7cfc0;
+        color: #164630;
+    }
+
+    .report-row-action-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        z-index: 20;
+        min-width: 160px;
+        padding: 6px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.14);
+    }
+
+    .report-row-actions.menu-open .report-row-action-menu {
+        display: grid;
+        gap: 2px;
+    }
+
+    .report-row-actions.menu-open.menu-open-up .report-row-action-menu {
+        top: auto;
+        bottom: calc(100% + 6px);
+    }
+
+    .report-row-action-menu button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 9px 10px;
+        border: 0;
+        border-radius: 7px;
+        background: transparent;
+        color: #334155;
+        text-align: left;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .report-row-action-menu button:hover,
+    .report-row-action-menu button:focus-visible {
+        background: #f1f5f9;
+        outline: none;
+    }
+
+    .report-row-action-menu .delete-report-action {
+        color: #b91c1c;
+    }
+
+    .report-row-action-menu .delete-report-action:hover,
+    .report-row-action-menu .delete-report-action:focus-visible {
+        background: #fef2f2;
+    }
+
+    .btn-selection-mode {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 7px 12px;
+        border: 1px solid #cbd5e1;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #475569;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .reports-search-toolbar .modern-input-text,
+    .reports-search-toolbar .btn-selection-mode {
+        height: 44px;
+        box-sizing: border-box;
+    }
+
+    .reports-search-toolbar .reports-search-field {
+        flex: 1 1 220px;
+        min-width: 220px;
+    }
+
+    .reports-search-toolbar .btn-selection-mode {
+        flex: 0 0 140px;
+        width: 140px;
+    }
+
+    .btn-selection-mode:hover,
+    .btn-selection-mode[aria-pressed="true"] {
+        border-color: #94a3b8;
+        background: #f1f5f9;
+        color: #1e293b;
+        transform: none !important;
+        box-shadow: none !important;
     }
 
     .modal-danger-header h3 {
@@ -1250,7 +1423,7 @@
                 <i class="fa-solid fa-database" style="color: #164630;"></i>
                 <span>Database Backups</span>
             </h3>
-            <p style="font-size: 0.8rem; color: #64748b; margin: 2px 0 0 0;">Create manual snapshot dumps and manage database restore archives.</p>
+            <p style="font-size: 0.8rem; color: #64748b; margin: 2px 0 0 0;">Manage manual snapshots and encrypted weekly full-database backups.</p>
         </div>
         <form method="POST" action="{{ url_for('admin_generate_backup') }}" id="generate-backup-form" data-loading-initialized="true" onsubmit="handleGenerateBackupSubmit(event)" style="margin: 0;">
             <button type="submit" id="btn-generate-backup" class="btn-generate-backup" title="Trigger database snapshot dump">
@@ -1277,23 +1450,48 @@
         </div>
     </div>
 
-    <!-- Backup policy note banner -->
+    <!-- Backup policy and schedule -->
     <div class="retention-policy-banner">
         <i class="fa-solid fa-clock-rotate-left"></i>
         <div>
-            <strong>Manual backup policy:</strong> Database backups are created manually by an administrator and remain available until they are explicitly deleted.
+            <strong>Backup schedule:</strong> Full PostgreSQL backups run every Sunday at 12:00 AM Asia/Manila. The 12 newest weekly archives are retained; manual snapshots remain until deleted.
         </div>
     </div>
+
+    {% if backup_storage_error %}
+    <div role="alert" style="margin-bottom: 14px; padding: 12px 14px; border: 1px solid #fecaca; border-radius: 9px; background: #fef2f2; color: #991b1b; font-size: 0.82rem;">
+        <strong>Cloud backup storage unavailable.</strong> {{ backup_storage_error }}
+    </div>
+    {% elif latest_backup_run %}
+    <div role="status" style="margin-bottom: 14px; padding: 12px 14px; border: 1px solid {% if latest_backup_run.status == 'success' %}#bbf7d0{% elif latest_backup_run.status == 'failure' %}#fecaca{% else %}#bfdbfe{% endif %}; border-radius: 9px; background: {% if latest_backup_run.status == 'success' %}#f0fdf4{% elif latest_backup_run.status == 'failure' %}#fef2f2{% else %}#eff6ff{% endif %}; color: {% if latest_backup_run.status == 'success' %}#166534{% elif latest_backup_run.status == 'failure' %}#991b1b{% else %}#1e40af{% endif %}; font-size: 0.82rem;">
+        <strong>Latest automated run: {{ latest_backup_run.status|default('unknown')|title }}</strong>
+        {% if latest_backup_run.finished_at %}
+            · {{ latest_backup_run.finished_at }}
+        {% elif latest_backup_run.started_at %}
+            · Started {{ latest_backup_run.started_at }}
+        {% endif %}
+        {% if latest_backup_run.archive_name %} · {{ latest_backup_run.archive_name }}{% endif %}
+        {% if latest_backup_run.error %}<div style="margin-top: 5px;">{{ latest_backup_run.error }}</div>{% endif %}
+        {% if latest_backup_run.run_url and latest_backup_run.run_url.startswith('https://github.com/') %}
+            <a href="{{ latest_backup_run.run_url }}" target="_blank" rel="noopener noreferrer" style="margin-left: 6px; color: inherit; text-decoration: underline;">View workflow run</a>
+        {% endif %}
+    </div>
+    {% else %}
+    <div role="status" style="margin-bottom: 14px; padding: 12px 14px; border: 1px solid #e2e8f0; border-radius: 9px; background: #f8fafc; color: #475569; font-size: 0.82rem;">
+        No automated backup run has been recorded yet. The workflow status will appear here after its first run.
+    </div>
+    {% endif %}
 
     <!-- Backup History Table -->
     <table>
         <thead>
             <tr>
-                <th style="width: 38%;">File Name</th>
-                <th style="width: 18%;">Type</th>
-                <th style="width: 14%;">Size</th>
-                <th style="width: 18%;">Date Created</th>
-                <th style="width: 12%; text-align: center;">Actions</th>
+                <th style="width: 34%;">File Name</th>
+                <th style="width: 15%;">Type</th>
+                <th style="width: 12%;">Status</th>
+                <th style="width: 12%;">Size</th>
+                <th style="width: 17%;">Date Created</th>
+                <th style="width: 10%; text-align: center;">Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -1306,8 +1504,14 @@
                         </span>
                     </td>
                     <td>
-                        <span class="badge-backup-type {% if b.type == 'Manual' %}manual{% else %}daily{% endif %}">
+                        <span class="badge-backup-type {% if b.type == 'Manual' %}manual{% else %}automated{% endif %}">
                             <i class="fa-solid {% if b.type == 'Manual' %}fa-user-gear{% else %}fa-robot{% endif %}"></i> {{ b.type }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge-backup-type {% if b.encrypted %}automated{% else %}unencrypted{% endif %}">
+                            <i class="fa-solid {% if b.encrypted %}fa-lock{% else %}fa-triangle-exclamation{% endif %}"></i>
+                            {% if b.encrypted %}Encrypted{% else %}Unencrypted{% endif %}
                         </span>
                     </td>
                     <td style="font-weight: 600; color: #1e293b;">{{ b.size_formatted }}</td>
@@ -1327,7 +1531,7 @@
                 {% endfor %}
             {% else %}
                 <tr>
-                    <td colspan="5" style="text-align: center; padding: 36px 12px; color: #64748b;">
+                    <td colspan="6" style="text-align: center; padding: 36px 12px; color: #64748b;">
                         <i class="fa-solid fa-box-open" style="font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px;"></i>
                         No backup archives generated yet. Click <strong>Generate Backup Now</strong> above to create your first dump.
                     </td>
@@ -1371,37 +1575,25 @@
     <div style="background: #fafafa; border: 1.5px solid #f1f5f9; border-radius: 14px; padding: 20px;">
         <!-- Tab 1: By Specific Report -->
         <div id="panel-single-delete" style="display: block;">
-            <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 10px;">
+            <div style="margin-bottom: 14px;">
                 <div>
                     <h4 style="font-size: 0.95rem; font-weight: 700; color: #0b1315; margin: 0 0 4px 0;">Target Specific Reports Deletion</h4>
-                    <p style="font-size: 0.82rem; color: #64748b; margin: 0;">Select reports from the list below using checkboxes, or specify a Report ID to permanently delete records and cloud images.</p>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                    <div id="selection-status-badge" class="selection-pill" style="display: none;">
-                        <i class="fa-solid fa-check-double"></i>
-                        <span id="selected-reports-counter">0 reports selected</span>
-                    </div>
-                    <button type="button" id="btn-clear-selection" class="btn-clear-selection" style="display: none;" onclick="clearReportSelection()">
-                        <i class="fa-solid fa-xmark"></i>
-                        <span>Clear Selection</span>
-                    </button>
+                    <p style="font-size: 0.82rem; color: #64748b; margin: 0;">Select reports from the list below using checkboxes to permanently delete records and cloud images.</p>
                 </div>
             </div>
 
             <!-- Toolbar & Actions -->
-            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; align-items: center;">
-                <div style="flex: 2; min-width: 220px; position: relative;">
+            <div class="reports-search-toolbar" style="display: flex; gap: 10px; margin-bottom: 12px; align-items: center; flex-wrap: wrap;">
+                <div class="reports-search-field" style="position: relative;">
                     <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: 0.82rem;"></i>
                     <input type="text" id="reports-search-input" class="modern-input-text" style="padding-left: 36px;" placeholder="Search reports by ID, pest, or status..." oninput="handleReportTableSearch(this.value)">
                 </div>
-                <div style="flex: 1; min-width: 140px; max-width: 170px;">
-                    <input type="number" id="target-report-id-input" class="modern-input-text" placeholder="Or enter ID..." oninput="handleIdInputChange(this.value)">
-                </div>
-                <div style="min-width: 200px;">
-                    <button type="button" class="btn-trigger-danger" id="btn-trigger-danger-action" onclick="openSingleReportDeleteModal()">
-                        <i class="fa-solid fa-trash-can"></i>
-                        <span id="btn-trigger-danger-text">Trigger Report Deletion...</span>
-                    </button>
+                <button type="button" id="toggle-report-selection-mode" class="btn-selection-mode" aria-pressed="false" onclick="toggleReportSelectionMode()">
+                    <i class="fa-regular fa-square-check"></i>
+                    <span>Select</span>
+                </button>
+                <div id="selection-status-badge" class="selection-count" style="display: none;">
+                    <span id="selected-reports-counter">0 reports selected</span>
                 </div>
             </div>
 
@@ -1410,66 +1602,71 @@
                 <table class="danger-reports-table" id="danger-reports-table">
                     <thead>
                         <tr>
-                            <th style="width: 130px; white-space: nowrap;">
+                            <th class="selection-column" style="white-space: nowrap;">
                                 <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer; margin: 0; font-size: 0.78rem; font-weight: 700; color: #475569; user-select: none; white-space: nowrap;">
                                     <input type="checkbox" id="reports-master-checkbox" class="modern-checkbox" title="Select All Reports" aria-label="Select All Reports" onchange="toggleSelectAllReports(this.checked)">
                                     <span>Select All</span>
                                 </label>
                             </th>
-                            <th style="width: 15%;">Report ID</th>
-                            <th style="width: 30%;">Pest</th>
-                            <th style="width: 23%;">Date Created</th>
-                            <th style="width: 20%;">Status</th>
-                            <th style="width: 12%; text-align: center;">Quick Action</th>
+                            <th class="report-id-column">Report ID</th>
+                            <th class="date-column">Date Created</th>
+                            <th class="status-column">Status</th>
+                            <th class="quick-action-column">Quick Action</th>
                         </tr>
                     </thead>
                     <tbody id="danger-reports-tbody">
                         {% if recent_reports and recent_reports|length > 0 %}
                             {% for r in recent_reports %}
                             <tr class="report-row-item" data-report-id="{{ r.id }}" data-search="{{ (r.id ~ ' ' ~ (r.pest_type or '') ~ ' ' ~ (r.formatted_date or '') ~ ' ' ~ (r.status or ''))|lower }}" onclick="handleRowClick(event, '{{ r.id }}')">
-                                <td onclick="event.stopPropagation()">
+                                <td class="selection-column" onclick="event.stopPropagation()">
                                     <label style="display: inline-flex; align-items: center; cursor: pointer; margin: 0;">
                                         <input type="checkbox" class="report-row-checkbox modern-checkbox" value="{{ r.id }}" data-report-id="{{ r.id }}" data-label="{{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}" onchange="handleRowCheckboxChange(this)">
                                     </label>
                                 </td>
-                                <td>
+                                <td class="report-id-cell">
                                     <span class="report-id-badge">
                                         <i class="fa-solid fa-hashtag" style="font-size: 0.72rem; color: #dc2626;"></i>{{ r.id }}
                                     </span>
                                 </td>
-                                <td style="font-weight: 600; color: #0f172a;">
-                                    <span style="display: inline-flex; align-items: center; gap: 6px;">
-                                        <i class="fa-solid fa-bug" style="color: #64748b; font-size: 0.8rem;"></i>
-                                        <span>{{ r.pest_type or 'General' }}</span>
-                                    </span>
-                                </td>
-                                <td style="color: #475569; font-size: 0.86rem;">
+                                <td class="report-date-cell" style="color: #475569; font-size: 0.86rem;">
                                     <i class="fa-regular fa-calendar" style="color: #94a3b8; margin-right: 4px; font-size: 0.8rem;"></i>
                                     {{ r.formatted_date or 'Recent' }}
                                 </td>
-                                <td>
+                                <td class="report-status-cell" title="{{ r.status or 'Under Review' }}">
                                     {% set s = (r.status or 'Under Review')|lower %}
                                     <span class="report-mini-status {% if 'resolved' in s or 'closed' in s %}status-resolved{% elif 'assessment issued' in s %}status-assessment{% elif 'waiting for agriculturist confirmation' in s or 'awaiting confirmed schedule' in s %}status-waiting{% elif 'visit scheduled' in s %}status-scheduled{% elif 'visit completed' in s %}status-completed{% elif 'recommendation issued' in s %}status-recommendation{% elif 'visit requested' in s %}status-visit-requested{% else %}status-review{% endif %}">
                                         {{ r.status or 'Under Review' }}
                                     </span>
                                 </td>
-                                <td style="text-align: center;" onclick="event.stopPropagation()">
-                                    <button type="button" class="btn-row-delete-single" title="Delete Report #{{ r.id }}" onclick="openPreconfirmModal('{{ r.id }}')">
-                                        <i class="fa-solid fa-trash-can"></i>
-                                    </button>
+                                <td class="quick-action-cell" onclick="event.stopPropagation()">
+                                    <div class="report-row-actions">
+                                        <button type="button" class="btn-row-actions-menu" title="Actions for Report #{{ r.id }}" aria-label="Actions for Report #{{ r.id }}" aria-haspopup="true" aria-expanded="false" onclick="toggleReportRowMenu(event)">
+                                            <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+                                        </button>
+                                        <div class="report-row-action-menu" role="menu">
+                                            <button type="button" role="menuitem" onclick="previewStoredReport('{{ r.id }}')">
+                                                <i class="fa-regular fa-eye"></i>
+                                                <span>Preview</span>
+                                            </button>
+                                            <button type="button" class="delete-report-action" role="menuitem" onclick="closeReportRowMenus(); openPreconfirmModal('{{ r.id }}')">
+                                                <i class="fa-regular fa-trash-can"></i>
+                                                <span>Delete</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
                         {% else %}
                             <tr id="empty-reports-row">
-                                <td colspan="6" style="text-align: center; padding: 32px 14px; color: #64748b;">
+                                <td colspan="5" style="text-align: center; padding: 32px 14px; color: #64748b;">
                                     <i class="fa-solid fa-inbox" style="font-size: 1.8rem; color: #cbd5e1; display: block; margin-bottom: 6px;"></i>
                                     No recent reports found in database. You can still enter a Report ID in the input above.
                                 </td>
                             </tr>
                         {% endif %}
                         <tr id="no-search-results-row" style="display: none;">
-                            <td colspan="6" style="text-align: center; padding: 24px 14px; color: #64748b;">
+                            <td colspan="5" style="text-align: center; padding: 24px 14px; color: #64748b;">
                                 <i class="fa-solid fa-magnifying-glass" style="font-size: 1.4rem; color: #cbd5e1; display: block; margin-bottom: 6px;"></i>
                                 No reports match your search query.
                             </td>
@@ -1478,15 +1675,8 @@
                 </table>
             </div>
 
-            <!-- Hidden native select retained for backward compatibility -->
-            <select id="recent-reports-dropdown" style="display: none;">
-                <option value="">-- Choose from recent reports --</option>
-                {% for r in recent_reports %}
-                <option value="{{ r.id }}" data-label="{{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}">
-                    {{ r.display_label or ('Report #' ~ r.id ~ ' · ' ~ (r.pest_type or 'General') ~ ' · ' ~ (r.formatted_date or 'Recent') ~ ' (' ~ (r.status or 'Under Review') ~ ')') }}
-                </option>
-                {% endfor %}
-            </select>
+            {% include 'components/report_modal.html' %}
+
         </div>
 
         <!-- Tab 2: By Date Range / Bulk -->
@@ -1548,7 +1738,7 @@
         </div>
         <h4>Delete this report?</h4>
         <div id="preconfirm-report-badge" class="preconfirm-report-badge">
-            <i class="fa-solid fa-hashtag" style="font-size: 0.72rem;"></i>
+            <i id="preconfirm-label-icon" class="fa-solid fa-hashtag" style="font-size: 0.72rem;"></i>
             <span id="preconfirm-report-label">Report</span>
         </div>
         <p>This action is <strong>irreversible</strong>. You will be asked to type a confirmation phrase in the next step before anything is permanently deleted.</p>
@@ -1711,6 +1901,76 @@
 
     // Selection state management for reports list component
     const selectedReportIds = new Set();
+    const reportSelectionContainer = document.querySelector(".danger-reports-table-container");
+
+    function toggleReportSelectionMode() {
+        const button = document.getElementById("toggle-report-selection-mode");
+        if (!reportSelectionContainer || !button) return;
+
+        const isActive = reportSelectionContainer.classList.contains("selection-mode");
+        if (isActive) {
+            clearReportSelection();
+            reportSelectionContainer.classList.remove("selection-mode");
+            button.setAttribute("aria-pressed", "false");
+            button.innerHTML = '<i class="fa-regular fa-square-check"></i><span>Select</span>';
+            return;
+        }
+
+        reportSelectionContainer.classList.add("selection-mode");
+        button.setAttribute("aria-pressed", "true");
+        button.innerHTML = '<i class="fa-solid fa-xmark"></i><span>Cancel</span>';
+    }
+
+    function toggleReportRowMenu(event) {
+        event.stopPropagation();
+        const actions = event.currentTarget.closest(".report-row-actions");
+        const shouldOpen = actions && !actions.classList.contains("menu-open");
+        closeReportRowMenus();
+        if (shouldOpen) {
+            const containerBounds = reportSelectionContainer.getBoundingClientRect();
+            const actionBounds = actions.getBoundingClientRect();
+            actions.classList.toggle("menu-open-up", containerBounds.bottom - actionBounds.bottom < 100);
+            actions.classList.add("menu-open");
+            event.currentTarget.setAttribute("aria-expanded", "true");
+        }
+    }
+
+    function closeReportRowMenus() {
+        document.querySelectorAll(".report-row-actions.menu-open").forEach(actions => {
+            actions.classList.remove("menu-open");
+            actions.classList.remove("menu-open-up");
+            actions.querySelector(".btn-row-actions-menu")?.setAttribute("aria-expanded", "false");
+        });
+    }
+
+    async function previewStoredReport(reportId) {
+        closeReportRowMenus();
+        try {
+            const response = await fetch(`/api/reports/${encodeURIComponent(reportId)}`, {
+                headers: { Accept: "application/json" },
+                credentials: "same-origin"
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.success || !payload.report) {
+                throw new Error(payload.message || `Unable to load Report #${reportId}.`);
+            }
+            if (typeof window.openReportModal !== "function") {
+                throw new Error("The report preview is unavailable. Please refresh the page and try again.");
+            }
+            window.openReportModal(payload.report, "admin");
+        } catch (error) {
+            console.error("Unable to preview report:", error);
+            alert(error.message || `Unable to preview Report #${reportId}.`);
+        }
+    }
+
+    document.addEventListener("click", event => {
+        if (!event.target.closest(".report-row-actions")) closeReportRowMenus();
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key === "Escape") closeReportRowMenus();
+    });
 
     function toggleSelectAllReports(isChecked) {
         const table = document.getElementById("danger-reports-tbody");
@@ -1754,6 +2014,7 @@
         if (event.target.closest("input") || event.target.closest("button") || event.target.closest("a")) {
             return;
         }
+        if (!reportSelectionContainer?.classList.contains("selection-mode")) return;
         const row = event.currentTarget;
         const cb = row ? row.querySelector(".report-row-checkbox") : null;
         if (cb) {
@@ -1795,32 +2056,13 @@
         const count = selectedReportIds.size;
         const badge = document.getElementById("selection-status-badge");
         const countText = document.getElementById("selected-reports-counter");
-        const clearBtn = document.getElementById("btn-clear-selection");
-        const triggerText = document.getElementById("btn-trigger-danger-text");
-        const manualInput = document.getElementById("target-report-id-input");
-        const manualVal = manualInput ? manualInput.value.trim() : "";
 
-        if (badge && countText && clearBtn) {
+        if (badge && countText) {
             if (count > 0) {
                 badge.style.display = "inline-flex";
                 countText.textContent = `${count} report${count === 1 ? "" : "s"} selected`;
-                clearBtn.style.display = "inline-flex";
             } else {
                 badge.style.display = "none";
-                clearBtn.style.display = "none";
-            }
-        }
-
-        if (triggerText) {
-            if (count > 1) {
-                triggerText.textContent = `Trigger Deletion (${count} Reports)...`;
-            } else if (count === 1) {
-                const singleId = Array.from(selectedReportIds)[0];
-                triggerText.textContent = `Trigger Deletion (Report #${singleId})...`;
-            } else if (manualVal) {
-                triggerText.textContent = `Trigger Deletion (ID #${manualVal})...`;
-            } else {
-                triggerText.textContent = "Trigger Report Deletion...";
             }
         }
     }
@@ -1866,7 +2108,7 @@
             row.style.display = matches ? "" : "none";
             if (matches) {
                 matchCount++;
-                // Highlight: pest cell (td index 2), id cell (td index 1), date (td index 3), status (td index 4)
+                // Highlight report ID, date, and status; the selection column remains hidden outside selection mode.
                 const cells = row.querySelectorAll('td');
                 // td[1] = Report ID badge
                 const idBadge = cells[1]?.querySelector('.report-id-badge');
@@ -1874,14 +2116,8 @@
                     if (!idBadge.dataset.origText) idBadge.dataset.origText = idBadge.textContent.trim();
                     idBadge.innerHTML = '<i class="fa-solid fa-hashtag" style="font-size:0.72rem;color:#dc2626;"></i>' + highlightSearchText(idBadge.dataset.origText, q);
                 }
-                // td[2] = Pest
-                const pestSpan = cells[2]?.querySelector('span span');
-                if (pestSpan) {
-                    if (!pestSpan.dataset.origText) pestSpan.dataset.origText = pestSpan.textContent.trim();
-                    pestSpan.innerHTML = highlightSearchText(pestSpan.dataset.origText, q);
-                }
-                // td[3] = Date text node
-                const dateTd = cells[3];
+                // td[2] = Date text node
+                const dateTd = cells[2];
                 if (dateTd) {
                     let dateText = dateTd.dataset.origText;
                     if (!dateText) {
@@ -1890,8 +2126,8 @@
                     }
                     dateTd.innerHTML = '<i class="fa-regular fa-calendar" style="color:#94a3b8;margin-right:4px;font-size:0.8rem;"></i>' + highlightSearchText(dateText, q);
                 }
-                // td[4] = Status badge
-                const statusBadge = cells[4]?.querySelector('.report-mini-status');
+                // td[3] = Status badge
+                const statusBadge = cells[3]?.querySelector('.report-mini-status');
                 if (statusBadge) {
                     if (!statusBadge.dataset.origText) statusBadge.dataset.origText = statusBadge.textContent.trim();
                     statusBadge.textContent = statusBadge.dataset.origText; // reset first
@@ -1902,11 +2138,9 @@
                 const cells = row.querySelectorAll('td');
                 const idBadge = cells[1]?.querySelector('.report-id-badge');
                 if (idBadge?.dataset.origText) idBadge.innerHTML = '<i class="fa-solid fa-hashtag" style="font-size:0.72rem;color:#dc2626;"></i>' + escapeHtml(idBadge.dataset.origText);
-                const pestSpan = cells[2]?.querySelector('span span');
-                if (pestSpan?.dataset.origText) pestSpan.textContent = pestSpan.dataset.origText;
-                const dateTd = cells[3];
+                const dateTd = cells[2];
                 if (dateTd?.dataset.origText) dateTd.innerHTML = '<i class="fa-regular fa-calendar" style="color:#94a3b8;margin-right:4px;font-size:0.8rem;"></i>' + escapeHtml(dateTd.dataset.origText);
-                const statusBadge = cells[4]?.querySelector('.report-mini-status');
+                const statusBadge = cells[3]?.querySelector('.report-mini-status');
                 if (statusBadge?.dataset.origText) statusBadge.textContent = statusBadge.dataset.origText;
             }
         });
@@ -1917,22 +2151,6 @@
         }
 
         updateMasterCheckboxState();
-    }
-
-    function handleRecentReportChange(value) {
-        const targetInput = document.getElementById("target-report-id-input");
-        if (targetInput) {
-            targetInput.value = value;
-        }
-        updateSelectionUI();
-    }
-
-    function handleIdInputChange(value) {
-        const dropdown = document.getElementById("recent-reports-dropdown");
-        if (dropdown) {
-            dropdown.value = value || "";
-        }
-        updateSelectionUI();
     }
 
     function setConfirmationPhraseVisibility(visible) {
@@ -1960,15 +2178,10 @@
             idsToDelete = [String(reportId).trim()];
         } else if (selectedReportIds.size > 0) {
             idsToDelete = Array.from(selectedReportIds);
-        } else {
-            const inputVal = document.getElementById("target-report-id-input") ? document.getElementById("target-report-id-input").value.trim() : "";
-            if (inputVal) {
-                idsToDelete = [inputVal];
-            }
         }
 
         if (idsToDelete.length === 0) {
-            alert("Please select one or more reports or enter a valid Report ID to delete.");
+            alert("Please select one or more reports to delete.");
             return;
         }
 
@@ -1991,14 +2204,6 @@
             const rowCb = document.querySelector(`.report-row-checkbox[value="${singleId}"]`);
             if (rowCb && rowCb.getAttribute("data-label")) {
                 contextLabel = rowCb.getAttribute("data-label");
-            } else {
-                const dropdown = document.getElementById("recent-reports-dropdown");
-                if (dropdown && dropdown.value === singleId && dropdown.selectedIndex >= 0) {
-                    const selectedOpt = dropdown.options[dropdown.selectedIndex];
-                    if (selectedOpt && selectedOpt.getAttribute("data-label")) {
-                        contextLabel = selectedOpt.getAttribute("data-label");
-                    }
-                }
             }
 
             document.getElementById("modal-danger-title").textContent = "Confirm Permanent Report Deletion";
@@ -2025,14 +2230,18 @@
         const year = yearSelect ? yearSelect.value : "2026";
         const month = monthSelect ? monthSelect.value : "all";
         const monthText = monthSelect ? monthSelect.options[monthSelect.selectedIndex].text : "All Months";
+        const rangeLabel = month === "all" ? "The entire year " + year : monthText + " " + year;
 
+        openBulkPreconfirmation({ year, month, monthText, rangeLabel });
+    }
+
+    function openBulkDeleteConfirmation({ year, month, monthText, rangeLabel }) {
         const form = document.getElementById("danger-delete-form");
         form.action = bulkDeleteUrl;
         document.getElementById("hidden-delete-report-id").value = "";
+        document.getElementById("hidden-delete-report-ids").value = "";
         document.getElementById("hidden-delete-year").value = year;
         document.getElementById("hidden-delete-month").value = month;
-
-        const rangeLabel = month === "all" ? "the entire Year " + year : monthText + " " + year;
 
         document.getElementById("modal-danger-title").textContent = "Confirm Bulk Cascading Deletion";
         document.getElementById("modal-danger-subtitle").textContent = "Bulk cleanup for " + rangeLabel;
@@ -2093,34 +2302,51 @@
     window.openReportDeleteModal = openSingleReportDeleteModal;
 
     // ── Pre-Confirmation Modal (Step 1) ────────────────────────────────────
-    let _preconfirmPendingReportId = null;
+    let _preconfirmPendingAction = null;
 
     window.openPreconfirmModal = function(reportId) {
-        _preconfirmPendingReportId = reportId ? String(reportId).trim() : null;
+        const normalizedReportId = reportId ? String(reportId).trim() : null;
 
         // Build label from row checkbox data-label if available
-        let label = _preconfirmPendingReportId ? 'Report #' + _preconfirmPendingReportId : 'Selected Reports';
-        if (_preconfirmPendingReportId) {
-            const rowCb = document.querySelector(`.report-row-checkbox[value="${_preconfirmPendingReportId}"]`);
+        let label = normalizedReportId ? 'Report #' + normalizedReportId : 'Selected Reports';
+        if (normalizedReportId) {
+            const rowCb = document.querySelector(`.report-row-checkbox[value="${normalizedReportId}"]`);
             if (rowCb && rowCb.getAttribute('data-label')) {
                 label = rowCb.getAttribute('data-label');
             }
         }
 
+        _preconfirmPendingAction = { type: "report", reportId: normalizedReportId };
+        document.getElementById('preconfirm-card-inner').querySelector('h4').textContent =
+            normalizedReportId ? "Delete this report?" : "Delete selected reports?";
+        document.getElementById('preconfirm-label-icon').style.display = normalizedReportId ? "" : "none";
         document.getElementById('preconfirm-report-label').textContent = label;
         document.getElementById('preconfirm-delete-modal').style.display = 'flex';
     };
 
+    function openBulkPreconfirmation(bulkAction) {
+        _preconfirmPendingAction = { type: "bulk", ...bulkAction };
+        document.getElementById('preconfirm-card-inner').querySelector('h4').textContent = "Delete reports in this date range?";
+        document.getElementById('preconfirm-label-icon').style.display = "none";
+        document.getElementById('preconfirm-report-label').textContent = bulkAction.rangeLabel;
+        document.getElementById('preconfirm-delete-modal').style.display = 'flex';
+    }
+
     window.closePreconfirmModal = function() {
         document.getElementById('preconfirm-delete-modal').style.display = 'none';
-        _preconfirmPendingReportId = null;
+        _preconfirmPendingAction = null;
     };
 
     window.proceedToFullConfirmation = function() {
-        const id = _preconfirmPendingReportId;
+        const action = _preconfirmPendingAction;
         closePreconfirmModal();
-        // Slight delay so the close animation feels smooth before Step 2 opens
-        setTimeout(() => openSingleReportDeleteModal(id), 120);
+        setTimeout(() => {
+            if (action?.type === "bulk") {
+                openBulkDeleteConfirmation(action);
+            } else if (action?.type === "report") {
+                openSingleReportDeleteModal(action.reportId);
+            }
+        }, 120);
     };
 
     window.handlePreconfirmBackdropClick = function(event) {

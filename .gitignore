@@ -30,6 +30,8 @@ cocoscan-model/.venv/
 *.pem
 *.key
 *.crt
+*-backups-identity.txt
+*.agekey
 instance/
 config/local.py
 
@@ -38,6 +40,7 @@ static/uploads/*
 !static/uploads/.gitkeep
 backups/*
 !backups/.gitkeep
+cocoscan_db_*.dump*
 *.sqlite3
 *.db
 *.sqlite

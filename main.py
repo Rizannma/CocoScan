@@ -21,6 +21,7 @@ from markupsafe import Markup, escape
 
 from app.image_utils import (
     process_and_compress_image,
+    compress_image_to_bytes,
     InvalidImageFormatError,
     StorageLimitExceededError,
     INVALID_IMAGE_ERROR_MESSAGE,
@@ -319,7 +320,7 @@ def check_session_timeout():
             else:
                 # Token is invalid, expired, inactive >30 days, or non-farmer -> delete cookie
                 if not request.path.startswith('/login') and not request.path.startswith('/static'):
-                    resp = redirect(url_for('login'))
+                    resp = redirect(url_for('login', signed_out=1))
                     resp.delete_cookie(REMEMBER_COOKIE_NAME)
                     return resp
 
@@ -462,15 +463,17 @@ def add_security_cache_headers(response):
             'Strict-Transport-Security',
             'max-age=31536000; includeSubDomains',
         )
-    response.headers.setdefault(
-        'Content-Security-Policy',
+    content_security_policy = (
         "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
         "object-src 'none'; img-src 'self' data: https:; "
         "connect-src 'self' https:; font-src 'self' https: data:; "
         "style-src 'self' 'unsafe-inline' https:; "
         "script-src 'self' 'unsafe-inline' https:; "
-        "form-action 'self'; upgrade-insecure-requests",
+        "form-action 'self'"
     )
+    if request.is_secure:
+        content_security_policy += '; upgrade-insecure-requests'
+    response.headers.setdefault('Content-Security-Policy', content_security_policy)
     set_csrf_cookie(response)
     return response
 
@@ -2937,9 +2940,11 @@ def farmer_predict():
                 'pest': 'Unknown',
             }), 400
 
+        preview_image = base64.b64encode(compress_image_to_bytes(image)).decode('ascii')
         response = {
             'success': True,
             'pest': result['pest'],
+            'preview_image': f"data:image/jpeg;base64,{preview_image}",
             'possible_pest_title': result.get('possible_pest_title', f"Possible Pest: {result['pest']}"),
             'pest_confidence': round(result['pest_confidence'] * 100, 1),
             'recommendations': result['recommendations'],
@@ -5680,15 +5685,19 @@ def admin_audit_log():
         log['highlighted_action'] = highlight_audit_value(display_action)
     
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return render_template('admin_audit_log.html',
-                               user_name=session.get('user_name', 'Administrator'),
-                               logs=data['logs'],
-                               total_records=data['total'],
-                               current_page=data['page'],
-                               per_page=data['per_page'],
-                               total_pages=data['total_pages'],
-                               search=search,
-                               current_action=action_filter)
+        response = make_response(render_template(
+            'admin_audit_log.html',
+            user_name=session.get('user_name', 'Administrator'),
+            logs=data['logs'],
+            total_records=data['total'],
+            current_page=data['page'],
+            per_page=data['per_page'],
+            total_pages=data['total_pages'],
+            search=search,
+            current_action=action_filter
+        ))
+        response.headers['Cache-Control'] = 'no-store, no-cache, max-age=0, must-revalidate'
+        return response
                                
     return render_template('admin_audit_log.html',
                            user_name=session.get('user_name', 'Administrator'),
@@ -5809,9 +5818,28 @@ def admin_storage_backups():
             (cat, msg) for cat, msg in session.get('_flashes', [])
             if "two-factor authentication verified" not in str(msg).lower()
         ]
-    from app.backup_service import get_storage_metrics, list_backups, get_recent_reports_for_danger_zone
-    metrics = get_storage_metrics(supabase)
-    backups = list_backups()
+    from app.backup_service import (
+        get_backup_storage_client,
+        get_latest_backup_run,
+        get_storage_metrics,
+        list_backups,
+        get_recent_reports_for_danger_zone,
+    )
+    backup_storage_error = None
+    latest_backup_run = None
+    try:
+        backup_storage_client = get_backup_storage_client()
+        backups = list_backups(backup_storage_client)
+        latest_backup_run = get_latest_backup_run(backup_storage_client)
+        metrics = get_storage_metrics(supabase, backup_storage_client)
+    except Exception as e:
+        logger.error("Could not load private database backups: %s", e)
+        backups = list_backups()
+        metrics = get_storage_metrics(supabase)
+        backup_storage_error = (
+            str(e) if isinstance(e, RuntimeError)
+            else "Could not connect to the private Supabase backup bucket. Check its URL, key, and access settings."
+        )
     recent_reports = get_recent_reports_for_danger_zone(supabase, limit=20)
     admin_name = session.get('user_name', 'Administrator')
     return render_template(
@@ -5821,6 +5849,8 @@ def admin_storage_backups():
         user_role=normalize_role(session.get('user_role')),
         metrics=metrics,
         backups=backups,
+        latest_backup_run=latest_backup_run,
+        backup_storage_error=backup_storage_error,
         recent_reports=recent_reports,
     )
 
@@ -5843,18 +5873,27 @@ def admin_generate_backup():
 @require_role('admin')
 def admin_download_backup(filename):
     """Download a database backup file."""
-    from app.backup_service import get_backup_path
-    filepath = get_backup_path(filename)
-    if not filepath or not filepath.exists():
-        flash("Requested backup file was not found or has expired.", "error")
-        return redirect(url_for('admin_storage_backups'))
-
-    return send_file(
-        filepath,
-        mimetype='application/octet-stream',
-        as_attachment=True,
-        download_name=filename,
+    from app.backup_service import (
+        get_backup_path,
+        get_backup_storage_client,
+        get_cloud_backup_download_url,
     )
+    filepath = get_backup_path(filename)
+    if filepath and filepath.exists():
+        return send_file(
+            filepath,
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=filename,
+        )
+
+    try:
+        signed_url = get_cloud_backup_download_url(get_backup_storage_client(), filename)
+        return redirect(signed_url)
+    except Exception as e:
+        logger.error("Could not download database backup %s: %s", filename, e)
+        flash("Requested backup file was not found, expired, or could not be downloaded.", "error")
+        return redirect(url_for('admin_storage_backups'))
 
 
 @app.route('/admin/storage-backups/delete/<filename>', methods=['POST'])
@@ -5873,15 +5912,30 @@ def admin_delete_backup(filename):
         return redirect(url_for('admin_storage_backups'))
 
     try:
-        from app.backup_service import delete_backup
-        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '')
-        success = delete_backup(
-            filename=filename,
-            admin_id=admin_id,
-            admin_name=admin_name,
-            admin_email=admin_email,
-            ip_address=ip_address,
+        from app.backup_service import (
+            delete_backup,
+            delete_cloud_backup,
+            get_backup_path,
+            get_backup_storage_client,
         )
+        ip_address = request.remote_addr or request.headers.get('X-Forwarded-For', '')
+        if get_backup_path(filename):
+            success = delete_backup(
+                filename=filename,
+                admin_id=admin_id,
+                admin_name=admin_name,
+                admin_email=admin_email,
+                ip_address=ip_address,
+            )
+        else:
+            success = delete_cloud_backup(
+                supabase_client=get_backup_storage_client(),
+                filename=filename,
+                admin_id=admin_id,
+                admin_name=admin_name,
+                admin_email=admin_email,
+                ip_address=ip_address,
+            )
         if success:
             flash(f"Backup archive '{filename}' deleted successfully.", "success")
         else:
@@ -6123,7 +6177,7 @@ def logout():
     if remember_token:
         security_service.revoke_remember_token(remember_token)
     session.clear()
-    resp = redirect(url_for('login'))
+    resp = redirect(url_for('login', signed_out=1))
     resp.delete_cookie(REMEMBER_COOKIE_NAME)
     resp.delete_cookie(OFFLINE_CAPABILITY_COOKIE)
     resp.delete_cookie('cocoscan_offline_active')
@@ -6146,5 +6200,5 @@ if __name__ == "__main__":
     app.run(
         # Container deployments require external binding.
         host="0.0.0.0",  # nosec B104
-        port=int(os.environ.get("PORT", 5001))
+        port=int(os.environ.get("PORT", 5003))
     )

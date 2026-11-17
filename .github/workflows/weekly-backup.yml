@@ -1,0 +1,51 @@
+name: Weekly database backup
+
+on:
+  schedule:
+    # 12:00 AM Sunday in Asia/Manila (UTC+8).
+    - cron: "0 16 * * 6"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      SUPABASE_BACKUP_BUCKET: cocoscan-database-backups
+      BACKUP_RETENTION_COUNT: "12"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PostgreSQL tools, age, and upload client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl --fail --silent --show-error https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor --yes -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update
+          sudo apt-get install --yes postgresql-client-18 age
+          python -m pip install --disable-pip-version-check requests
+          pg_dump --version
+          age --version
+
+      - name: Create, encrypt, upload, verify, and retain backup
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          BACKUP_AGE_RECIPIENT: ${{ secrets.BACKUP_AGE_RECIPIENT }}
+        run: python scripts/automated_database_backup.py

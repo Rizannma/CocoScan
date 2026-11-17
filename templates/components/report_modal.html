@@ -283,6 +283,112 @@
                 justify-content: flex-end;
                 margin-top: 20px;
             }
+            .report-privacy-card {
+                width: 100%;
+                padding: 16px;
+                border: 1px solid #bfdbfe;
+                border-radius: 16px;
+                background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 100%);
+                color: #1e3a8a;
+                text-align: left;
+            }
+            .report-privacy-heading {
+                display: flex;
+                align-items: flex-start;
+                gap: 11px;
+                margin-bottom: 8px;
+            }
+            .report-privacy-icon {
+                display: grid;
+                place-items: center;
+                flex: 0 0 36px;
+                width: 36px;
+                height: 36px;
+                border-radius: 11px;
+                background: #dbeafe;
+                color: #1d4ed8;
+            }
+            .report-privacy-heading h4 {
+                margin: 0;
+                color: #1e3a8a;
+                font-size: 0.96rem;
+                line-height: 1.35;
+            }
+            .report-privacy-heading p {
+                margin: 3px 0 0;
+                color: #475569;
+                font-size: 0.84rem;
+                line-height: 1.5;
+            }
+            .report-privacy-details {
+                margin: 12px 0 0 47px;
+                border-top: 1px solid #dbeafe;
+                color: #334155;
+                font-size: 0.82rem;
+                line-height: 1.5;
+            }
+            .report-privacy-details summary {
+                width: fit-content;
+                padding: 10px 0 4px;
+                color: #1d4ed8;
+                font-weight: 700;
+                cursor: pointer;
+            }
+            .report-privacy-details summary:focus-visible,
+            .report-privacy-consent:focus-within {
+                outline: 3px solid rgba(37, 99, 235, 0.35);
+                outline-offset: 3px;
+                border-radius: 4px;
+            }
+            .report-privacy-detail-grid {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px 16px;
+                padding: 8px 0 2px;
+            }
+            .report-privacy-detail-grid p {
+                margin: 0;
+            }
+            .report-privacy-detail-grid strong {
+                display: block;
+                margin-bottom: 2px;
+                color: #1e3a8a;
+            }
+            .report-privacy-consent {
+                width: 100%;
+                display: flex;
+                align-items: flex-start;
+                gap: 10px;
+                margin: 2px 0 0;
+                padding: 12px 14px;
+                border: 1px solid #e2e8f0;
+                border-radius: 12px;
+                background: #fff;
+                color: #334155;
+                font-size: 0.88rem;
+                line-height: 1.45;
+                text-align: left;
+                cursor: pointer;
+            }
+            .report-privacy-consent input {
+                flex: 0 0 auto;
+                width: 18px;
+                height: 18px;
+                margin: 1px 0 0;
+                accent-color: #16803c;
+            }
+            @media (max-width: 520px) {
+                .report-privacy-card {
+                    padding: 14px;
+                }
+                .report-privacy-details {
+                    margin-left: 0;
+                }
+                .report-privacy-detail-grid {
+                    grid-template-columns: 1fr;
+                    gap: 8px;
+                }
+            }
             .btn-control {
                 position: relative;
                 overflow: hidden;
@@ -961,12 +1067,26 @@
         </div>
 
         <div class="control-action-bar" id="report-scan-action-bar" style="display:none;">
-            <div id="report-privacy-notice" style="width:100%; margin-bottom:12px; padding:12px 14px; border:1px solid #bfdbfe; border-radius:12px; background:#eff6ff; color:#1e3a8a; font-size:0.78rem; line-height:1.45; text-align:left;">
-                <strong style="display:block; margin-bottom:4px;">Privacy notice</strong>
-                When you submit this report, CocoScan collects your account identity, leaf photos and optional supporting photos, AI prediction and confidence, your notes, location details (including GPS coordinates, accuracy, source, and derived barangay/municipality/province), and photo/submission timestamps. This information is used to analyze your report, coordinate authorized agriculturist review, and improve service and dataset quality. Access is limited to authorized system users for these purposes.
-            </div>
-            <label for="report-privacy-consent" style="width:100%; display:flex; align-items:flex-start; gap:8px; margin-bottom:12px; color:#334155; font-size:0.8rem; line-height:1.4; text-align:left; cursor:pointer;">
-                <input id="report-privacy-consent" type="checkbox" style="margin-top:3px; flex:0 0 auto;">
+            <section id="report-privacy-notice" class="report-privacy-card" aria-labelledby="report-privacy-title">
+                <div class="report-privacy-heading">
+                    <span class="report-privacy-icon" aria-hidden="true"><i class="fa-solid fa-shield-halved"></i></span>
+                    <div>
+                        <h4 id="report-privacy-title">Privacy notice</h4>
+                        <p>Your report includes your account, photos, AI result, notes, location details, and timestamps. We use it to assess the report, coordinate authorized review, and improve CocoScan.</p>
+                    </div>
+                </div>
+                <details class="report-privacy-details">
+                    <summary>See what is collected and how it is used</summary>
+                    <div class="report-privacy-detail-grid">
+                        <p><strong>Information collected</strong>Account identity, leaf and optional supporting photos, AI prediction and confidence, your notes, and photo/submission timestamps.</p>
+                        <p><strong>Location details</strong>GPS coordinates, accuracy, source, and derived barangay, municipality, or province when available.</p>
+                        <p><strong>How it is used</strong>To analyze your report, coordinate authorized agriculturist review, and improve service and dataset quality.</p>
+                        <p><strong>Who can access it</strong>Access is limited to authorized system users for these purposes.</p>
+                    </div>
+                </details>
+            </section>
+            <label for="report-privacy-consent" class="report-privacy-consent">
+                <input id="report-privacy-consent" type="checkbox">
                 <span>I have read and understand this privacy notice.</span>
             </label>
             <button class="btn-control submit-primary" id="report-scan-submit-btn" type="button" onclick="submitReportPayload()" style="display:none;">

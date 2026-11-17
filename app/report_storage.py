@@ -1,13 +1,12 @@
 from datetime import datetime, UTC, timedelta, timezone
 import json
+import logging
 import os
-from urllib.parse import urlparse
+from urllib.parse import quote, unquote, urlparse
 from typing import Any, Mapping
 
 
-SUPABASE_REPORT_IMAGE_BASE_URL = (
-    "https://utvltqgxqnpcqrphuojc.supabase.co/storage/v1/object/public/reports/"
-)
+logger = logging.getLogger(__name__)
 
 MANILA_TIMEZONE = timezone(timedelta(hours=8))
 
@@ -96,23 +95,24 @@ def is_resolved_report_status(value: Any) -> bool:
 def _storage_object_path(image_url: str) -> str:
     """Extract a bucket-relative path from a stored Supabase image reference."""
     parsed = urlparse(image_url)
-    if parsed.scheme and parsed.netloc:
-        marker = "/storage/v1/object/"
-        if marker not in parsed.path:
-            return ""
-        object_path = parsed.path.split(marker, 1)[1].lstrip("/")
+    path = parsed.path
+    marker = "/storage/v1/object/"
+    if marker in path:
+        object_path = path.split(marker, 1)[1].lstrip("/")
         for prefix in ("public/", "sign/"):
             if object_path.startswith(prefix):
                 object_path = object_path[len(prefix):]
         bucket = (os.getenv("SUPABASE_STORAGE_BUCKET", "reports") or "reports").strip()
         if object_path.startswith(f"{bucket}/"):
-            return object_path[len(bucket) + 1:]
+            return unquote(object_path[len(bucket) + 1:])
         return ""
-    return image_url.lstrip("/")
+    if parsed.scheme and parsed.netloc:
+        return ""
+    return unquote(path.lstrip("/"))
 
 
-def resolve_report_image_url(image_url: Any, storage_client: Any = None, expires_in: int = 300) -> str:
-    """Return a usable URL, signing private Supabase Storage objects when possible."""
+def resolve_report_image_url(image_url: Any, storage_client: Any = None, expires_in: int = 3600) -> str:
+    """Return the public URL for a report image stored in the public bucket."""
     if not image_url:
         return ""
 
@@ -123,30 +123,26 @@ def resolve_report_image_url(image_url: Any, storage_client: Any = None, expires
     if resolved.startswith(("data:", "blob:")):
         return resolved
 
+    parsed = urlparse(resolved)
+    if "/storage/v1/object/public/" in parsed.path.lower():
+        return resolved
+
     object_path = _storage_object_path(resolved)
     if not object_path:
         return resolved
 
-    if storage_client is not None:
-        try:
-            bucket = (os.getenv("SUPABASE_STORAGE_BUCKET", "reports") or "reports").strip()
-            result = storage_client.storage.from_(bucket).create_signed_url(object_path, expires_in)
-            if isinstance(result, dict):
-                signed_url = result.get("signedURL") or result.get("signedUrl")
-                if signed_url:
-                    signed_url = str(signed_url)
-                    if signed_url.startswith("/"):
-                        base_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-                        if base_url:
-                            signed_url = f"{base_url}{signed_url}"
-                    return signed_url
-        except Exception:
-            return ""
-
+    bucket = (os.getenv("SUPABASE_STORAGE_BUCKET", "reports") or "reports").strip()
     base_url = os.getenv("SUPABASE_URL", "").rstrip("/")
-    if base_url:
-        return f"{base_url}/storage/v1/object/public/{os.getenv('SUPABASE_STORAGE_BUCKET', 'reports').strip()}/{object_path}"
-    return f"{SUPABASE_REPORT_IMAGE_BASE_URL}{object_path}"
+    if parsed.scheme and parsed.netloc:
+        base_url = f"{parsed.scheme}://{parsed.netloc}"
+    if not base_url:
+        logger.warning("Cannot resolve public report image URL without SUPABASE_URL")
+        return ""
+
+    return (
+        f"{base_url}/storage/v1/object/public/"
+        f"{quote(bucket, safe='')}/{quote(object_path, safe='/')}"
+    )
 
 
 def parse_utc_timestamp(value: Any) -> datetime | None:

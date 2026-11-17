@@ -205,7 +205,8 @@ class DatasetHubTests(unittest.TestCase):
         resp = self.client.get("/farmer/scan")
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        self.assertIn("When you submit this report, CocoScan collects", html)
+        self.assertIn("Your report includes your account, photos, AI result", html)
+        self.assertIn("See what is collected and how it is used", html)
         self.assertIn("report-privacy-consent", html)
         self.assertIn("GPS coordinates, accuracy, source", html)
 

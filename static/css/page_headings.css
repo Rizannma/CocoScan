@@ -1,0 +1,35 @@
+.dashboard-header-container,
+.section-title-wrap {
+    margin-bottom: 4px !important;
+}
+
+.dashboard-header-container h1,
+.section-title-wrap h1 {
+    margin: 0 !important;
+    color: var(--brand-dark, #0b251a) !important;
+    font-size: 1.35rem !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+    letter-spacing: normal !important;
+}
+
+.dashboard-header-container p,
+.section-title-wrap p {
+    margin: 2px 0 0 !important;
+    color: var(--text-muted, #64748b) !important;
+    font-size: 0.84rem !important;
+    line-height: 1.4 !important;
+}
+
+@media (min-width: 1024px) {
+    .dashboard-header-container h1,
+    .section-title-wrap h1 {
+        font-size: 1.65rem !important;
+    }
+
+    .dashboard-header-container p,
+    .section-title-wrap p {
+        margin-top: 4px !important;
+        font-size: 0.9rem !important;
+    }
+}

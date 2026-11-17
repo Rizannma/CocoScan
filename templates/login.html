@@ -41,12 +41,13 @@
 
     <div id="dynamic-login-feedback" style="display: none; margin-bottom: 1.5rem;"></div>
 
-    <form id="login-form" action="{{ url_for('login') }}" method="POST">
+    <form id="login-form" action="{{ url_for('login') }}" method="POST" autocomplete="off">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="form-group has-icon-left">
             <label for="email">Email Address</label>
             <div class="input-wrapper">
                 <i class="fa-regular fa-envelope input-icon-left"></i>
-                <input type="email" id="email" name="email" placeholder="name@example.com" required>
+                <input type="email" id="email" name="email" placeholder="name@example.com" autocomplete="off" required>
             </div>
         </div>
 
@@ -54,7 +55,7 @@
             <label for="password">Password</label>
             <div class="input-wrapper">
                 <i class="fa-solid fa-lock input-icon-left"></i>
-                <input type="password" id="password" name="password" placeholder="••••••••" required>
+                <input type="password" id="password" name="password" placeholder="••••••••" autocomplete="new-password" required>
                 <i class="fa-regular fa-eye toggle-password" onclick="togglePasswordVisibility('password', this)"></i>
             </div>
         </div>
@@ -254,6 +255,22 @@
 
 {% block scripts %}
 <script>
+    // A server logout cannot clear browser storage by itself. Clear the
+    // previous account identity when returning from an explicit logout.
+    (async function clearClientIdentityAfterLogout() {
+        const signedOut = new URLSearchParams(window.location.search).get('signed_out') === '1';
+        if (!signedOut) return;
+
+        ['cocoscan_user_role', 'cocoscan_user_email', 'cocoscan_user_name',
+            'cocoscan_user_first_name', 'cocoscan_user_id', 'cocoscan_offline_active',
+            'cocoscan_remember_me', 'cocoscan_remember_expires_at',
+            'cocoscan_remember_last_used'].forEach(key => localStorage.removeItem(key));
+        if (window.CocoScanAuth && typeof window.CocoScanAuth.clearRememberMeSession === 'function') {
+            await window.CocoScanAuth.clearRememberMeSession();
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+    })();
+
     // Immediate Offline Remember Me Helper: Automatically resume farmer session if offline
     (async function checkOfflineRememberedSession() {
         if (!navigator.onLine && window.CocoScanAuth && typeof window.CocoScanAuth.getRememberMeSession === 'function') {
@@ -534,17 +551,12 @@
             submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" style="margin-right: 6px;"></i> Logging in...';
         }
 
-        // 1. Immediate Offline Check: If device is completely offline
-        if (!navigator.onLine) {
-            await handleOfflineLogin(email, password, false);
-            return;
-        }
-
-        // 2. Online Mode with 5-Second Timeout for Render Cold Starts & Slow Connections
+        // Always try the local server first. navigator.onLine describes general
+        // internet connectivity and can be false while localhost is reachable.
         const controller = new AbortController();
         const timeoutId = setTimeout(() => {
             controller.abort();
-        }, 5000);
+        }, 15000);
 
         try {
             const formData = new FormData(loginForm);
@@ -654,10 +666,18 @@
                     return;
                 }
             } else {
+                let serverError = '';
+                try {
+                    const errorPayload = JSON.parse(text);
+                    serverError = errorPayload.error || errorPayload.message || '';
+                } catch (parseError) {
+                    // The response may be an HTML error page from the local server.
+                }
+
                 if (!navigator.onLine) {
                     await handleOfflineLogin(email, password, true);
                 } else {
-                    showFeedbackToast('Server error during login. Please try again.', 'error');
+                    showFeedbackToast(serverError || `Server error during login (${response.status}). Please try again.`, 'error');
                     if (loginForm) loginForm.dataset.submitting = 'false';
                     if (submitBtn) {
                         submitBtn.disabled = false;

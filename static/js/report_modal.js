@@ -3,9 +3,6 @@
         "Bagong Bayan II-A", "Bagong Pook VI-C", "Barangay I-A", "Barangay I-B", "Barangay II-A", "Barangay II-B", "Barangay II-C", "Barangay II-D", "Barangay II-E", "Barangay II-F", "Barangay III-A", "Barangay III-B", "Barangay III-C", "Barangay III-D", "Barangay III-E", "Barangay III-F", "Barangay IV-A", "Barangay IV-B", "Barangay IV-C", "Barangay V-A", "Barangay V-B", "Barangay V-C", "Barangay V-D", "Barangay VI-A", "Barangay VI-B", "Bautista", "Concepcion", "Del Remedio", "Dolores", "San Antonio 1", "San Antonio 2", "San Bartolome", "San Buenaventura", "San Crispin", "San Cristobal", "San Diego", "San Francisco", "San Gabriel", "San Gregorio", "San Ignacio", "San Isidro", "San Joaquin", "San Jose", "San Juan", "San Lorenzo", "San Lucas 1", "San Lucas 2", "San Marcos", "San Mateo", "San Miguel", "San Nicolas", "San Pedro", "San Rafael", "San Roque", "San Vicente", "Santa Ana", "Santa Catalina", "Santa Cruz", "Santa Elena", "Santa Filomena", "Santa Isabel", "Santa Maria", "Santa Maria Magdalena", "Santa Monica", "Santa Veronica", "Santiago I", "Santiago II", "Santisimo Rosario", "Santo Angel", "Santo Cristo", "Santo Niño", "Soledad", "Atisan", "Balagtas", "Dapdap", "Dolores", "Sta. Catalina", "Sta. Cruz", "Sta. Elena"
     ];
 
-    const SUPABASE_REPORT_IMAGE_BASE_URL =
-        "https://utvltqgxqnpcqrphuojc.supabase.co/storage/v1/object/public/reports/";
-
     // Inject compact schedule input styles once so templates don't need edits
     (function injectScheduleInputStyles() {
         if (typeof document === 'undefined' || document.getElementById('schedule-input-styles')) return;
@@ -412,11 +409,15 @@
         const resolved = String(imageUrl).trim();
         if (!resolved) return "";
 
-        if (resolved.startsWith("http://") || resolved.startsWith("https://") || resolved.startsWith("data:") || resolved.startsWith("blob:")) {
+        if (resolved.startsWith("data:") || resolved.startsWith("blob:")) {
             return resolved;
         }
 
-        return `${SUPABASE_REPORT_IMAGE_BASE_URL}${resolved.replace(/^\/+/, "")}`;
+        if (resolved.startsWith("http://") || resolved.startsWith("https://")) {
+            return resolved;
+        }
+
+        return "";
     }
 
     function formatTimestamp(value) {
@@ -3440,25 +3441,22 @@
             console.warn("Initial modal render encountered an error", renderErr);
         }
 
-        // If report is missing vital metadata (or opened with partial record), dynamically fetch from API
+        // Refresh report data on every open so cached signed image URLs are renewed.
         if (report.id && currentReportModalMode !== "scan") {
-            const isPartialData = !report.farmer || report.farmer === "Farmer" || !report.pest || report.pest === "Unknown Pest" || report.confidence === "--";
-            if (isPartialData) {
-                try {
-                    const apiRes = await fetch(`/api/reports/${encodeURIComponent(report.id)}`);
-                    const apiData = await apiRes.json().catch(() => ({}));
-                    if (apiRes.ok && apiData.success && apiData.report) {
-                        currentReportModalRecord = normalizeReportData({
-                            ...apiData.report,
-                            ...reportData,
-                            mode: currentReportModalMode,
-                        });
-                        report = currentReportModalRecord;
-                        renderModalFields();
-                    }
-                } catch (fetchErr) {
-                    console.warn("Dynamic report fetch encountered an error:", fetchErr);
+            try {
+                const apiRes = await fetch(`/api/reports/${encodeURIComponent(report.id)}`);
+                const apiData = await apiRes.json().catch(() => ({}));
+                if (apiRes.ok && apiData.success && apiData.report) {
+                    currentReportModalRecord = normalizeReportData({
+                        ...reportData,
+                        ...apiData.report,
+                        mode: currentReportModalMode,
+                    });
+                    report = currentReportModalRecord;
+                    renderModalFields();
                 }
+            } catch (fetchErr) {
+                console.warn("Report refresh encountered an error:", fetchErr);
             }
         }
 

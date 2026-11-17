@@ -19,6 +19,8 @@
            1. VARIABLES & BASE STYLES
            ========================================================================== */
         :root {
+            --layout-content-max-width: 1280px;
+            --layout-content-gutter: clamp(16px, 2.5vw, 28px);
             --bg-base: #f4f7f5;
             --bg-card: #ffffff;
             --brand-dark: #0b251a;
@@ -84,7 +86,7 @@
             top: 0;
             left: 0;
             z-index: 1000;
-            padding: 0 max(16px, calc((100% - 1400px) / 2 + 24px));
+            padding: 0 max(var(--layout-content-gutter), calc((100% - var(--layout-content-max-width)) / 2 + var(--layout-content-gutter)));
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -533,27 +535,31 @@
         .main-content-layout {
             flex: 1;
             width: 100%;
-            max-width: 1400px;
+            max-width: var(--layout-content-max-width);
             margin: 0 auto;
-            padding: 88px 24px 24px 24px;
+            padding: 88px var(--layout-content-gutter) 32px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 18px;
         }
 
         .dashboard-header-container {
             margin-bottom: 4px;
         }
 
+        .greeting-action-row {
+            margin-bottom: 12px !important;
+        }
+
         .dashboard-header-container h1 {
-            font-size: 1.45rem;
+            font-size: 1.35rem;
             font-weight: 800;
             color: var(--brand-dark);
             letter-spacing: -0.5px;
         }
 
         .dashboard-header-container p {
-            font-size: 0.85rem;
+            font-size: 0.84rem;
             color: var(--text-muted);
             margin-top: 2px;
         }
@@ -564,14 +570,14 @@
         .metrics-grid-matrix {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
+            gap: 10px;
             width: 100%;
         }
 
         @media (min-width: 1024px) {
             .metrics-grid-matrix {
                 grid-template-columns: repeat(4, 1fr);
-                gap: 24px;
+                gap: 16px;
             }
         }
 
@@ -593,12 +599,13 @@
             background-color: var(--bg-card);
             border-radius: 16px;
             padding: 16px;
-            border: 1px solid var(--border-light);
+            border: none;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
             width: 100%;
+            box-sizing: border-box;
         }
 
         .metric-data h5 {
@@ -607,6 +614,7 @@
             text-transform: uppercase;
             font-weight: 700;
             letter-spacing: 0.2px;
+            margin: 0;
         }
 
         .metric-data .metric-count {
@@ -620,6 +628,7 @@
         .metric-data p {
             font-size: 0.68rem;
             color: var(--text-muted);
+            margin: 0;
         }
 
         .metric-icon-box {
@@ -664,10 +673,29 @@
             width: 100%;
         }
 
+        .dashboard-charts .chart-visual-card {
+            display: flex;
+            flex-direction: column;
+            height: var(--dashboard-weather-card-height, auto);
+            box-sizing: border-box;
+        }
+
+        .dashboard-charts {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            width: 100%;
+        }
+
+        .dashboard-charts > .charts-breakdown-row {
+            display: block;
+            margin-top: 16px;
+        }
+
         .charts-breakdown-row {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 16px;
+            gap: 12px;
             width: 100%;
         }
 
@@ -685,6 +713,7 @@
             display: flex;
             align-items: center;
             gap: 6px;
+            flex: 0 0 auto;
         }
 
         .chart-header-inline i {
@@ -697,13 +726,19 @@
             height: 190px;
         }
 
+        .dashboard-charts .chart-box-render-frame {
+            flex: 1 1 auto;
+            min-height: 0;
+            height: auto;
+        }
+
         /* ==========================================================================
            8. QUICK ACTION SYSTEM BUTTONS
            ========================================================================== */
         .quick-action-card {
             background-color: var(--bg-card);
             border-radius: 16px;
-            padding: 20px;
+            padding: 16px;
             border: 1px solid var(--border-light);
             text-align: center;
             width: 100%;
@@ -718,7 +753,7 @@
         .quick-action-card p {
             font-size: 0.78rem;
             color: var(--text-muted);
-            margin: 6px 0 16px 0;
+            margin: 4px 0 12px;
             line-height: 1.4;
         }
 
@@ -822,7 +857,6 @@
         }
 
         .navbar-refresh-btn {
-        .navbar-refresh-btn {
             margin-right: 0;
         }
 
@@ -852,21 +886,20 @@
            10. RESPONSIVE MEDIA QUERIES
            ========================================================================== */
         @media (max-width: 500px) {
-            .main-content-layout {
-                padding: 88px 16px 24px;
+            .metrics-grid-matrix,
+            .metrics-sub-split {
+                gap: 10px;
             }
         }
 
         @media (min-width: 1024px) {
             .main-content-layout {
-                max-width: 1400px;
-                padding: 108px 32px 32px 32px;
-                gap: 24px;
+                padding-top: 96px;
+                padding-bottom: 36px;
             }
 
             .mobile-header {
                 height: 72px;
-                padding: 0 max(32px, calc((100% - 1400px) / 2 + 32px));
             }
 
             .hamburger-btn {
@@ -887,17 +920,17 @@
             }
 
             .dashboard-header-container h1 {
-                font-size: 1.95rem;
+                font-size: 1.65rem;
             }
 
             .dashboard-header-container p {
-                font-size: 0.98rem;
+                font-size: 0.9rem;
                 margin-top: 4px;
             }
 
             .metric-card-node {
-                padding: 24px;
-                border-radius: 20px;
+                padding: 16px;
+                border-radius: 18px;
             }
 
             .metric-data h5 {
@@ -905,32 +938,40 @@
             }
 
             .metric-data .metric-count {
-                font-size: 2.3rem;
-                margin: 6px 0;
+                font-size: 2.1rem;
+                margin: 4px 0;
             }
 
             .metric-data p {
-                font-size: 0.78rem;
+                font-size: 0.75rem;
             }
 
             .metric-icon-box {
-                width: 52px;
-                height: 52px;
-                font-size: 1.4rem;
+                width: 48px;
+                height: 48px;
+                font-size: 1.3rem;
             }
 
             .chart-visual-card {
-                padding: 24px;
-                border-radius: 20px;
+                padding: 18px;
+                border-radius: 18px;
             }
 
             .chart-header-inline {
-                font-size: 1rem;
-                margin-bottom: 20px;
+                font-size: 0.95rem;
+                margin-bottom: 16px;
             }
 
             .chart-box-render-frame {
                 height: 260px;
+            }
+
+            .dashboard-charts .chart-box-render-frame {
+                height: auto;
+            }
+
+            .quick-action-card {
+                padding: 18px;
             }
         }
     </style>
@@ -950,6 +991,7 @@
     </style>
     {% endif %}
     {% block extra_head %}{% endblock %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/page_headings.css') }}?v=2">
 </head>
 
     {% set role_str = ((session.get('user_role', '') if session is defined and session else '') ~ ' ' ~ (user_role if user_role is defined and user_role else '') ~ ' ' ~ (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
@@ -1115,13 +1157,37 @@
             {% include 'components/weather_widget.html' %}
 
             {% block charts %}
-            {% include 'components/chart_cards.html' %}
+            <div class="dashboard-charts">
+                {% include 'components/chart_cards.html' %}
+            </div>
             {% endblock %}
             {% endblock %}
 
         </main>
     </div>
-    <script src="{{ url_for('static', filename='js/report_modal.js') }}?v=42"></script>
+    <script>
+        (() => {
+            const weatherCard = document.getElementById('weather-analytics-card-root');
+            const dashboard = document.querySelector('.main-content-layout');
+            if (!weatherCard || !dashboard) return;
+
+            const syncChartCardHeight = () => {
+                const height = weatherCard.getBoundingClientRect().height;
+                if (height > 0) {
+                    dashboard.style.setProperty('--dashboard-weather-card-height', `${height}px`);
+                    window.chartInstances?.forEach(chart => chart.resize());
+                }
+            };
+
+            syncChartCardHeight();
+            if ('ResizeObserver' in window) {
+                new ResizeObserver(syncChartCardHeight).observe(weatherCard);
+            } else {
+                window.addEventListener('resize', syncChartCardHeight);
+            }
+        })();
+    </script>
+    <script src="{{ url_for('static', filename='js/report_modal.js') }}?v=43"></script>
 
     <script id="chart-data" type="application/json">
         {{ (chart_data if chart_data is defined and chart_data else {}) | tojson }}

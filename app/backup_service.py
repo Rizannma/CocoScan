@@ -10,8 +10,10 @@ import json
 import logging
 import os
 from pathlib import Path
+import re
 import shutil
 from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
 
 from cryptography.fernet import Fernet
 
@@ -28,6 +30,8 @@ DEFAULT_STORAGE_LIMIT_MB = 1024.0
 # Estimated average image size for calculations when remote byte query is unsupported
 DEFAULT_IMAGE_SIZE_KB = 180.0
 BACKUP_ENCRYPTION_CONTEXT = b"CocoScan database backup encryption v1"
+DEFAULT_BACKUP_BUCKET = "cocoscan-database-backups"
+AUTOMATED_BACKUP_FILENAME_PATTERN = re.compile(r"^cocoscan_db_weekly_\d{8}T\d{6}Z\.dump\.age$")
 
 
 def _backup_cipher() -> Fernet:
@@ -72,12 +76,15 @@ def format_bytes(size_bytes: float) -> str:
     return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
 
 
-def get_storage_metrics(supabase_client: Optional[Any] = None) -> Dict[str, Any]:
+def get_storage_metrics(
+    supabase_client: Optional[Any] = None,
+    backup_storage_client: Optional[Any] = None,
+) -> Dict[str, Any]:
     """
     Calculate storage metrics for Dataset Hub, System Backups, and Total Bucket Usage.
     """
     # 1. Calculate Backups Storage
-    backup_files = list_backups()
+    backup_files = list_backups(backup_storage_client)
     total_backup_bytes = sum(b.get("size_bytes", 0) for b in backup_files)
     backup_count = len(backup_files)
 
@@ -216,7 +223,7 @@ def generate_database_backup(supabase_client: Optional[Any] = None, backup_type:
     return backup_info
 
 
-def list_backups() -> List[Dict[str, Any]]:
+def list_backups(supabase_client: Optional[Any] = None) -> List[Dict[str, Any]]:
     """
     List all database backups stored in the backups directory sorted by creation date descending.
     """
@@ -247,6 +254,9 @@ def list_backups() -> List[Dict[str, Any]]:
 
     # Sort newest first
     backups.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+    if supabase_client is not None:
+        backups.extend(list_cloud_backups(supabase_client))
+        backups.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
     return backups
 
 
@@ -262,6 +272,143 @@ def get_backup_path(filename: str) -> Optional[Path]:
     if filepath.exists() and filepath.is_file():
         return filepath
     return None
+
+
+def get_backup_storage_client() -> Any:
+    """Create the least-privilege app-side client for private backup storage."""
+    url = os.getenv("SUPABASE_URL", "").strip()
+    key = os.getenv("SUPABASE_BACKUP_SERVICE_ROLE_KEY", "").strip()
+    if not url or not key:
+        raise RuntimeError(
+            "Private cloud backups are not configured. Set SUPABASE_URL and "
+            "SUPABASE_BACKUP_SERVICE_ROLE_KEY in the application environment."
+        )
+    try:
+        from supabase import create_client
+        return create_client(url, key)
+    except Exception as exc:
+        logger.error("Could not initialize private backup storage client: %s", exc)
+        raise RuntimeError("Could not initialize private backup storage client.") from exc
+
+
+def _backup_bucket_name() -> str:
+    return os.getenv("SUPABASE_BACKUP_BUCKET", DEFAULT_BACKUP_BUCKET).strip() or DEFAULT_BACKUP_BUCKET
+
+
+def list_cloud_backups(supabase_client: Any) -> List[Dict[str, Any]]:
+    """List encrypted weekly archives from the private Supabase backup bucket."""
+    storage = supabase_client.storage.from_(_backup_bucket_name())
+    entries = storage.list("weekly", {"limit": 100, "offset": 0})
+    backups: List[Dict[str, Any]] = []
+    for entry in entries or []:
+        filename = str(entry.get("name") or "")
+        if not AUTOMATED_BACKUP_FILENAME_PATTERN.fullmatch(filename):
+            continue
+        metadata = entry.get("metadata") or {}
+        size = int(metadata.get("size") or entry.get("size") or 0)
+        created_at = entry.get("created_at") or entry.get("updated_at") or ""
+        try:
+            parsed_date = datetime.fromisoformat(str(created_at).replace("Z", "+00:00"))
+            formatted_date = parsed_date.astimezone(timezone.utc).strftime("%b %d, %Y %H:%M")
+            timestamp = parsed_date.timestamp()
+        except (TypeError, ValueError, OverflowError):
+            formatted_date = str(created_at) or "Unknown"
+            timestamp = 0
+        backups.append({
+            "filename": filename,
+            "type": "Automated",
+            "size_bytes": size,
+            "size_formatted": format_bytes(size),
+            "created_at": formatted_date,
+            "timestamp": timestamp,
+            "encrypted": True,
+            "cloud": True,
+        })
+    backups.sort(key=lambda item: item["timestamp"], reverse=True)
+    return backups
+
+
+def get_latest_backup_run(supabase_client: Any) -> Optional[Dict[str, Any]]:
+    """Read the latest scheduled-backup status manifest, if one exists."""
+    storage = supabase_client.storage.from_(_backup_bucket_name())
+    entries = storage.list("runs", {"limit": 20, "offset": 0})
+    if not any(str(entry.get("name") or "") == "latest.json" for entry in (entries or [])):
+        return None
+    content = storage.download("runs/latest.json")
+    try:
+        manifest = json.loads(content.decode("utf-8") if isinstance(content, bytes) else content)
+    except (UnicodeDecodeError, TypeError, json.JSONDecodeError) as exc:
+        logger.error("Latest automated backup status manifest is invalid: %s", exc)
+        raise RuntimeError("The latest automated backup status could not be read.") from exc
+    if not isinstance(manifest, dict):
+        raise RuntimeError("The latest automated backup status has an invalid format.")
+    if manifest.get("status") not in {"running", "success", "failure"}:
+        raise RuntimeError("The latest automated backup status has an invalid state.")
+    run_url = str(manifest.get("run_url") or "")
+    if run_url:
+        parsed_url = urlparse(run_url)
+        if (
+            parsed_url.scheme != "https"
+            or parsed_url.hostname != "github.com"
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or not re.fullmatch(r"/[^/]+/[^/]+/actions/runs/\d+", parsed_url.path)
+        ):
+            manifest["run_url"] = ""
+    return manifest
+
+
+def get_cloud_backup_download_url(supabase_client: Any, filename: str) -> str:
+    """Create a short-lived URL for a validated private weekly archive."""
+    if not AUTOMATED_BACKUP_FILENAME_PATTERN.fullmatch(Path(filename).name) or Path(filename).name != filename:
+        raise ValueError("Invalid automated backup filename.")
+    result = supabase_client.storage.from_(_backup_bucket_name()).create_signed_url(
+        f"weekly/{filename}", 300
+    )
+    if not isinstance(result, dict):
+        raise RuntimeError("Could not create a temporary backup download link.")
+    signed_url = result.get("signedURL") or result.get("signedUrl")
+    if not signed_url:
+        raise RuntimeError("Could not create a temporary backup download link.")
+    if str(signed_url).startswith("/"):
+        signed_url = f"{os.getenv('SUPABASE_URL', '').rstrip('/')}{signed_url}"
+    expected_host = urlparse(os.getenv("SUPABASE_URL", "")).hostname
+    signed_host = urlparse(str(signed_url)).hostname
+    if urlparse(str(signed_url)).scheme != "https" or not expected_host or signed_host != expected_host:
+        raise RuntimeError("Supabase returned an invalid backup download link.")
+    return str(signed_url)
+
+
+def delete_cloud_backup(
+    supabase_client: Any,
+    filename: str,
+    admin_id: str = "",
+    admin_name: str = "",
+    admin_email: str = "",
+    ip_address: str = "",
+) -> bool:
+    """Delete an encrypted weekly archive from private storage and audit the action."""
+    if not AUTOMATED_BACKUP_FILENAME_PATTERN.fullmatch(Path(filename).name) or Path(filename).name != filename:
+        raise ValueError("Invalid automated backup filename.")
+    result = supabase_client.storage.from_(_backup_bucket_name()).remove([f"weekly/{filename}"])
+    if not result:
+        return False
+    try:
+        from app.security_service import log_audit
+        log_audit(
+            email=admin_email or f"{admin_name or 'Admin'} ({admin_id or 'admin'})",
+            role="admin",
+            action="DATABASE_BACKUP_DELETE",
+            details=(
+                f"Admin '{admin_name or 'Administrator'}' (ID: {admin_id or 'admin'}) permanently deleted "
+                f"automated database backup archive '{filename}'. "
+                f"Action Timestamp: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}."
+            ),
+            ip_address=ip_address or "",
+        )
+    except Exception as exc:
+        logger.error("Failed to record audit log for cloud backup deletion: %s", exc)
+    return True
 
 
 def delete_backup(

@@ -21,6 +21,10 @@ from app.backup_service import (
     get_recent_reports_for_danger_zone,
     generate_database_backup,
     list_backups,
+    list_cloud_backups,
+    get_latest_backup_run,
+    get_cloud_backup_download_url,
+    delete_cloud_backup,
     get_backup_path,
     delete_backup,
     prune_temporary_cache,
@@ -148,21 +152,171 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertIn("System Backups Storage", content)
         self.assertIn("Database Backups", content)
         self.assertIn("Generate Backup Now", content)
-        self.assertIn("Manual backup policy", content)
+        self.assertIn("Backup schedule", content)
+        self.assertIn("Cloud backup storage unavailable", content)
         self.assertIn("Danger Zone", content)
         self.assertIn("By Specific Report", content)
         self.assertIn("By Date Range / Bulk", content)
-        self.assertIn("Trigger Report Deletion...", content)
+        self.assertNotIn('id="target-report-id-input"', content)
+        self.assertNotIn('id="btn-trigger-danger-action"', content)
+        self.assertNotIn("Or enter ID...", content)
+        self.assertIn("function openBulkPreconfirmation", content)
+        self.assertIn("function openBulkDeleteConfirmation", content)
+        self.assertIn("openBulkDeleteConfirmation(action)", content)
         self.assertIn("Bulk Delete by Date Range", content)
         self.assertIn("delete report PCA Admin", content)
         self.assertIn("reports-master-checkbox", content)
         self.assertIn("Select All", content)
         self.assertIn("danger-reports-table", content)
+        self.assertIn("toggle-report-selection-mode", content)
+        self.assertIn('class="selection-count"', content)
+        self.assertIn("max-width: 300px;", content)
+        self.assertIn("table-layout: auto;", content)
+        self.assertNotIn('id="btn-clear-selection"', content)
+        self.assertNotIn("fa-check-double", content)
+        self.assertNotIn("<th style=\"width: 20%;\">Pest</th>", content)
+        self.assertIn(".danger-reports-table .selection-column", content)
+        self.assertIn("white-space: nowrap", content)
+        self.assertIn("transform: none !important", content)
+        self.assertIn("quick-action-column", content)
+        self.assertIn("quick-action-cell", content)
+        self.assertIn(".modal-danger-header .icon-circle i", content)
+        self.assertIn("font-size: 1.1rem", content)
+        self.assertNotIn("font-size: 1.35rem;\n        flex-shrink: 0;", content)
+        self.assertIn("btn-row-actions-menu", content)
+        self.assertIn("Preview", content)
+        self.assertIn("Delete", content)
+        self.assertIn("previewStoredReport", content)
         self.assertIn("status-assessment", content)
         self.assertIn("status-waiting", content)
         self.assertIn("background: #eff6ff", content)
         self.assertIn("padding: 4px 8px", content)
         self.assertIn("border-radius: 4px", content)
+
+    def test_cloud_backup_listing_and_latest_run(self):
+        filename = "cocoscan_db_weekly_20261115T160000Z.dump.age"
+        storage = MagicMock()
+        storage.list.side_effect = [
+            [{
+                "name": filename,
+                "metadata": {"size": "4096"},
+                "created_at": "2026-11-15T16:00:00+00:00",
+            }],
+            [{"name": "latest.json"}],
+        ]
+        storage.download.return_value = json.dumps({
+            "status": "success",
+            "finished_at": "2026-11-15T16:02:00+00:00",
+        }).encode("utf-8")
+        supabase_client = MagicMock()
+        supabase_client.storage.from_.return_value = storage
+
+        backups = list_cloud_backups(supabase_client)
+        latest_run = get_latest_backup_run(supabase_client)
+
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(backups[0]["filename"], filename)
+        self.assertEqual(backups[0]["type"], "Automated")
+        self.assertEqual(backups[0]["size_bytes"], 4096)
+        self.assertTrue(backups[0]["encrypted"])
+        self.assertEqual(latest_run["status"], "success")
+        storage.download.assert_called_once_with("runs/latest.json")
+
+    def test_cloud_backup_download_and_delete_are_scoped(self):
+        filename = "cocoscan_db_weekly_20261115T160000Z.dump.age"
+        storage = MagicMock()
+        storage.create_signed_url.return_value = {
+            "signedURL": "https://cocoscan.supabase.co/storage/v1/object/sign/"
+            "cocoscan-database-backups/weekly/" + filename + "?token=temporary",
+        }
+        storage.remove.return_value = [{"name": filename}]
+        supabase_client = MagicMock()
+        supabase_client.storage.from_.return_value = storage
+
+        with patch.dict(os.environ, {"SUPABASE_URL": "https://cocoscan.supabase.co"}):
+            signed_url = get_cloud_backup_download_url(supabase_client, filename)
+        with patch("app.security_service.log_audit"):
+            deleted = delete_cloud_backup(
+                supabase_client,
+                filename,
+                admin_id="admin-123",
+                admin_name="PCA Admin",
+            )
+
+        self.assertTrue(signed_url.startswith("https://cocoscan.supabase.co/"))
+        self.assertTrue(deleted)
+        storage.create_signed_url.assert_called_once_with(f"weekly/{filename}", 300)
+        storage.remove.assert_called_once_with([f"weekly/{filename}"])
+
+    def test_admin_cloud_backup_download_and_delete_routes(self):
+        filename = "cocoscan_db_weekly_20261115T160000Z.dump.age"
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = "admin-123"
+            sess["user_role"] = "admin"
+            sess["user_name"] = "PCA Admin"
+
+        with (
+            patch("app.backup_service.get_backup_path", return_value=None),
+            patch("app.backup_service.get_backup_storage_client", return_value=MagicMock()),
+            patch(
+                "app.backup_service.get_cloud_backup_download_url",
+                return_value="https://cocoscan.supabase.co/private-backup",
+            ),
+        ):
+            download = self.client.get(f"/admin/storage-backups/download/{filename}")
+        self.assertEqual(download.status_code, 302)
+        self.assertEqual(download.headers["Location"], "https://cocoscan.supabase.co/private-backup")
+
+        with (
+            patch("app.backup_service.get_backup_path", return_value=None),
+            patch("app.backup_service.get_backup_storage_client", return_value=MagicMock()),
+            patch("app.backup_service.delete_cloud_backup", return_value=True),
+        ):
+            deletion = self.client.post(
+                f"/admin/storage-backups/delete/{filename}",
+                data={"confirmation_phrase": "delete backup PCA Admin"},
+                follow_redirects=True,
+            )
+        self.assertEqual(deletion.status_code, 200)
+        self.assertIn("deleted successfully", deletion.get_data(as_text=True))
+
+    def test_admin_storage_page_shows_automated_run_status(self):
+        with self.client.session_transaction() as sess:
+            sess["user_id"] = "admin-123"
+            sess["user_role"] = "admin"
+            sess["user_name"] = "PCA Admin"
+
+        metrics = {
+            "total_storage_formatted": "0 B",
+            "percent_used": 0,
+            "limit_formatted": "1 GB",
+            "dataset_hub": {
+                "size_formatted": "0 B",
+                "total_samples": 0,
+                "status": "Synced to Supabase Cloud",
+                "categories": [],
+            },
+            "system_backups": {"size_formatted": "0 B", "count": 0},
+        }
+        with (
+            patch("app.backup_service.get_backup_storage_client", return_value=MagicMock()),
+            patch("app.backup_service.get_latest_backup_run", return_value={
+                "status": "success",
+                "finished_at": "2026-11-15T16:02:00+00:00",
+                "archive_name": "cocoscan_db_weekly_20261115T160000Z.dump.age",
+                "run_url": "https://github.com/example/cocoscan/actions/runs/12345",
+            }),
+            patch("app.backup_service.list_backups", return_value=[]),
+            patch("app.backup_service.get_storage_metrics", return_value=metrics),
+            patch("app.backup_service.get_recent_reports_for_danger_zone", return_value=[]),
+        ):
+            response = self.client.get("/admin/storage-backups")
+
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertIn("Latest automated run: Success", html)
+        self.assertIn("cocoscan_db_weekly_20261115T160000Z.dump.age", html)
+        self.assertIn("View workflow run", html)
 
     def test_reports_list_selection_component_rendered_with_reports(self):
         with self.client.session_transaction() as sess:
@@ -193,6 +347,9 @@ class StorageBackupsTests(unittest.TestCase):
             html = res.get_data(as_text=True)
             self.assertIn("reports-master-checkbox", html)
             self.assertIn("Select All", html)
+            self.assertIn('class="selection-column"', html)
+            self.assertIn("btn-row-actions-menu", html)
+            self.assertIn('data-user-role="admin"', html)
             self.assertIn('class="report-row-checkbox', html)
             self.assertIn('data-report-id="21"', html)
             self.assertIn('data-report-id="20"', html)

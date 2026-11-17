@@ -351,12 +351,12 @@
         .main-content-layout {
             flex: 1;
             width: 100%;
-            max-width: 1400px;
+            max-width: var(--layout-content-max-width, 1280px);
             margin: 0 auto;
-            padding: 88px 24px 24px 24px;
+            padding: 88px var(--layout-content-gutter, clamp(16px, 2.5vw, 28px)) 32px;
             display: flex;
             flex-direction: column;
-            gap: 16px;
+            gap: 18px;
         }
 
         .section-title-wrap {
@@ -366,13 +366,13 @@
         }
 
         .section-title-wrap h1 {
-            font-size: 1.45rem;
+            font-size: 1.35rem;
             font-weight: 800;
             color: var(--brand-dark);
         }
 
         .section-title-wrap p {
-            font-size: 0.85rem;
+            font-size: 0.84rem;
             color: var(--text-muted);
         }
 
@@ -811,21 +811,21 @@
            ========================================================================== */
         @media (max-width: 500px) {
             .btn-clear-filters {
-                width: 100%;
+                width: auto;
                 justify-content: center;
+                margin-left: auto;
             }
         }
 
         @media (min-width: 1024px) {
             .main-content-layout {
-                max-width: 1400px;
-                padding: 108px 32px 32px 32px;
-                gap: 24px;
+                padding-top: 96px;
+                padding-bottom: 36px;
             }
 
             .mobile-header {
                 height: 72px;
-                padding: 0 max(32px, calc((100% - 1400px) / 2 + 32px));
+                padding: 0 max(var(--layout-content-gutter, 28px), calc((100% - var(--layout-content-max-width, 1280px)) / 2 + var(--layout-content-gutter, 28px)));
             }
 
             .sidebar-wrapper {
@@ -833,17 +833,8 @@
             }
 
             .header-content-wrapper {
-                max-width: 1400px;
+                max-width: var(--layout-content-max-width, 1280px);
                 margin: 0 auto;
-            }
-
-            .section-title-wrap h1 {
-                font-size: 1.95rem;
-            }
-
-            .section-title-wrap p {
-                font-size: 0.98rem;
-                margin-top: 4px;
             }
 
             .map-viewport-frame {
@@ -875,18 +866,18 @@
                     <input type="text" id="map-search-input" class="search-input"
                         placeholder="Search locations here...">
                 </div>
-                <button id="clear-filters-btn" class="btn-clear-filters" onclick="clearAllActiveFilters()">
-                    <i class="fa-solid fa-filter-circle-xmark"></i> Clear Filters
-                </button>
             </div>
 
             <!-- FILTER CONTROLS ROW -->
             <div class="filter-buttons-row"
-                style="display:flex; gap:8px; align-items:center; width:100%; position:relative; z-index:70; flex-wrap:wrap; margin-bottom: 12px;">
+                style="display:flex; gap:8px; align-items:center; width:100%; position:relative; z-index:70; flex-wrap:wrap; justify-content:space-between; margin-bottom: 12px;">
                 <div class="filter-button-group" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
                     <button id="filter-all-btn" class="chip-filter-btn active-chip">All (0)</button>
                     <button id="filter-pest-btn" class="chip-filter-btn">Pest ▾</button>
                 </div>
+                <button id="clear-filters-btn" class="btn-clear-filters" onclick="clearAllActiveFilters()">
+                    <i class="fa-solid fa-filter-circle-xmark"></i> Clear Filters
+                </button>
             </div>
             <div id="pest-dropdown" class="filter-dropdown"
                 style="position:absolute; width:0; height:0; margin:0; padding:0; pointer-events:none;">
