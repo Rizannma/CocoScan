@@ -344,7 +344,7 @@ def check_session_timeout():
                 resp.delete_cookie(REMEMBER_COOKIE_NAME)
                 return resp
 
-            # Farmers are excluded from the 15-minute inactivity timeout.
+            # Farmers are excluded from the standard inactivity timeout.
             # Enforce the 30-day sliding inactivity expiration rule instead.
             if now - last_active > FARMER_REMEMBER_INACTIVITY_SECONDS:
                 remember_token = request.cookies.get(REMEMBER_COOKIE_NAME)
@@ -364,11 +364,11 @@ def check_session_timeout():
                 if token_data:
                     session['session_expires_at'] = token_data['expires_at']
         else:
-            # Non-farmer roles (Admin, Agriculturist, LGU): strictly enforce standard 15-minute inactivity timeout
+            # Non-farmer roles (Admin, Agriculturist, LGU): enforce the standard 5-minute inactivity timeout.
             if now - last_active > INACTIVITY_TIMEOUT_SECONDS:
                 session.clear()
-                security_service.log_audit(user_email, user_role, "SESSION_TIMEOUT", "Session expired due to 15 minutes of inactivity", _get_real_ip())
-                flash("Your session has expired due to 15 minutes of inactivity. Please log in again.", "warning")
+                security_service.log_audit(user_email, user_role, "SESSION_TIMEOUT", "Session expired due to 5 minutes of inactivity", _get_real_ip())
+                flash("Your session has expired due to 5 minutes of inactivity. Please log in again.", "warning")
                 resp = redirect(url_for('login'))
                 resp.delete_cookie(REMEMBER_COOKIE_NAME)
                 return resp

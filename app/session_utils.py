@@ -3,15 +3,15 @@ Session utility helpers and custom session interface for CocoScan.
 Implements Farmer-exclusive Remember Me persistence:
 - Farmers: 90 days maximum duration, with 30-day sliding inactivity expiration
 - Non-Farmer Roles (Admin, LGU, Agriculturist): Standard sessions (no persistent remember tokens)
-- Standard Active Session Inactivity Timeout: 15 minutes (900 seconds)
+- Standard Active Session Inactivity Timeout: 5 minutes (300 seconds)
 """
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Any
 from flask.sessions import SecureCookieSessionInterface
 from app.route_utils import normalize_role
 
-# Inactivity timeout for standard active sessions (15 minutes)
-INACTIVITY_TIMEOUT_SECONDS = 900
+# Inactivity timeout for standard active sessions (5 minutes)
+INACTIVITY_TIMEOUT_SECONDS = 300
 
 # Farmer-exclusive Remember Me duration settings
 FARMER_REMEMBER_MAX_DAYS = 90
@@ -56,4 +56,3 @@ class RoleBasedSessionInterface(SecureCookieSessionInterface):
             if days > 0:
                 return datetime.now(timezone.utc) + timedelta(days=days)
         return None
-

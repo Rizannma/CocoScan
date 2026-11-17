@@ -1590,10 +1590,10 @@
     {% set current_role_norm = ((session.get('user_role', '') if session is defined and session else '') or (user_role if user_role is defined and user_role else '') or (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
     {% if 'farmer' not in current_role_norm %}
     <script>
-        // 15-Minute Client-Side Inactivity Monitor (Admin, Agriculturist, LGU only - Farmers excluded due to 90-day stay-logged-in rule)
+        // 5-Minute Client-Side Inactivity Monitor (Admin, Agriculturist, LGU only - Farmers excluded due to 90-day stay-logged-in rule)
         (function() {
             let timeoutTimer;
-            const TIMEOUT_DURATION = 15 * 60 * 1000; // 15 minutes in ms
+            const TIMEOUT_DURATION = 5 * 60 * 1000; // 5 minutes in ms
 
             function resetInactivityTimer() {
                 clearTimeout(timeoutTimer);
