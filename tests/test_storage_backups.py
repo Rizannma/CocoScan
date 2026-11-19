@@ -25,6 +25,7 @@ from app.backup_service import (
     get_latest_backup_run,
     get_cloud_backup_download_url,
     delete_cloud_backup,
+    get_backup_storage_client,
     get_backup_path,
     delete_backup,
     prune_temporary_cache,
@@ -70,6 +71,42 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertEqual(format_bytes(1024 * 50), "50.0 KB")
         self.assertEqual(format_bytes(1024 * 1024 * 5), "5.00 MB")
         self.assertEqual(format_bytes(1024 * 1024 * 1024 * 2), "2.00 GB")
+
+    def test_backup_client_sends_secret_key_without_bearer_header(self):
+        client = MagicMock()
+        client.options.headers = {
+            "apiKey": "sb_secret_test",
+            "Authorization": "Bearer sb_secret_test",
+        }
+        with (
+            patch.dict(os.environ, {
+                "SUPABASE_URL": "https://project.supabase.co",
+                "SUPABASE_BACKUP_SERVICE_ROLE_KEY": "sb_secret_test",
+            }),
+            patch("supabase.create_client", return_value=client),
+        ):
+            result = get_backup_storage_client()
+
+        self.assertIs(result, client)
+        self.assertNotIn("Authorization", client.options.headers)
+
+    def test_backup_client_preserves_legacy_service_role_bearer_header(self):
+        client = MagicMock()
+        client.options.headers = {
+            "apiKey": "legacy-jwt",
+            "Authorization": "Bearer legacy-jwt",
+        }
+        with (
+            patch.dict(os.environ, {
+                "SUPABASE_URL": "https://project.supabase.co",
+                "SUPABASE_BACKUP_SERVICE_ROLE_KEY": "legacy-jwt",
+            }),
+            patch("supabase.create_client", return_value=client),
+        ):
+            result = get_backup_storage_client()
+
+        self.assertIs(result, client)
+        self.assertEqual(client.options.headers["Authorization"], "Bearer legacy-jwt")
 
     def test_backup_generation_and_listing(self):
         backups_dir = get_backups_dir()
@@ -151,6 +188,10 @@ class StorageBackupsTests(unittest.TestCase):
         self.assertIn("Dataset Hub Storage", content)
         self.assertIn("System Backups Storage", content)
         self.assertIn("Database Backups", content)
+        self.assertIn("session-timeout-overlay", content)
+        self.assertIn("Stay signed in", content)
+        self.assertIn("You’ll be signed out in", content)
+        self.assertIn("/session/keep-alive", content)
         self.assertIn("Generate Backup Now", content)
         self.assertIn("Backup schedule", content)
         self.assertIn("Cloud backup storage unavailable", content)

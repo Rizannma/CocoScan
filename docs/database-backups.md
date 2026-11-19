@@ -19,7 +19,7 @@ Create these repository Actions secrets:
 | Secret | Value |
 | --- | --- |
 | `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role key; grants private bucket management to the workflow |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase secret key (`sb_secret_...`) or legacy `service_role` JWT; grants private bucket management to the workflow |
 | `SUPABASE_DB_URL` | PostgreSQL connection URI for a database role allowed to dump the full database |
 | `BACKUP_AGE_RECIPIENT` | age public recipient generated from the private identity below |
 
@@ -53,7 +53,9 @@ visible in the admin status panel when Supabase Storage remains reachable.
 ## Configure the web application
 
 Set `SUPABASE_BACKUP_SERVICE_ROLE_KEY` in the deployed application's secret
-environment to the Supabase service-role key. The admin page uses this
+environment to the Supabase secret key (`sb_secret_...`) or legacy
+`service_role` JWT. New secret keys are sent only as the `apikey` header because
+they are not JWTs. The admin page uses this
 server-side key to list, download through short-lived signed URLs, and delete
 private archives. The key is used only by admin-protected routes and must never
 be exposed to browser JavaScript. Optionally set `SUPABASE_BACKUP_BUCKET` if

@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 import pytest
 
@@ -75,6 +76,52 @@ def test_csrf_header_allows_state_changing_request(client):
     )
 
     assert response.status_code != 403
+
+
+def test_session_keep_alive_refreshes_authenticated_non_farmer_session(client):
+    previous_activity = time.time() - 300
+    with client.session_transaction() as sess:
+        sess["user_id"] = "00000000-0000-0000-0000-000000000099"
+        sess["user_role"] = "admin"
+        sess["last_active"] = previous_activity
+
+    response = client.post("/session/keep-alive")
+
+    assert response.status_code == 200
+    assert response.get_json()["success"] is True
+    with client.session_transaction() as sess:
+        assert sess["last_active"] > previous_activity
+
+
+def test_session_keep_alive_rejects_farmer_session(client):
+    with client.session_transaction() as sess:
+        sess["user_id"] = "00000000-0000-0000-0000-000000000001"
+        sess["user_role"] = "farmer"
+        sess["last_active"] = time.time()
+
+    response = client.post("/session/keep-alive")
+
+    assert response.status_code in {302, 403}
+
+
+def test_inactivity_logout_displays_reason_on_login(client):
+    response = client.get("/logout?reason=inactivity", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"You were signed out after 15 minutes of inactivity." in response.data
+
+
+def test_server_timeout_displays_warning_on_login(client):
+    with client.session_transaction() as sess:
+        sess["user_id"] = "00000000-0000-0000-0000-000000000098"
+        sess["user_email"] = "admin@example.com"
+        sess["user_role"] = "admin"
+        sess["last_active"] = time.time() - 901
+
+    response = client.get("/admin/storage-backups", follow_redirects=True)
+
+    assert response.status_code == 200
+    assert b"Your session has expired due to 15 minutes of inactivity." in response.data
 
 
 def test_farmer_is_redirected_when_opening_admin_dashboard_directly(client):

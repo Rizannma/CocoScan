@@ -1,0 +1,262 @@
+{% set current_role_norm = ((session.get('user_role', '') if session is defined and session else '') or (user_role if user_role is defined and user_role else '') or (sidebar_role if sidebar_role is defined and sidebar_role else ''))|lower %}
+{% if session is defined and session.get('user_id') and 'farmer' not in current_role_norm %}
+<style>
+    .session-timeout-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 12000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(15, 23, 42, 0.58);
+    }
+
+    .session-timeout-overlay.is-visible {
+        display: flex;
+    }
+
+    .session-timeout-dialog {
+        width: min(100%, 440px);
+        padding: 28px;
+        border: 1px solid #e2e8f0;
+        border-radius: 18px;
+        background: #ffffff;
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+        color: #1e293b;
+        text-align: center;
+    }
+
+    .session-timeout-icon {
+        display: grid;
+        width: 52px;
+        height: 52px;
+        margin: 0 auto 14px;
+        place-items: center;
+        border-radius: 50%;
+        background: #fff7ed;
+        color: #c2410c;
+        font-size: 1.3rem;
+    }
+
+    .session-timeout-dialog h2 {
+        margin: 0 0 8px;
+        font-size: 1.2rem;
+        font-weight: 750;
+    }
+
+    .session-timeout-dialog p {
+        margin: 0;
+        color: #64748b;
+        font-size: 0.92rem;
+        line-height: 1.55;
+    }
+
+    .session-timeout-countdown {
+        display: block;
+        margin: 14px 0 18px;
+        color: #b45309;
+        font-size: 1.05rem;
+        font-weight: 750;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .session-timeout-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .session-timeout-actions button,
+    .session-timeout-actions a {
+        min-height: 42px;
+        padding: 10px 16px;
+        border: 1px solid #cbd5e1;
+        border-radius: 9px;
+        background: #ffffff;
+        color: #334155;
+        font: inherit;
+        font-size: 0.88rem;
+        font-weight: 650;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .session-timeout-actions button {
+        border-color: #166534;
+        background: #166534;
+        color: #ffffff;
+    }
+
+    .session-timeout-actions button:disabled {
+        cursor: wait;
+        opacity: 0.7;
+    }
+
+    @media (max-width: 480px) {
+        .session-timeout-dialog {
+            padding: 24px 20px;
+        }
+
+        .session-timeout-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div id="session-timeout-monitor"
+     data-csrf-token="{{ csrf_token }}"
+     data-keep-alive-url="{{ url_for('session_keep_alive') }}"
+     data-logout-url="{{ url_for('logout', reason='inactivity') }}">
+    <div id="session-timeout-overlay" class="session-timeout-overlay" role="presentation">
+        <section class="session-timeout-dialog" role="dialog" aria-modal="true"
+                 aria-labelledby="session-timeout-title" aria-describedby="session-timeout-message">
+            <div class="session-timeout-icon" aria-hidden="true">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <h2 id="session-timeout-title">Are you still there?</h2>
+            <p id="session-timeout-message">For your security, you’ll be signed out after 15 minutes of inactivity.</p>
+            <span class="session-timeout-countdown" id="session-timeout-countdown" aria-live="polite"></span>
+            <p id="session-timeout-error" role="alert" style="display: none; margin: -4px 0 14px; color: #b91c1c;"></p>
+            <div class="session-timeout-actions">
+                <button type="button" id="session-keep-alive-button">Stay signed in</button>
+                <a href="{{ url_for('logout', reason='inactivity') }}">Sign out now</a>
+            </div>
+        </section>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const monitor = document.getElementById('session-timeout-monitor');
+        if (!monitor) return;
+
+        const overlay = document.getElementById('session-timeout-overlay');
+        const countdown = document.getElementById('session-timeout-countdown');
+        const keepAliveButton = document.getElementById('session-keep-alive-button');
+        const errorMessage = document.getElementById('session-timeout-error');
+        const timeoutMs = 15 * 60 * 1000;
+        const warningAtMs = 13 * 60 * 1000;
+        const heartbeatIntervalMs = 5 * 60 * 1000;
+        let warningTimer;
+        let logoutTimer;
+        let countdownTimer;
+        let lastHeartbeatAt = Date.now();
+        let extendingSession = false;
+
+        function stopCountdown() {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+        }
+
+        function hideWarning() {
+            overlay.classList.remove('is-visible');
+            stopCountdown();
+            errorMessage.style.display = 'none';
+            errorMessage.textContent = '';
+        }
+
+        function signOutForInactivity() {
+            window.location.assign(monitor.dataset.logoutUrl);
+        }
+
+        function showWarning() {
+            overlay.classList.add('is-visible');
+            keepAliveButton.focus();
+            const expiresAt = Date.now() + (timeoutMs - warningAtMs);
+            function updateCountdown() {
+                const remainingSeconds = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+                const minutes = Math.floor(remainingSeconds / 60);
+                const seconds = String(remainingSeconds % 60).padStart(2, '0');
+                countdown.textContent = `You’ll be signed out in ${minutes}:${seconds}`;
+                if (remainingSeconds === 0) signOutForInactivity();
+            }
+            updateCountdown();
+            countdownTimer = setInterval(updateCountdown, 1000);
+        }
+
+        function resetInactivityTimer() {
+            clearTimeout(warningTimer);
+            clearTimeout(logoutTimer);
+            hideWarning();
+            warningTimer = setTimeout(showWarning, warningAtMs);
+            logoutTimer = setTimeout(signOutForInactivity, timeoutMs);
+
+            if (Date.now() - lastHeartbeatAt >= heartbeatIntervalMs) {
+                refreshServerSession();
+            }
+        }
+
+        async function refreshServerSession() {
+            if (extendingSession) return;
+            extendingSession = true;
+            try {
+                const response = await fetch(monitor.dataset.keepAliveUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': monitor.dataset.csrfToken,
+                        'Accept': 'application/json'
+                    }
+                });
+                if (response.redirected) {
+                    window.location.assign(response.url);
+                    return;
+                }
+                if (!response.ok) {
+                    throw new Error(`Session refresh failed (${response.status}).`);
+                }
+                lastHeartbeatAt = Date.now();
+            } catch (error) {
+                console.error('Could not refresh the active session:', error);
+                if (overlay.classList.contains('is-visible')) {
+                    errorMessage.textContent = 'We couldn’t verify your session. Please sign in again.';
+                    errorMessage.style.display = 'block';
+                }
+            } finally {
+                extendingSession = false;
+            }
+        }
+
+        keepAliveButton.addEventListener('click', async function() {
+            keepAliveButton.disabled = true;
+            errorMessage.style.display = 'none';
+            try {
+                const response = await fetch(monitor.dataset.keepAliveUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'X-CSRFToken': monitor.dataset.csrfToken,
+                        'Accept': 'application/json'
+                    }
+                });
+                if (response.redirected) {
+                    window.location.assign(response.url);
+                    return;
+                }
+                if (!response.ok) {
+                    throw new Error(`Session refresh failed (${response.status}).`);
+                }
+                lastHeartbeatAt = Date.now();
+                resetInactivityTimer();
+            } catch (error) {
+                console.error('Could not extend the active session:', error);
+                errorMessage.textContent = 'We couldn’t keep your session active. Please sign in again.';
+                errorMessage.style.display = 'block';
+            } finally {
+                keepAliveButton.disabled = false;
+            }
+        });
+
+        ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(function(eventName) {
+            window.addEventListener(eventName, function(event) {
+                if (overlay.classList.contains('is-visible') && overlay.contains(event.target)) return;
+                resetInactivityTimer();
+            }, { passive: true });
+        });
+
+        resetInactivityTimer();
+    })();
+</script>
+{% endif %}

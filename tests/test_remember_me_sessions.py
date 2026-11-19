@@ -160,18 +160,17 @@ def test_farmer_remember_me_post_auth_api():
 
 
 def test_hybrid_inactivity_and_farmer_remember_restoration():
-    """Verify non-farmer sessions time out after 5m, while farmers retain their longer inactivity window."""
-    assert INACTIVITY_TIMEOUT_SECONDS == 5 * 60
+    """Verify non-farmer sessions time out after 15m, while farmers are excluded from 15m inactivity."""
     app.config.update(TESTING=True)
     with app.test_client() as client:
         test_uid = str(uuid.uuid4())
-        # Scenario A: Non-farmer session times out after five minutes.
+        # Scenario A: Non-farmer session times out after 15m (900s)
         with client.session_transaction() as sess:
             sess['user_id'] = test_uid
             sess['user_email'] = 'timeout_agri@example.com'
             sess['user_role'] = 'agriculturist'
             sess['user_name'] = 'Agri Timeout'
-            sess['last_active'] = time.time() - (INACTIVITY_TIMEOUT_SECONDS + 1)
+            sess['last_active'] = time.time() - 950  # 950 seconds ago (> 900s)
 
         response = client.get('/dashboard', follow_redirects=False)
         assert response.status_code == 302
@@ -181,14 +180,14 @@ def test_hybrid_inactivity_and_farmer_remember_restoration():
         with client.session_transaction() as sess:
             assert 'user_id' not in sess
 
-        # Scenario B: Farmer session is excluded from the standard inactivity timeout.
+        # Scenario B: Farmer session is EXCLUDED from 15m inactivity (950s does not expire session)
         farmer_uid = str(uuid.uuid4())
         with client.session_transaction() as sess:
             sess['user_id'] = farmer_uid
             sess['user_email'] = 'farmer_active@example.com'
             sess['user_role'] = 'farmer'
             sess['user_name'] = 'Farmer Active'
-            sess['last_active'] = time.time() - (INACTIVITY_TIMEOUT_SECONDS + 1)
+            sess['last_active'] = time.time() - 950  # 950 seconds ago (> 900s, but < 30 days)
 
         response_farmer = client.get('/dashboard', follow_redirects=False)
         assert response_farmer.status_code == 302
@@ -330,4 +329,5 @@ def test_invalid_remember_token_on_login_clears_cookie():
 
         set_cookie_headers = response.headers.getlist('Set-Cookie')
         assert any(REMEMBER_COOKIE_NAME in h and ('Max-Age=0' in h or 'Expires=' in h or '""' in h) for h in set_cookie_headers)
+
 

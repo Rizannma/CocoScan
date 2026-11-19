@@ -57,6 +57,20 @@ class AutomatedDatabaseBackupTests(unittest.TestCase):
         self.env_patch.start()
         self.addCleanup(self.env_patch.stop)
 
+    def test_new_secret_key_is_not_sent_as_bearer(self):
+        with patch.dict(os.environ, {"SUPABASE_SERVICE_ROLE_KEY": "sb_secret_test"}):
+            storage = backup_job.SupabaseBackupStorage()
+
+        self.assertEqual(storage.session.headers["apikey"], "sb_secret_test")
+        self.assertNotIn("Authorization", storage.session.headers)
+
+    def test_legacy_service_role_key_is_sent_as_bearer(self):
+        with patch.dict(os.environ, {"SUPABASE_SERVICE_ROLE_KEY": "legacy-jwt"}):
+            storage = backup_job.SupabaseBackupStorage()
+
+        self.assertEqual(storage.session.headers["apikey"], "legacy-jwt")
+        self.assertEqual(storage.session.headers["Authorization"], "Bearer legacy-jwt")
+
     def _fake_command(self, command, description, env=None):
         if command[0] == "pg_dump":
             dump_path = Path(next(arg.split("=", 1)[1] for arg in command if arg.startswith("--file=")))

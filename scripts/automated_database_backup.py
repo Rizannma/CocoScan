@@ -33,10 +33,11 @@ class SupabaseBackupStorage:
         self.service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
         self.bucket = os.getenv("SUPABASE_BACKUP_BUCKET", DEFAULT_BUCKET).strip() or DEFAULT_BUCKET
         self.session = requests.Session()
-        self.session.headers.update({
-            "apikey": self.service_key,
-            "Authorization": "Bearer " + self.service_key,
-        })
+        headers = {"apikey": self.service_key}
+        # New Supabase secret keys are API keys, not JWT bearer tokens.
+        if not self.service_key.startswith("sb_secret_"):
+            headers["Authorization"] = "Bearer " + self.service_key
+        self.session.headers.update(headers)
 
     def _url(self, path: str) -> str:
         return f"{self.base_url}/storage/v1/{path}"

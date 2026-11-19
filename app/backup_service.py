@@ -285,7 +285,11 @@ def get_backup_storage_client() -> Any:
         )
     try:
         from supabase import create_client
-        return create_client(url, key)
+        client = create_client(url, key)
+        if key.startswith("sb_secret_"):
+            # New Supabase secret keys are API keys, not JWT bearer tokens.
+            client.options.headers.pop("Authorization", None)
+        return client
     except Exception as exc:
         logger.error("Could not initialize private backup storage client: %s", exc)
         raise RuntimeError("Could not initialize private backup storage client.") from exc

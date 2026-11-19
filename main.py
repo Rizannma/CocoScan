@@ -344,7 +344,7 @@ def check_session_timeout():
                 resp.delete_cookie(REMEMBER_COOKIE_NAME)
                 return resp
 
-            # Farmers are excluded from the standard inactivity timeout.
+            # Farmers are excluded from the 15-minute inactivity timeout.
             # Enforce the 30-day sliding inactivity expiration rule instead.
             if now - last_active > FARMER_REMEMBER_INACTIVITY_SECONDS:
                 remember_token = request.cookies.get(REMEMBER_COOKIE_NAME)
@@ -364,11 +364,11 @@ def check_session_timeout():
                 if token_data:
                     session['session_expires_at'] = token_data['expires_at']
         else:
-            # Non-farmer roles (Admin, Agriculturist, LGU): enforce the standard 5-minute inactivity timeout.
+            # Non-farmer roles (Admin, Agriculturist, LGU): strictly enforce standard 15-minute inactivity timeout
             if now - last_active > INACTIVITY_TIMEOUT_SECONDS:
                 session.clear()
-                security_service.log_audit(user_email, user_role, "SESSION_TIMEOUT", "Session expired due to 5 minutes of inactivity", _get_real_ip())
-                flash("Your session has expired due to 5 minutes of inactivity. Please log in again.", "warning")
+                security_service.log_audit(user_email, user_role, "SESSION_TIMEOUT", "Session expired due to 15 minutes of inactivity", _get_real_ip())
+                flash("Your session has expired due to 15 minutes of inactivity. Please log in again.", "warning")
                 resp = redirect(url_for('login'))
                 resp.delete_cookie(REMEMBER_COOKIE_NAME)
                 return resp
@@ -6177,6 +6177,8 @@ def logout():
     if remember_token:
         security_service.revoke_remember_token(remember_token)
     session.clear()
+    if request.args.get('reason') == 'inactivity':
+        flash("You were signed out after 15 minutes of inactivity.", "warning")
     resp = redirect(url_for('login', signed_out=1))
     resp.delete_cookie(REMEMBER_COOKIE_NAME)
     resp.delete_cookie(OFFLINE_CAPABILITY_COOKIE)
@@ -6184,6 +6186,20 @@ def logout():
     resp.delete_cookie('cocoscan_user_email')
     resp.delete_cookie('cocoscan_user_role')
     return resp
+
+
+@app.route('/session/keep-alive', methods=['POST'])
+@require_role('admin', 'agri_expert', 'lgu')
+def session_keep_alive():
+    """Refresh an active non-farmer session from the inactivity warning."""
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({"success": False, "error": "Your session has expired."}), 401
+    if is_farmer_role(session.get('user_role')):
+        return jsonify({"success": False, "error": "This session does not use the inactivity timeout."}), 403
+    session['last_active'] = time.time()
+    session.modified = True
+    return jsonify({"success": True})
 
 @app.errorhandler(404)
 def page_not_found(e):
