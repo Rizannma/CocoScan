@@ -29,8 +29,8 @@ class BackupError(RuntimeError):
 
 class SupabaseBackupStorage:
     def __init__(self) -> None:
-        self.base_url = os.environ["SUPABASE_URL"].rstrip("/")
-        self.service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
+        self.base_url = os.environ["SUPABASE_URL"].strip().rstrip("/")
+        self.service_key = os.environ["SUPABASE_SERVICE_ROLE_KEY"].strip()
         self.bucket = os.getenv("SUPABASE_BACKUP_BUCKET", DEFAULT_BUCKET).strip() or DEFAULT_BUCKET
         self.session = requests.Session()
         headers = {"apikey": self.service_key}
@@ -132,7 +132,7 @@ def _run(command: list[str], description: str, env: dict[str, str] | None = None
     if result.returncode:
         details = (result.stderr or "").strip().splitlines()
         detail = details[-1][:500] if details else "command exited unsuccessfully"
-        database_url = os.getenv("SUPABASE_DB_URL", "")
+        database_url = os.getenv("SUPABASE_DB_URL", "").strip()
         if database_url:
             detail = detail.replace(database_url, "[database URL redacted]")
         raise BackupError(f"{description} failed: {detail}")
@@ -165,7 +165,7 @@ def run_backup() -> None:
 
     run_id = os.getenv("GITHUB_RUN_ID", "")
     repository = os.getenv("GITHUB_REPOSITORY", "")
-    server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com").rstrip("/")
+    server_url = os.getenv("GITHUB_SERVER_URL", "https://github.com").strip().rstrip("/")
     run_url = f"{server_url}/{repository}/actions/runs/{run_id}" if repository and run_id else ""
     manifest: dict[str, Any] = {
         "status": "running",
@@ -257,7 +257,7 @@ def run_backup() -> None:
     except Exception as exc:
         safe_error = str(exc)
         for secret_name in ("SUPABASE_DB_URL", "SUPABASE_SERVICE_ROLE_KEY"):
-            secret = os.getenv(secret_name, "")
+            secret = os.getenv(secret_name, "").strip()
             if secret:
                 safe_error = safe_error.replace(secret, "[redacted]")
         manifest.update({

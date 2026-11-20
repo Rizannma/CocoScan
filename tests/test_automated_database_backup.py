@@ -64,12 +64,35 @@ class AutomatedDatabaseBackupTests(unittest.TestCase):
         self.assertEqual(storage.session.headers["apikey"], "sb_secret_test")
         self.assertNotIn("Authorization", storage.session.headers)
 
+    def test_storage_url_and_service_role_key_are_trimmed(self):
+        with patch.dict(os.environ, {
+            "SUPABASE_URL": " \r\nhttps://cocoscan.supabase.co/ \t",
+            "SUPABASE_SERVICE_ROLE_KEY": " \nlegacy-jwt\r ",
+        }):
+            storage = backup_job.SupabaseBackupStorage()
+
+        self.assertEqual(storage.base_url, "https://cocoscan.supabase.co")
+        self.assertEqual(storage.service_key, "legacy-jwt")
+
     def test_legacy_service_role_key_is_sent_as_bearer(self):
         with patch.dict(os.environ, {"SUPABASE_SERVICE_ROLE_KEY": "legacy-jwt"}):
             storage = backup_job.SupabaseBackupStorage()
 
         self.assertEqual(storage.session.headers["apikey"], "legacy-jwt")
         self.assertEqual(storage.session.headers["Authorization"], "Bearer legacy-jwt")
+
+    def test_database_url_is_trimmed_before_dump(self):
+        storage = FakeStorage()
+        db_url = "postgresql://backup:test-password@example.com:5432/cocoscan"
+        with (
+            patch.dict(os.environ, {"SUPABASE_DB_URL": f" \r\n{db_url} \t"}),
+            patch.object(backup_job, "SupabaseBackupStorage", return_value=storage),
+            patch.object(backup_job, "_run", side_effect=self._fake_command) as run,
+        ):
+            backup_job.run_backup()
+
+        dump_command = run.call_args_list[0].args[0]
+        self.assertIn(f"--dbname={db_url}", dump_command)
 
     def _fake_command(self, command, description, env=None):
         if command[0] == "pg_dump":
